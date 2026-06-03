@@ -1,0 +1,4354 @@
+openapi: 3.0.3
+info:
+  title: G Speed Bintaro - Bengkel API
+  description: |
+    API untuk manajemen bengkel **G Speed Bintaro** — spesialis Vespa.
+    
+    ## Fitur Utama
+    - 🔐 Autentikasi (Login JWT Dev / Magic Link Prod)
+    - 👥 Manajemen pengguna (Admin, Kasir, Mekanik)
+    - 👤 Manajemen pelanggan & kendaraan
+    - 📦 Manajemen produk (sparepart & service)
+    - 📋 Manajemen pesanan & pembayaran (Cash & QRIS via Midtrans)
+    - 💰 Manajemen shift kasir
+    - 📊 Manajemen stok & pengeluaran
+    - 🔧 Penugasan mekanik
+    - 📈 Laporan, dashboard & customer insight
+    - 🔔 Notifikasi real-time
+    - 🤖 AI Agent/Chatbot (G-Speed Copilot)
+    
+    ## Autentikasi
+    - **Development**: Login dengan email → JWT Token
+    - **Production**: Magic Link via Supabase Auth → JWT Token
+    
+    ## Role
+    | Role | Deskripsi |
+    |------|-----------|
+    | **ADMIN** | Akses penuh — kelola semua data, lihat laporan & dashboard |
+    | **CASHIER** | Kelola pesanan, pembayaran, shift, pelanggan |
+    | **MECHANIC** | Lihat & kerjakan task, lihat riwayat kerja |
+  version: 1.0.0
+  contact:
+    name: Developer
+    email: h3ykyy@gmail.com
+
+servers:
+  - url: http://localhost:3000/api/v1
+    description: 🔧 Development Server
+  - url: https://bengkel-ucu0.onrender.com
+    description: 🚀 Production Server
+
+tags:
+  - name: Auth
+    description: Autentikasi pengguna (Login & Validasi Email)
+  - name: Users
+    description: Manajemen pengguna (CRUD + bulk deactivate/activate)
+  - name: Customers
+    description: Manajemen pelanggan (CRUD + bulk delete)
+  - name: Vehicles
+    description: Manajemen kendaraan pelanggan
+  - name: Products
+    description: Manajemen produk sparepart & service (CRUD + bulk activate/deactivate)
+  - name: Orders
+    description: Manajemen pesanan (CRUD + bulk close/cancel)
+  - name: Payments
+    description: Manajemen pembayaran — Cash & QRIS via Midtrans
+  - name: Expenses
+    description: Manajemen pengeluaran (CRUD + bulk delete)
+  - name: Shifts
+    description: Manajemen shift kasir (open/close + cash flow)
+  - name: Stock
+    description: Manajemen stok sparepart (in/out/adjust + bulk delete)
+  - name: Tasks
+    description: Penugasan mekanik (assign/start/complete + bulk)
+  - name: Reports
+    description: Laporan & dashboard — sales, profit-loss, inventory, customers, mechanics, vehicles
+  - name: Notifications
+    description: Manajemen notifikasi (CRUD + bulk + mark read)
+  - name: Settings
+    description: Pengaturan aplikasi (key-value)
+  - name: Agent
+    description: 🤖 G-Speed Copilot — AI asisten bengkel
+  - name: Health
+    description: Pemeriksaan kesehatan sistem
+
+components:
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    PageParam:
+      in: query
+      name: page
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+      description: Nomor halaman
+    LimitParam:
+      in: query
+      name: limit
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 10
+      description: Jumlah item per halaman
+    PeriodParam:
+      in: query
+      name: period
+      schema:
+        type: string
+        enum: [daily, weekly, monthly, yearly]
+        default: monthly
+      description: Periode laporan
+    ReferenceDateParam:
+      in: query
+      name: referenceDate
+      schema:
+        type: string
+        format: date
+      description: "Tanggal referensi (default: hari ini)"
+
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+        error:
+          type: object
+          properties:
+            code:
+              type: integer
+            type:
+              type: string
+
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+
+    PaginationMeta:
+      type: object
+      properties:
+        total:
+          type: integer
+        page:
+          type: integer
+        limit:
+          type: integer
+        totalPages:
+          type: integer
+
+    LoginRequest:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+          example: admin@bengkel.com
+
+    LoginResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          type: object
+          properties:
+            user:
+              $ref: "#/components/schemas/UserResponse"
+            tokens:
+              type: object
+              properties:
+                accessToken:
+                  type: string
+                refreshToken:
+                  type: string
+
+    EmailValidationRequest:
+      type: object
+      required:
+        - email
+      properties:
+        email:
+          type: string
+          format: email
+
+    EmailValidationResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        message:
+          type: string
+        data:
+          type: object
+          properties:
+            id:
+              type: string
+            email:
+              type: string
+            isActive:
+              type: boolean
+            isAuthenticated:
+              type: boolean
+
+    UserSimple:
+      type: object
+      properties:
+        id:
+          type: string
+        fullName:
+          type: string
+
+    UserResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+          format: email
+        fullName:
+          type: string
+        phone:
+          type: string
+          nullable: true
+        role:
+          type: string
+          enum: [ADMIN, CASHIER, MECHANIC]
+        isActive:
+          type: boolean
+        isAuthenticated:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    CustomerSimple:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        phone:
+          type: string
+          nullable: true
+
+    CustomerResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        phone:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        vehicles:
+          type: array
+          items:
+            $ref: "#/components/schemas/VehicleSimple"
+        orders:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderSimple"
+        _count:
+          type: object
+          properties:
+            vehicles:
+              type: integer
+            orders:
+              type: integer
+
+    VehicleSimple:
+      type: object
+      properties:
+        id:
+          type: string
+        plateNumber:
+          type: string
+        brand:
+          type: string
+          nullable: true
+        model:
+          type: string
+          nullable: true
+
+    VehicleResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        plateNumber:
+          type: string
+        brand:
+          type: string
+          nullable: true
+        model:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        customer:
+          $ref: "#/components/schemas/CustomerSimple"
+        orders:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderSimple"
+        _count:
+          type: object
+          properties:
+            orders:
+              type: integer
+
+    ProductSimple:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        sku:
+          type: string
+        type:
+          type: string
+          enum: [SPAREPART, SERVICE]
+
+    ProductResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        sku:
+          type: string
+        type:
+          type: string
+          enum: [SPAREPART, SERVICE]
+        description:
+          type: string
+          nullable: true
+        price:
+          type: integer
+        cost:
+          type: integer
+        stock:
+          type: integer
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        image:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+            fileName:
+              type: string
+            path:
+              type: string
+
+    OrderSimple:
+      type: object
+      properties:
+        id:
+          type: string
+        orderNumber:
+          type: string
+        status:
+          type: string
+        total:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    OrderItemResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        quantity:
+          type: integer
+        unitPrice:
+          type: integer
+        subtotal:
+          type: integer
+        productNameSnapshot:
+          type: string
+        product:
+          $ref: "#/components/schemas/ProductSimple"
+          nullable: true
+        assignments:
+          type: array
+          items:
+            $ref: "#/components/schemas/AssignmentSimple"
+
+    AssignmentSimple:
+      type: object
+      properties:
+        id:
+          type: string
+        mechanicId:
+          type: string
+          nullable: true
+        startAt:
+          type: string
+          format: date-time
+          nullable: true
+        endAt:
+          type: string
+          format: date-time
+          nullable: true
+        mechanic:
+          $ref: "#/components/schemas/UserSimple"
+          nullable: true
+
+    OrderResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        orderNumber:
+          type: string
+        status:
+          type: string
+          enum: [DRAFT, QUEUED, IN_PROGRESS, COMPLETED, CLOSED, CANCELLED]
+        subtotal:
+          type: integer
+        tax:
+          type: integer
+        total:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        cashier:
+          $ref: "#/components/schemas/UserSimple"
+        customer:
+          $ref: "#/components/schemas/CustomerSimple"
+          nullable: true
+        vehicle:
+          $ref: "#/components/schemas/VehicleSimple"
+          nullable: true
+        payment:
+          $ref: "#/components/schemas/PaymentSimple"
+          nullable: true
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderItemResponse"
+
+    PaymentSimple:
+      type: object
+      properties:
+        id:
+          type: string
+        method:
+          type: string
+          enum: [CASH, QRIS]
+        amountPaid:
+          type: integer
+        status:
+          type: string
+          enum: [PENDING, PAID, REFUNDED]
+        paidAt:
+          type: string
+          format: date-time
+          nullable: true
+
+    PaymentResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        method:
+          type: string
+          enum: [CASH, QRIS]
+        amountPaid:
+          type: integer
+        change:
+          type: integer
+        status:
+          type: string
+          enum: [PENDING, PAID, REFUNDED]
+        paidAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        order:
+          $ref: "#/components/schemas/OrderSimple"
+
+    ExpenseSimple:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        amount:
+          type: integer
+        category:
+          type: string
+        date:
+          type: string
+          format: date
+
+    ExpenseResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+          nullable: true
+        amount:
+          type: integer
+        category:
+          type: string
+          enum: [SUPPLIES, MAINTENANCE, UTILITIES, RENT, OTHER]
+        date:
+          type: string
+          format: date
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        shift:
+          $ref: "#/components/schemas/ShiftSimple"
+          nullable: true
+        recordedBy:
+          $ref: "#/components/schemas/UserSimple"
+        receipt:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+            fileName:
+              type: string
+            path:
+              type: string
+
+    ShiftSimple:
+      type: object
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+          enum: [OPEN, CLOSED]
+        openedAt:
+          type: string
+          format: date-time
+        closedAt:
+          type: string
+          format: date-time
+          nullable: true
+        cashier:
+          $ref: "#/components/schemas/UserSimple"
+          nullable: true
+
+    ShiftResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+          enum: [OPEN, CLOSED]
+        startingCash:
+          type: integer
+        endingCash:
+          type: integer
+          nullable: true
+        expectedCash:
+          type: integer
+          nullable: true
+        cashSales:
+          type: integer
+        cashIn:
+          type: integer
+        cashOut:
+          type: integer
+        discrepancy:
+          type: integer
+        openedAt:
+          type: string
+          format: date-time
+        closedAt:
+          type: string
+          format: date-time
+          nullable: true
+        cashier:
+          $ref: "#/components/schemas/UserSimple"
+        _count:
+          type: object
+          properties:
+            orders:
+              type: integer
+
+    StockMovementResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [IN, OUT, ADJUSTMENT]
+        sourceType:
+          type: string
+          enum: [MANUAL, PURCHASE, SALE, RETURN, ADJUSTMENT]
+        quantity:
+          type: integer
+        note:
+          type: string
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        product:
+          type: object
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            sku:
+              type: string
+            stock:
+              type: integer
+        recordedBy:
+          $ref: "#/components/schemas/UserSimple"
+        orderItem:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+            order:
+                $ref: "#/components/schemas/OrderSimple"
+
+    TaskDetailResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        startAt:
+          type: string
+          format: date-time
+          nullable: true
+        endAt:
+          type: string
+          format: date-time
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+        mechanic:
+          type: object
+          nullable: true
+          properties:
+            id:
+              type: string
+            fullName:
+              type: string
+        orderItem:
+          type: object
+          properties:
+            id:
+              type: string
+            productNameSnapshot:
+              type: string
+            order:
+              type: object
+              properties:
+                id:
+                  type: string
+                orderNumber:
+                  type: string
+                status:
+                  type: string
+                vehicle:
+                  $ref: "#/components/schemas/VehicleSimple"
+                  nullable: true
+
+    DashboardResponse:
+      type: object
+      properties:
+        today:
+          type: object
+          properties:
+            date:
+              type: string
+            orders:
+              type: integer
+            revenue:
+              type: integer
+            averageOrderValue:
+              type: number
+        thisMonth:
+          type: object
+          properties:
+            orders:
+              type: integer
+            revenue:
+              type: integer
+            newCustomers:
+              type: integer
+            activeCustomers:
+              type: integer
+        pending:
+          type: object
+          properties:
+            orders:
+              type: integer
+        activeShift:
+          type: object
+          nullable: true
+        inventory:
+          type: object
+          properties:
+            totalProducts:
+              type: integer
+            activeProducts:
+              type: integer
+            lowStockCount:
+              type: integer
+            outOfStockCount:
+              type: integer
+            totalStockValue:
+              type: integer
+            lowStockProducts:
+              type: array
+              items:
+                type: object
+        customers:
+          type: object
+          properties:
+            totalCustomers:
+              type: integer
+            newThisMonth:
+              type: integer
+            activeThisMonth:
+              type: integer
+            totalVehicles:
+              type: integer
+
+    SalesReportResponse:
+      type: object
+      properties:
+        period:
+          type: string
+        dateRange:
+          type: object
+          properties:
+            startDate:
+              type: string
+              format: date-time
+            endDate:
+              type: string
+              format: date-time
+        labels:
+          type: array
+          items:
+            type: string
+        summary:
+          type: object
+          properties:
+            totalOrders:
+              type: integer
+            totalSales:
+              type: integer
+            totalSubtotal:
+              type: integer
+            totalTax:
+              type: integer
+            averageOrderValue:
+              type: number
+        breakdown:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+              orderCount:
+                type: integer
+              totalSales:
+                type: integer
+              totalSubtotal:
+                type: integer
+              totalTax:
+                type: integer
+              averageOrderValue:
+                type: number
+
+    ProfitLossReportResponse:
+      type: object
+      properties:
+        period:
+          type: string
+        dateRange:
+          type: object
+        labels:
+          type: array
+          items:
+            type: string
+        summary:
+          type: object
+          properties:
+            grossRevenue:
+              type: integer
+            totalCogs:
+              type: integer
+            grossProfit:
+              type: integer
+            grossMargin:
+              type: number
+            totalOperatingExpenses:
+              type: integer
+            netProfit:
+              type: integer
+            netMargin:
+              type: number
+        breakdown:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+              grossRevenue:
+                type: integer
+              totalCogs:
+                type: integer
+              grossProfit:
+                type: integer
+              totalOperatingExpenses:
+                type: integer
+              netProfit:
+                type: integer
+
+    InventoryReportResponse:
+      type: object
+      properties:
+        summary:
+          type: object
+          properties:
+            totalItems:
+              type: integer
+            totalAssetValue:
+              type: integer
+            totalRetailValue:
+              type: integer
+            potentialProfit:
+              type: integer
+            profitMargin:
+              type: number
+            outOfStock:
+              type: integer
+            lowStock:
+              type: integer
+            healthy:
+              type: integer
+        items:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              sku:
+                type: string
+              name:
+                type: string
+              stock:
+                type: integer
+              cost:
+                type: integer
+              price:
+                type: integer
+              image:
+                type: string
+                nullable: true
+              assetValue:
+                type: integer
+              retailValue:
+                type: integer
+              potentialProfit:
+                type: integer
+              stockStatus:
+                type: string
+                enum: [OUT_OF_STOCK, LOW_STOCK, HEALTHY]
+        metadata:
+          $ref: "#/components/schemas/PaginationMeta"
+
+    ExpenseReportResponse:
+      type: object
+      properties:
+        period:
+          type: string
+        dateRange:
+          type: object
+        labels:
+          type: array
+          items:
+            type: string
+        filters:
+          type: object
+        summary:
+          type: object
+          properties:
+            totalAmount:
+              type: integer
+            count:
+              type: integer
+            byCategory:
+              type: array
+              items:
+                type: object
+                properties:
+                  category:
+                    type: string
+                  total:
+                    type: integer
+                  count:
+                    type: integer
+        breakdown:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+              totalAmount:
+                type: integer
+              count:
+                type: integer
+
+    PaymentReportResponse:
+      type: object
+      properties:
+        period:
+          type: string
+        dateRange:
+          type: object
+        labels:
+          type: array
+          items:
+            type: string
+        filters:
+          type: object
+        summary:
+          type: object
+          properties:
+            totalAmount:
+              type: integer
+            totalCount:
+              type: integer
+            byMethod:
+              type: array
+              items:
+                type: object
+                properties:
+                  method:
+                    type: string
+                  amount:
+                    type: integer
+                  count:
+                    type: integer
+            byStatus:
+              type: array
+              items:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  amount:
+                    type: integer
+                  count:
+                    type: integer
+        breakdown:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+              totalAmount:
+                type: integer
+              count:
+                type: integer
+
+    TopProductsReportResponse:
+      type: object
+      properties:
+        period:
+          type: string
+        dateRange:
+          type: object
+        summary:
+          type: object
+          properties:
+            totalQuantity:
+              type: integer
+            totalRevenue:
+              type: integer
+            totalProfit:
+              type: integer
+            productCount:
+              type: integer
+        products:
+          type: array
+          items:
+            type: object
+            properties:
+              productId:
+                type: string
+              productName:
+                type: string
+              sku:
+                type: string
+              type:
+                type: string
+              image:
+                type: string
+                nullable: true
+              quantitySold:
+                type: integer
+              totalRevenue:
+                type: integer
+              totalCost:
+                type: integer
+              profit:
+                type: integer
+              profitMargin:
+                type: number
+        metadata:
+          $ref: "#/components/schemas/PaginationMeta"
+
+    MechanicPerformanceReportResponse:
+      type: object
+      properties:
+        period:
+          type: string
+        dateRange:
+          type: object
+        summary:
+          type: object
+          properties:
+            totalMechanics:
+              type: integer
+            totalTasks:
+              type: integer
+            totalCompleted:
+              type: integer
+            totalEarnings:
+              type: integer
+            averageCompletionRate:
+              type: number
+        mechanics:
+          type: array
+          items:
+            type: object
+            properties:
+              mechanicId:
+                type: string
+              mechanicName:
+                type: string
+              email:
+                type: string
+              totalTasks:
+                type: integer
+              completedTasks:
+                type: integer
+              pendingTasks:
+                type: integer
+              totalEarnings:
+                type: integer
+              averagePerTask:
+                type: integer
+              completionRate:
+                type: number
+        metadata:
+          $ref: "#/components/schemas/PaginationMeta"
+
+    MechanicTaskStatsResponse:
+      type: object
+      properties:
+        totalTasks:
+          type: integer
+        completedTasks:
+          type: integer
+        pendingTasks:
+          type: integer
+
+    MechanicEarningsResponse:
+      type: object
+      properties:
+        mechanicId:
+          type: string
+        period:
+          type: string
+        dateRange:
+          type: object
+        totalEarnings:
+          type: integer
+        taskCount:
+          type: integer
+        averagePerTask:
+          type: integer
+
+    ShiftReportResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+        startingCash:
+          type: integer
+        endingCash:
+          type: integer
+          nullable: true
+        expectedCash:
+          type: integer
+          nullable: true
+        cashSales:
+          type: integer
+        cashIn:
+          type: integer
+        cashOut:
+          type: integer
+        discrepancy:
+          type: integer
+        totalExpenses:
+          type: integer
+        netSales:
+          type: integer
+        openedAt:
+          type: string
+          format: date-time
+        closedAt:
+          type: string
+          format: date-time
+          nullable: true
+        orderCount:
+          type: integer
+        paymentBreakdown:
+          type: array
+          items:
+            type: object
+        cashier:
+          type: object
+
+    StockMovementReportResponse:
+      type: object
+      properties:
+        period:
+          type: string
+        dateRange:
+          type: object
+        productId:
+          type: string
+        movement:
+          type: object
+          properties:
+            summary:
+              type: object
+              properties:
+                IN:
+                  type: integer
+                OUT:
+                  type: integer
+                ADJUSTMENT:
+                  type: integer
+                netChange:
+                  type: integer
+            movements:
+              type: array
+              items:
+                type: object
+            metadata:
+              $ref: "#/components/schemas/PaginationMeta"
+        consistency:
+          type: object
+          properties:
+            current:
+              type: integer
+            calculated:
+              type: integer
+            difference:
+              type: integer
+            isConsistent:
+              type: boolean
+
+    TaskStatsResponse:
+      type: object
+      properties:
+        total:
+          type: integer
+        assigned:
+          type: integer
+        unassigned:
+          type: integer
+        tasks:
+          type: array
+          items:
+            type: object
+
+    CustomerReportResponse:
+      type: object
+      properties:
+        period:
+          type: string
+        dateRange:
+          type: object
+        labels:
+          type: array
+          items:
+            type: string
+        summary:
+          type: object
+          properties:
+            totalCustomers:
+              type: integer
+            newCustomers:
+              type: integer
+            activeCustomers:
+              type: integer
+            totalVehicles:
+              type: integer
+        acquisition:
+          type: array
+          items:
+            type: object
+            properties:
+              date:
+                type: string
+              newCustomers:
+                type: integer
+              totalCustomers:
+                type: integer
+        visitFrequency:
+          type: array
+          items:
+            type: object
+            properties:
+              visitCount:
+                type: integer
+              customerCount:
+                type: integer
+              percentage:
+                type: number
+        retention:
+          type: array
+          items:
+            type: object
+            properties:
+              month:
+                type: string
+              newCustomers:
+                type: integer
+              returningCustomers:
+                type: integer
+              totalActiveCustomers:
+                type: integer
+              retentionRate:
+                type: number
+        topCustomers:
+          type: array
+          items:
+            $ref: "#/components/schemas/TopCustomerItem"
+        topCustomersMetadata:
+          $ref: "#/components/schemas/PaginationMeta"
+
+    TopCustomerItem:
+      type: object
+      properties:
+        customerId:
+          type: string
+        customerName:
+          type: string
+        phone:
+          type: string
+          nullable: true
+        totalOrders:
+          type: integer
+        totalSpent:
+          type: integer
+        averageOrderValue:
+          type: integer
+        lastOrderDate:
+          type: string
+          format: date-time
+          nullable: true
+        vehicles:
+          type: array
+          items:
+            type: string
+
+    TopCustomersResponse:
+      type: object
+      properties:
+        customers:
+          type: array
+          items:
+            $ref: "#/components/schemas/TopCustomerItem"
+        metadata:
+          $ref: "#/components/schemas/PaginationMeta"
+
+    CustomerTransactionHistoryResponse:
+      type: object
+      properties:
+        customer:
+          type: object
+          properties:
+            id:
+              type: string
+            name:
+              type: string
+            phone:
+              type: string
+              nullable: true
+            registeredAt:
+              type: string
+              format: date-time
+            vehicles:
+              type: array
+              items:
+                type: object
+        orders:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              orderNumber:
+                type: string
+              status:
+                type: string
+              total:
+                type: integer
+              createdAt:
+                type: string
+                format: date-time
+              vehiclePlate:
+                type: string
+                nullable: true
+              paymentMethod:
+                type: string
+                nullable: true
+              amountPaid:
+                type: integer
+              items:
+                type: array
+                items:
+                  type: object
+        summary:
+          type: object
+          properties:
+            totalOrders:
+              type: integer
+            totalSpent:
+              type: integer
+            averageOrderValue:
+              type: integer
+
+    InactiveCustomersResponse:
+      type: object
+      properties:
+        daysThreshold:
+          type: integer
+        customers:
+          type: array
+          items:
+            type: object
+            properties:
+              customerId:
+                type: string
+              customerName:
+                type: string
+              phone:
+                type: string
+                nullable: true
+              lastOrderDate:
+                type: string
+                format: date-time
+                nullable: true
+              daysSinceLastOrder:
+                type: integer
+                nullable: true
+              totalOrders:
+                type: integer
+              totalSpent:
+                type: integer
+        metadata:
+          $ref: "#/components/schemas/PaginationMeta"
+
+    CLVResponse:
+      type: object
+      properties:
+        customers:
+          type: array
+          items:
+            type: object
+            properties:
+              customerId:
+                type: string
+              customerName:
+                type: string
+              phone:
+                type: string
+                nullable: true
+              totalOrders:
+                type: integer
+              totalSpent:
+                type: integer
+              averageOrderValue:
+                type: integer
+              firstOrderDate:
+                type: string
+                format: date-time
+                nullable: true
+              lastOrderDate:
+                type: string
+                format: date-time
+                nullable: true
+              customerLifespanDays:
+                type: integer
+                nullable: true
+              clv:
+                type: integer
+        metadata:
+          $ref: "#/components/schemas/PaginationMeta"
+
+    VehicleReportResponse:
+      type: object
+      properties:
+        totalVehicles:
+          type: integer
+        byBrand:
+          type: array
+          items:
+            type: object
+            properties:
+              brand:
+                type: string
+              count:
+                type: integer
+        recentVehicles:
+          type: array
+          items:
+            type: object
+            properties:
+              id:
+                type: string
+              plateNumber:
+                type: string
+              brand:
+                type: string
+                nullable: true
+              model:
+                type: string
+                nullable: true
+              customerName:
+                type: string
+              orderCount:
+                type: integer
+
+    NotificationResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        message:
+          type: string
+        type:
+          type: string
+          enum: [INFO, WARNING, SUCCESS, ERROR]
+        isRead:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+
+    SettingResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        key:
+          type: string
+        value:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+
+    AgentChatRequest:
+      type: object
+      required: [message]
+      properties:
+        message:
+          type: string
+          example: "Berapa total penjualan hari ini?"
+
+    AgentChatResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            reply:
+              type: string
+            toolCalls:
+              type: array
+              items:
+                type: object
+            cached:
+              type: boolean
+
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: "ok"
+        timestamp:
+          type: string
+          format: date-time
+        uptime:
+          type: number
+        services:
+          type: object
+          properties:
+            database:
+              type: string
+            redis:
+              type: string
+            supabase:
+              type: string
+
+security:
+  - BearerAuth: []
+
+paths:
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login dengan email
+      description: |
+        Login untuk mendapatkan JWT access token dan refresh token.
+        
+        **Development**: Langsung generate JWT token
+        **Production**: Verifikasi via Supabase Magic Link
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+      responses:
+        "200":
+          description: Login berhasil
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginResponse"
+        "400":
+          description: Bad Request
+        "404":
+          description: User tidak ditemukan
+        "403":
+          description: Akun tidak aktif
+
+  /auth/validate/email:
+    post:
+      tags: [Auth]
+      summary: Validasi email user
+      description: Memvalidasi apakah email terdaftar, aktif, dan terautentikasi
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EmailValidationRequest"
+      responses:
+        "200":
+          description: Email valid
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EmailValidationResponse"
+        "400":
+          description: Bad Request
+        "404":
+          description: Email tidak terdaftar
+        "403":
+          description: Akun tidak aktif atau belum terautentikasi
+
+  /health:
+    get:
+      tags: [Health]
+      summary: Periksa kesehatan sistem
+      security: []
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /users:
+    post:
+      tags: [Users]
+      summary: Buat user baru
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, fullName]
+              properties:
+                email:
+                  type: string
+                  format: email
+                fullName:
+                  type: string
+                phone:
+                  type: string
+                role:
+                  type: string
+                  enum: [CASHIER, MECHANIC]
+                  default: CASHIER
+      responses:
+        "201":
+          description: Created
+        "400":
+          description: Bad Request
+        "409":
+          description: Conflict
+    get:
+      tags: [Users]
+      summary: Daftar user
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: role
+          schema:
+            type: string
+            enum: [ADMIN, CASHIER, MECHANIC]
+        - in: query
+          name: isActive
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: OK
+
+  /users/me:
+    get:
+      tags: [Users]
+      summary: Profil pengguna yang sedang login
+      responses:
+        "200":
+          description: OK
+
+  /users/employees:
+    get:
+      tags: [Users]
+      summary: Daftar karyawan (kasir & mekanik)
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: role
+          schema:
+            type: string
+            enum: [CASHIER, MECHANIC]
+        - in: query
+          name: isActive
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: OK
+
+  /users/admins:
+    get:
+      tags: [Users]
+      summary: Daftar admin
+      responses:
+        "200":
+          description: OK
+
+  /users/check/email:
+    get:
+      tags: [Users]
+      summary: Cek ketersediaan email
+      parameters:
+        - in: query
+          name: email
+          required: true
+          schema:
+            type: string
+            format: email
+        - in: query
+          name: excludeId
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+
+  /users/check/phone:
+    get:
+      tags: [Users]
+      summary: Cek ketersediaan nomor telepon
+      parameters:
+        - in: query
+          name: phone
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: excludeId
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+
+  /users/role/{role}:
+    get:
+      tags: [Users]
+      summary: Daftar user berdasarkan role
+      parameters:
+        - in: path
+          name: role
+          required: true
+          schema:
+            type: string
+            enum: [ADMIN, CASHIER, MECHANIC]
+      responses:
+        "200":
+          description: OK
+
+  /users/email/{email}:
+    get:
+      tags: [Users]
+      summary: Cari user berdasarkan email
+      parameters:
+        - in: path
+          name: email
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+
+  /users/phone/{phone}:
+    get:
+      tags: [Users]
+      summary: Cari user berdasarkan nomor telepon
+      parameters:
+        - in: path
+          name: phone
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+
+  /users/{id}:
+    get:
+      tags: [Users]
+      summary: Detail user
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+    put:
+      tags: [Users]
+      summary: Update user
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                fullName:
+                  type: string
+                phone:
+                  type: string
+                role:
+                  type: string
+                  enum: [ADMIN, CASHIER, MECHANIC]
+                isActive:
+                  type: boolean
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+    delete:
+      tags: [Users]
+      summary: Hapus user
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+
+  /users/{id}/resend-magic-link:
+    post:
+      tags: [Users]
+      summary: Kirim ulang magic link
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+
+  /users/deactivate:
+    patch:
+      tags: [Users]
+      summary: Nonaktifkan banyak user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties:
+                ids:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: OK
+
+  /users/activate:
+    patch:
+      tags: [Users]
+      summary: Aktifkan banyak user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties:
+                ids:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: OK
+
+  /customers:
+    post:
+      tags: [Customers]
+      summary: Buat pelanggan baru
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name:
+                  type: string
+                phone:
+                  type: string
+      responses:
+        "201":
+          description: Created
+        "409":
+          description: Conflict
+    get:
+      tags: [Customers]
+      summary: Daftar pelanggan
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - in: query
+          name: search
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+
+  /customers/upsert:
+    put:
+      tags: [Customers]
+      summary: Buat atau update pelanggan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, phone]
+              properties:
+                name:
+                  type: string
+                phone:
+                  type: string
+      responses:
+        "200":
+          description: OK
+
+  /customers/phone/check:
+    get:
+      tags: [Customers]
+      summary: Cek ketersediaan nomor telepon
+      parameters:
+        - in: query
+          name: phone
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: excludeId
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+
+  /customers/phone/{phone}:
+    get:
+      tags: [Customers]
+      summary: Cari pelanggan berdasarkan nomor telepon
+      parameters:
+        - in: path
+          name: phone
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+
+  /customers/{id}:
+    get:
+      tags: [Customers]
+      summary: Detail pelanggan
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+    put:
+      tags: [Customers]
+      summary: Update pelanggan
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                name:
+                  type: string
+                phone:
+                  type: string
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+    delete:
+      tags: [Customers]
+      summary: Hapus pelanggan
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+
+  /vehicles:
+    post:
+      tags: [Vehicles]
+      summary: Tambah kendaraan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [plateNumber, customerId]
+              properties:
+                plateNumber:
+                  type: string
+                customerId:
+                  type: string
+                brand:
+                  type: string
+                model:
+                  type: string
+      responses:
+        "201":
+          description: Created
+        "409":
+          description: Conflict
+    get:
+      tags: [Vehicles]
+      summary: Daftar kendaraan
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: customerId
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+
+  /vehicles/check/plate:
+    get:
+      tags: [Vehicles]
+      summary: Cek ketersediaan plat nomor
+      parameters:
+        - in: query
+          name: plateNumber
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: excludeId
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+
+  /vehicles/search/plate:
+    get:
+      tags: [Vehicles]
+      summary: Cari kendaraan berdasarkan plat nomor
+      parameters:
+        - in: query
+          name: plateNumber
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+
+  /vehicles/plate/{plateNumber}:
+    get:
+      tags: [Vehicles]
+      summary: Detail kendaraan berdasarkan plat nomor
+      parameters:
+        - in: path
+          name: plateNumber
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+
+  /vehicles/customer/{customerId}:
+    get:
+      tags: [Vehicles]
+      summary: Daftar kendaraan milik pelanggan
+      parameters:
+        - in: path
+          name: customerId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+
+  /vehicles/{id}:
+    get:
+      tags: [Vehicles]
+      summary: Detail kendaraan
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+    put:
+      tags: [Vehicles]
+      summary: Update kendaraan
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              minProperties: 1
+              properties:
+                plateNumber:
+                  type: string
+                brand:
+                  type: string
+                model:
+                  type: string
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+    delete:
+      tags: [Vehicles]
+      summary: Hapus kendaraan
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+
+  /products:
+    post:
+      tags: [Products]
+      summary: Buat produk baru
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [name, price]
+              properties:
+                name:
+                  type: string
+                type:
+                  type: string
+                  enum: [SPAREPART, SERVICE]
+                  default: SPAREPART
+                description:
+                  type: string
+                price:
+                  type: integer
+                  minimum: 0
+                cost:
+                  type: integer
+                  minimum: 0
+                stock:
+                  type: integer
+                  minimum: 0
+                image:
+                  type: string
+                  format: binary
+      responses:
+        "201":
+          description: Created
+        "400":
+          description: Bad Request
+    get:
+      tags: [Products]
+      summary: Daftar produk
+      security: []
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: type
+          schema:
+            type: string
+            enum: [SPAREPART, SERVICE]
+        - in: query
+          name: isActive
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: OK
+
+  /products/services:
+    get:
+      tags: [Products]
+      summary: Daftar produk service
+      security: []
+      responses:
+        "200":
+          description: OK
+
+  /products/spareparts:
+    get:
+      tags: [Products]
+      summary: Daftar produk sparepart
+      security: []
+      responses:
+        "200":
+          description: OK
+
+  /products/low-stock:
+    get:
+      tags: [Products]
+      summary: Produk dengan stok rendah
+      parameters:
+        - in: query
+          name: threshold
+          schema:
+            type: integer
+            minimum: 1
+            default: 5
+      responses:
+        "200":
+          description: OK
+
+  /products/check/sku:
+    get:
+      tags: [Products]
+      summary: Cek ketersediaan SKU
+      parameters:
+        - in: query
+          name: sku
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: excludeId
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+
+  /products/sku/{sku}:
+    get:
+      tags: [Products]
+      summary: Detail produk berdasarkan SKU
+      security: []
+      parameters:
+        - in: path
+          name: sku
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+
+  /products/{id}:
+    get:
+      tags: [Products]
+      summary: Detail produk
+      security: []
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+    put:
+      tags: [Products]
+      summary: Update produk
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                name:
+                  type: string
+                type:
+                  type: string
+                  enum: [SPAREPART, SERVICE]
+                description:
+                  type: string
+                price:
+                  type: integer
+                cost:
+                  type: integer
+                stock:
+                  type: integer
+                isActive:
+                  type: boolean
+                image:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+
+  /products/{id}/status:
+    patch:
+      tags: [Products]
+      summary: Toggle status aktif/non-aktif produk
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+
+  /products/deactivate:
+    patch:
+      tags: [Products]
+      summary: Nonaktifkan banyak produk
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties:
+                ids:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: OK
+
+  /products/activate:
+    patch:
+      tags: [Products]
+      summary: Aktifkan banyak produk
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties:
+                ids:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: OK
+
+  /orders:
+    post:
+      tags: [Orders]
+      summary: Buat pesanan baru
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                customerId:
+                  type: string
+                vehicleId:
+                  type: string
+                items:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    required: [productId, quantity]
+                    properties:
+                      productId:
+                        type: string
+                      quantity:
+                        type: integer
+                        minimum: 1
+      responses:
+        "201":
+          description: Created
+        "400":
+          description: Bad Request
+    get:
+      tags: [Orders]
+      summary: Daftar pesanan
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [DRAFT, QUEUED, IN_PROGRESS, COMPLETED, CLOSED, CANCELLED]
+        - in: query
+          name: cashierId
+          schema:
+            type: string
+        - in: query
+          name: customerId
+          schema:
+            type: string
+        - in: query
+          name: vehicleId
+          schema:
+            type: string
+        - in: query
+          name: startDate
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: endDate
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: OK
+
+  /orders/calculate:
+    post:
+      tags: [Orders]
+      summary: Hitung estimasi total pesanan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [items]
+              properties:
+                items:
+                  type: array
+                  minItems: 1
+                  items:
+                    type: object
+                    required: [productId, quantity]
+                    properties:
+                      productId:
+                        type: string
+                      quantity:
+                        type: integer
+                        minimum: 1
+      responses:
+        "200":
+          description: OK
+
+  /orders/active:
+    get:
+      tags: [Orders]
+      summary: Daftar pesanan aktif kasir yang login
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - in: query
+          name: search
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+
+  /orders/{identifier}:
+    get:
+      tags: [Orders]
+      summary: Detail pesanan (ID atau nomor pesanan)
+      parameters:
+        - in: path
+          name: identifier
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+
+  /orders/{id}/status:
+    patch:
+      tags: [Orders]
+      summary: Update status pesanan
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status:
+                  type: string
+                  enum: [QUEUED, IN_PROGRESS, COMPLETED, CLOSED, CANCELLED]
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+        "409":
+          description: Conflict
+
+  /orders/{id}/close:
+    patch:
+      tags: [Orders]
+      summary: Tutup pesanan (COMPLETED → CLOSED)
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+        "409":
+          description: Conflict
+
+  /orders/{id}/cancel:
+    post:
+      tags: [Orders]
+      summary: Batalkan pesanan
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+
+  /orders/{id}:
+    delete:
+      tags: [Orders]
+      summary: Soft delete pesanan
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+
+  /orders/{id}/restore:
+    post:
+      tags: [Orders]
+      summary: Restore pesanan
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+
+  /orders/close:
+    patch:
+      tags: [Orders]
+      summary: Tutup banyak pesanan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties:
+                ids:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: OK
+
+  /orders/cancel:
+    post:
+      tags: [Orders]
+      summary: Batalkan banyak pesanan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties:
+                ids:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: OK
+
+  /orders/{orderNumber}/history:
+    get:
+      tags: [Orders]
+      summary: Lacak riwayat pesanan
+      security: []
+      parameters:
+        - in: path
+          name: orderNumber
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+
+  /payments:
+    post:
+      tags: [Payments]
+      summary: Buat pembayaran
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [orderId, method]
+              properties:
+                orderId:
+                  type: string
+                method:
+                  type: string
+                  enum: [CASH, QRIS]
+                amountPaid:
+                  type: integer
+                  minimum: 0
+      responses:
+        "201":
+          description: Created
+        "404":
+          description: Not Found
+        "409":
+          description: Conflict
+    get:
+      tags: [Payments]
+      summary: Daftar pembayaran
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - in: query
+          name: orderId
+          schema:
+            type: string
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [PENDING, PAID, REFUNDED]
+        - in: query
+          name: method
+          schema:
+            type: string
+            enum: [CASH, QRIS]
+        - in: query
+          name: startDate
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: endDate
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: OK
+
+  /payments/webhook:
+    post:
+      tags: [Payments]
+      summary: Webhook Midtrans
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        "200":
+          description: OK
+
+  /payments/order/{orderId}:
+    get:
+      tags: [Payments]
+      summary: Pembayaran berdasarkan order
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+
+  /payments/order/{orderId}/status:
+    get:
+      tags: [Payments]
+      summary: Cek status pembayaran QRIS
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+
+  /payments/{id}:
+    get:
+      tags: [Payments]
+      summary: Detail pembayaran
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+
+  /payments/{id}/refund:
+    post:
+      tags: [Payments]
+      summary: Refund pembayaran
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+        "409":
+          description: Conflict
+
+  /payments/refund:
+    post:
+      tags: [Payments]
+      summary: Refund banyak pembayaran
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties:
+                ids:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: OK
+
+  /expenses:
+    post:
+      tags: [Expenses]
+      summary: Buat pengeluaran baru
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [title, amount]
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                amount:
+                  type: integer
+                  minimum: 1
+                category:
+                  type: string
+                  enum: [SUPPLIES, MAINTENANCE, UTILITIES, RENT, OTHER]
+                  default: OTHER
+                date:
+                  type: string
+                  format: date
+                receipt:
+                  type: string
+                  format: binary
+      responses:
+        "201":
+          description: Created
+        "400":
+          description: Bad Request
+    get:
+      tags: [Expenses]
+      summary: Daftar pengeluaran
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - in: query
+          name: category
+          schema:
+            type: string
+            enum: [SUPPLIES, MAINTENANCE, UTILITIES, RENT, OTHER]
+        - in: query
+          name: shiftId
+          schema:
+            type: string
+        - in: query
+          name: startDate
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: endDate
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: search
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+
+  /expenses/cashier:
+    get:
+      tags: [Expenses]
+      summary: Daftar pengeluaran kasir yang login
+      responses:
+        "200":
+          description: OK
+
+  /expenses/shift/{shiftId}:
+    get:
+      tags: [Expenses]
+      summary: Daftar pengeluaran berdasarkan shift
+      parameters:
+        - in: path
+          name: shiftId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+
+  /expenses/{id}:
+    get:
+      tags: [Expenses]
+      summary: Detail pengeluaran
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+    put:
+      tags: [Expenses]
+      summary: Update pengeluaran
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                title:
+                  type: string
+                description:
+                  type: string
+                amount:
+                  type: integer
+                category:
+                  type: string
+                  enum: [SUPPLIES, MAINTENANCE, UTILITIES, RENT, OTHER]
+                date:
+                  type: string
+                  format: date
+                receipt:
+                  type: string
+                  format: binary
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+    delete:
+      tags: [Expenses]
+      summary: Hapus pengeluaran
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+
+  /shifts/open:
+    post:
+      tags: [Shifts]
+      summary: Buka shift baru
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [startingCash]
+              properties:
+                startingCash:
+                  type: integer
+                  minimum: 0
+      responses:
+        "201":
+          description: Created
+        "409":
+          description: Conflict
+
+  /shifts:
+    get:
+      tags: [Shifts]
+      summary: Daftar semua shift
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [OPEN, CLOSED]
+        - in: query
+          name: cashierId
+          schema:
+            type: string
+        - in: query
+          name: startDate
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: endDate
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: OK
+
+  /shifts/active:
+    get:
+      tags: [Shifts]
+      summary: Shift aktif kasir yang login
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+
+  /shifts/active/check:
+    get:
+      tags: [Shifts]
+      summary: Cek apakah memiliki shift aktif
+      responses:
+        "200":
+          description: OK
+
+  /shifts/cashiers:
+    get:
+      tags: [Shifts]
+      summary: Daftar shift kasir yang login
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: OK
+
+  /shifts/starting-cash-suggestion:
+    get:
+      tags: [Shifts]
+      summary: Saran starting cash
+      responses:
+        "200":
+          description: OK
+
+  /shifts/{id}:
+    get:
+      tags: [Shifts]
+      summary: Detail shift
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+
+  /shifts/{id}/expected-cash:
+    get:
+      tags: [Shifts]
+      summary: Hitung expected cash
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+
+  /shifts/{id}/close:
+    post:
+      tags: [Shifts]
+      summary: Tutup shift
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [endingCash]
+              properties:
+                endingCash:
+                  type: integer
+                  minimum: 0
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+        "409":
+          description: Conflict
+
+  /shifts/{id}/cash-in:
+    post:
+      tags: [Shifts]
+      summary: Catat kas masuk
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount]
+              properties:
+                amount:
+                  type: integer
+                  minimum: 1
+                note:
+                  type: string
+      responses:
+        "200":
+          description: OK
+
+  /shifts/{id}/cash-out:
+    post:
+      tags: [Shifts]
+      summary: Catat kas keluar
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [amount]
+              properties:
+                amount:
+                  type: integer
+                  minimum: 1
+                note:
+                  type: string
+      responses:
+        "200":
+          description: OK
+
+  /stock/in:
+    post:
+      tags: [Stock]
+      summary: Catat stok masuk
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [productId, quantity]
+              properties:
+                productId:
+                  type: string
+                quantity:
+                  type: integer
+                  minimum: 1
+                note:
+                  type: string
+      responses:
+        "201":
+          description: Created
+
+  /stock/out:
+    post:
+      tags: [Stock]
+      summary: Catat stok keluar
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [productId, quantity]
+              properties:
+                productId:
+                  type: string
+                quantity:
+                  type: integer
+                  minimum: 1
+                note:
+                  type: string
+      responses:
+        "201":
+          description: Created
+
+  /stock/sale:
+    post:
+      tags: [Stock]
+      summary: Catat stok keluar karena penjualan
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [productId, quantity, orderItemId]
+              properties:
+                productId:
+                  type: string
+                quantity:
+                  type: integer
+                  minimum: 1
+                orderItemId:
+                  type: string
+      responses:
+        "201":
+          description: Created
+
+  /stock/return:
+    post:
+      tags: [Stock]
+      summary: Catat stok masuk karena retur
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [productId, quantity]
+              properties:
+                productId:
+                  type: string
+                quantity:
+                  type: integer
+                  minimum: 1
+                note:
+                  type: string
+      responses:
+        "201":
+          description: Created
+
+  /stock/adjust:
+    post:
+      tags: [Stock]
+      summary: Catat penyesuaian stok
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [productId, quantity, note]
+              properties:
+                productId:
+                  type: string
+                quantity:
+                  type: integer
+                note:
+                  type: string
+      responses:
+        "201":
+          description: Created
+
+  /stock/movements:
+    get:
+      tags: [Stock]
+      summary: Daftar pergerakan stok
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - in: query
+          name: productId
+          schema:
+            type: string
+        - in: query
+          name: type
+          schema:
+            type: string
+            enum: [IN, OUT, ADJUSTMENT]
+        - in: query
+          name: startDate
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: endDate
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: OK
+
+  /stock/movements/{id}:
+    get:
+      tags: [Stock]
+      summary: Detail pergerakan stok
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+    delete:
+      tags: [Stock]
+      summary: Hapus pergerakan stok
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+
+  /stock/products/{productId}/movements:
+    get:
+      tags: [Stock]
+      summary: Pergerakan stok per produk
+      parameters:
+        - in: path
+          name: productId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+
+  /stock/orders/{orderId}/movements:
+    get:
+      tags: [Stock]
+      summary: Pergerakan stok per pesanan
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+
+  /tasks/assign:
+    post:
+      tags: [Tasks]
+      summary: Assign mekanik ke order
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [orderId, mechanicId]
+              properties:
+                orderId:
+                  type: string
+                mechanicId:
+                  type: string
+      responses:
+        "201":
+          description: Created
+        "400":
+          description: Bad Request
+
+  /tasks/bulk-assign:
+    post:
+      tags: [Tasks]
+      summary: Bulk assign mekanik
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [assignments]
+              properties:
+                assignments:
+                  type: array
+                  items:
+                    type: object                    
+                    required: [orderId, mechanicId]
+                    properties:
+                      orderId:
+                        type: string
+                      mechanicId:
+                        type: string
+      responses:
+        "200":
+          description: OK
+
+  /tasks/bulk-start:
+    post:
+      tags: [Tasks]
+      summary: Mulai banyak order sekaligus
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [orderIds]
+              properties:
+                orderIds:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: OK
+
+  /tasks/bulk-complete:
+    post:
+      tags: [Tasks]
+      summary: Selesaikan banyak order sekaligus
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [orderIds]
+              properties:
+                orderIds:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "200":
+          description: OK
+
+  /tasks:
+    get:
+      tags: [Tasks]
+      summary: Daftar semua task
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - in: query
+          name: mechanicId
+          schema:
+            type: string
+        - in: query
+          name: orderId
+          schema:
+            type: string
+        - in: query
+          name: orderStatus
+          schema:
+            type: string
+        - in: query
+          name: search
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+
+  /tasks/me:
+    get:
+      tags: [Tasks]
+      summary: Task saya - aktif
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: OK
+
+  /tasks/me/history:
+    get:
+      tags: [Tasks]
+      summary: Riwayat task saya
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - in: query
+          name: search
+          schema:
+            type: string
+        - in: query
+          name: startDate
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: endDate
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: OK
+
+  /tasks/unassigned:
+    get:
+      tags: [Tasks]
+      summary: Task service yang belum ditugaskan
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: OK
+
+  /tasks/mechanics/available:
+    get:
+      tags: [Tasks]
+      summary: Daftar mekanik tersedia
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - in: query
+          name: search
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+
+  /tasks/mechanic/{mechanicId}:
+    get:
+      tags: [Tasks]
+      summary: Task berdasarkan mekanik
+      parameters:
+        - in: path
+          name: mechanicId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+
+  /tasks/order/{orderId}:
+    get:
+      tags: [Tasks]
+      summary: Semua task dalam satu order
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+
+  /tasks/order/{orderId}/unassign:
+    post:
+      tags: [Tasks]
+      summary: Unassign mekanik dari order
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+
+  /tasks/order/{orderId}/start:
+    post:
+      tags: [Tasks]
+      summary: Mulai pengerjaan order
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "409":
+          description: Conflict
+
+  /tasks/order/{orderId}/complete:
+    post:
+      tags: [Tasks]
+      summary: Selesaikan pengerjaan order
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "409":
+          description: Conflict
+
+  /tasks/order-item/{orderItemId}/check:
+    get:
+      tags: [Tasks]
+      summary: Cek apakah order item sudah ada mekanik
+      parameters:
+        - in: path
+          name: orderItemId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+
+  /tasks/{id}:
+    get:
+      tags: [Tasks]
+      summary: Detail task
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+
+  /reports/dashboard:
+    get:
+      tags: [Reports]
+      summary: Ringkasan dashboard (sesuai role)
+      description: Admin melihat data seluruh bengkel, Kasir & Mekanik melihat data pribadi
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardResponse"
+
+  /reports/sales:
+    get:
+      tags: [Reports]
+      summary: Laporan penjualan
+      description: Laporan penjualan dengan breakdown harian/per jam
+      parameters:
+        - $ref: "#/components/parameters/PeriodParam"
+        - $ref: "#/components/parameters/ReferenceDateParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SalesReportResponse"
+
+  /reports/profit-loss:
+    get:
+      tags: [Reports]
+      summary: Laporan laba rugi
+      parameters:
+        - $ref: "#/components/parameters/PeriodParam"
+        - $ref: "#/components/parameters/ReferenceDateParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProfitLossReportResponse"
+
+  /reports/inventory:
+    get:
+      tags: [Reports]
+      summary: Laporan inventori (dengan pagination)
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InventoryReportResponse"
+
+  /reports/expenses:
+    get:
+      tags: [Reports]
+      summary: Laporan pengeluaran
+      parameters:
+        - $ref: "#/components/parameters/PeriodParam"
+        - $ref: "#/components/parameters/ReferenceDateParam"
+        - in: query
+          name: category
+          schema:
+            type: string
+            enum: [SUPPLIES, MAINTENANCE, UTILITIES, RENT, OTHER]
+        - in: query
+          name: shiftId
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExpenseReportResponse"
+
+  /reports/payments:
+    get:
+      tags: [Reports]
+      summary: Laporan pembayaran
+      parameters:
+        - $ref: "#/components/parameters/PeriodParam"
+        - $ref: "#/components/parameters/ReferenceDateParam"
+        - in: query
+          name: method
+          schema:
+            type: string
+            enum: [CASH, QRIS]
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [PENDING, PAID, REFUNDED]
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PaymentReportResponse"
+
+  /reports/products/top:
+    get:
+      tags: [Reports]
+      summary: Produk terlaris (dengan pagination)
+      parameters:
+        - $ref: "#/components/parameters/PeriodParam"
+        - $ref: "#/components/parameters/ReferenceDateParam"
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TopProductsReportResponse"
+
+  /reports/mechanics/performance:
+    get:
+      tags: [Reports]
+      summary: Performa mekanik (dengan pagination)
+      parameters:
+        - $ref: "#/components/parameters/PeriodParam"
+        - $ref: "#/components/parameters/ReferenceDateParam"
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MechanicPerformanceReportResponse"
+
+  /reports/mechanics/{mechanicId}/tasks:
+    get:
+      tags: [Reports]
+      summary: Statistik tugas mekanik
+      parameters:
+        - in: path
+          name: mechanicId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MechanicTaskStatsResponse"
+
+  /reports/mechanics/{mechanicId}/earnings:
+    get:
+      tags: [Reports]
+      summary: Pendapatan mekanik
+      parameters:
+        - in: path
+          name: mechanicId
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/PeriodParam"
+        - $ref: "#/components/parameters/ReferenceDateParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MechanicEarningsResponse"
+
+  /reports/shift/{shiftId}:
+    get:
+      tags: [Reports]
+      summary: Laporan shift
+      parameters:
+        - in: path
+          name: shiftId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ShiftReportResponse"
+
+  /reports/stock/{productId}/movements:
+    get:
+      tags: [Reports]
+      summary: Laporan pergerakan stok (dengan pagination)
+      parameters:
+        - in: path
+          name: productId
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/PeriodParam"
+        - $ref: "#/components/parameters/ReferenceDateParam"
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StockMovementReportResponse"
+
+  /reports/orders/{orderId}/tasks:
+    get:
+      tags: [Reports]
+      summary: Statistik task per order
+      parameters:
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskStatsResponse"
+
+  /reports/customers:
+    get:
+      tags: [Reports]
+      summary: Ringkasan pelanggan (akuisisi, frekuensi, retensi, top)
+      parameters:
+        - $ref: "#/components/parameters/PeriodParam"
+        - $ref: "#/components/parameters/ReferenceDateParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerReportResponse"
+
+  /reports/customers/top:
+    get:
+      tags: [Reports]
+      summary: Top customers (dengan pagination)
+      parameters:
+        - $ref: "#/components/parameters/PeriodParam"
+        - $ref: "#/components/parameters/ReferenceDateParam"
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TopCustomersResponse"
+
+  /reports/customers/{customerId}/transactions:
+    get:
+      tags: [Reports]
+      summary: Riwayat transaksi pelanggan
+      parameters:
+        - in: path
+          name: customerId
+          required: true
+          schema:
+            type: string
+        - $ref: "#/components/parameters/PeriodParam"
+        - $ref: "#/components/parameters/ReferenceDateParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CustomerTransactionHistoryResponse"
+        "404":
+          description: Pelanggan tidak ditemukan
+
+  /reports/customers/inactive:
+    get:
+      tags: [Reports]
+      summary: Pelanggan tidak aktif (dengan pagination)
+      parameters:
+        - in: query
+          name: daysThreshold
+          schema:
+            type: integer
+            minimum: 1
+            default: 30
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InactiveCustomersResponse"
+
+  /reports/customers/lifetime-value:
+    get:
+      tags: [Reports]
+      summary: Customer Lifetime Value (dengan pagination)
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CLVResponse"
+
+  /reports/vehicles:
+    get:
+      tags: [Reports]
+      summary: Ringkasan kendaraan
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VehicleReportResponse"
+
+  /notifications:
+    post:
+      tags: [Notifications]
+      summary: Buat notifikasi
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, message, userId]
+              properties:
+                title:
+                  type: string
+                message:
+                  type: string
+                type:
+                  type: string
+                  enum: [INFO, WARNING, SUCCESS, ERROR]
+                  default: INFO
+                userId:
+                  type: string
+      responses:
+        "201":
+          description: Created
+    delete:
+      tags: [Notifications]
+      summary: Hapus semua notifikasi
+      responses:
+        "200":
+          description: OK
+
+  /notifications/bulk:
+    post:
+      tags: [Notifications]
+      summary: Buat notifikasi ke banyak user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title, message, userIds]
+              properties:
+                title:
+                  type: string
+                message:
+                  type: string
+                type:
+                  type: string
+                  enum: [INFO, WARNING, SUCCESS, ERROR]
+                  default: INFO
+                userIds:
+                  type: array
+                  items:
+                    type: string
+      responses:
+        "201":
+          description: Created
+
+  /notifications/me:
+    get:
+      tags: [Notifications]
+      summary: Notifikasi saya
+      parameters:
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
+        - in: query
+          name: isRead
+          schema:
+            type: boolean
+        - in: query
+          name: type
+          schema:
+            type: string
+            enum: [INFO, WARNING, SUCCESS, ERROR]
+      responses:
+        "200":
+          description: OK
+
+  /notifications/unread-count:
+    get:
+      tags: [Notifications]
+      summary: Jumlah notifikasi belum dibaca
+      responses:
+        "200":
+          description: OK
+
+  /notifications/total-count:
+    get:
+      tags: [Notifications]
+      summary: Jumlah total notifikasi
+      responses:
+        "200":
+          description: OK
+
+  /notifications/read-all:
+    patch:
+      tags: [Notifications]
+      summary: Tandai semua sudah dibaca
+      responses:
+        "200":
+          description: OK
+
+  /notifications/{id}:
+    get:
+      tags: [Notifications]
+      summary: Detail notifikasi
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+    delete:
+      tags: [Notifications]
+      summary: Hapus notifikasi
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+
+  /notifications/{id}/read:
+    patch:
+      tags: [Notifications]
+      summary: Tandai sudah dibaca
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+
+  /settings:
+    get:
+      tags: [Settings]
+      summary: Daftar semua settings
+      responses:
+        "200":
+          description: OK
+    put:
+      tags: [Settings]
+      summary: Bulk update settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties:
+                type: string
+      responses:
+        "200":
+          description: OK
+
+  /settings/{key}:
+    get:
+      tags: [Settings]
+      summary: Detail setting
+      parameters:
+        - in: path
+          name: key
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: OK
+        "404":
+          description: Not Found
+    put:
+      tags: [Settings]
+      summary: Update setting
+      parameters:
+        - in: path
+          name: key
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [value]
+              properties:
+                value:
+                  type: string
+      responses:
+        "200":
+          description: OK
+
+  /agent/chat:
+    post:
+      tags: [Agent]
+      summary: Chat dengan G-Speed Copilot
+      description: AI asisten bengkel yang bisa menjawab pertanyaan operasional sesuai role user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AgentChatRequest"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AgentChatResponse"
+        "400":
+          description: Bad Request
+        "500":
+          description: Gagal menghubungi AI service

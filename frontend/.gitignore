@@ -1,0 +1,114 @@
+# =========================
+# Dependencies
+# =========================
+node_modules/
+
+# =========================
+# Logs
+# =========================
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# =========================
+# Environment Variables
+# =========================
+.env
+.env.local
+.env.development
+.env.production
+.env.*.local
+!.env.example
+
+# =========================
+# Build Output
+# =========================
+dist/
+build/
+dist-ssr/
+
+# =========================
+# Coverage & Testing
+# =========================
+coverage/
+.nyc_output/
+test-results/
+playwright-report/
+jest-html-reporters-*
+test-report.txt
+lcov-report/
+html-report/
+reports/
+
+# =========================
+# Prisma
+# =========================
+prisma/dev.db*
+*.db
+*.sqlite
+*.sqlite3
+
+# =========================
+# Uploads / Runtime files
+# =========================
+uploads/
+public/uploads/
+
+# =========================
+# k6 Performance Testing
+# =========================
+k6/results/
+*.json
+
+# =========================
+# Cache / Temp
+# =========================
+.cache/
+.tmp/
+temp/
+*.tmp
+
+# =========================
+# OS Files
+# =========================
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# =========================
+# Editor / IDE
+# =========================
+.vscode/
+!.vscode/settings.json
+!.vscode/extensions.json
+
+.idea/
+*.iml
+
+# =========================
+# Vercel
+# =========================
+.vercel/
+
+# =========================
+# Git / Misc
+# =========================
+*.swp
+*.swo
+*~
+
+# =========================
+# Optional Project Notes
+# =========================
+note
+note/
+
+# =========================
+# Archives
+# =========================
+*.tgz
+*.tar.gz
