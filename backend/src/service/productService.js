@@ -35,7 +35,7 @@ class ProductService {
     let exists = true;
 
     while (exists) {
-      sku = await CodeGenerator.productSku(type, lastProduct?.sku);
+      sku = CodeGenerator.productSku(type, lastProduct?.sku);
       exists = await this.productRepo.isSkuExists(sku);
       if (exists) lastProduct.sku = sku;
     }

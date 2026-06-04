@@ -1,9 +1,7 @@
 import OrderRepository from "#repository/orderRepository.js";
 import ProductRepository from "#repository/productRepository.js";
-import StockRepository from "#repository/stockRepository.js";
 import ShiftRepository from "#repository/shiftRepository.js";
 import SettingRepository from "#repository/settingRepository.js";
-import OrderHistoryRepository from "#repository/orderHistoryRepository.js";
 import NotificationRepository from "#repository/notificationRepository.js";
 import UserRepository from "#repository/userRepository.js";
 import CacheManager from "#shared/utils/cache.js";
@@ -11,18 +9,16 @@ import CodeGenerator from "#shared/utils/code.js";
 import Currency from "#shared/utils/currency.js";
 import DateTime from "#shared/utils/datetime.js";
 import ApiError from "#shared/utils/error.js";
-import Storage from "#shared/utils/storage.js";
 import prisma from "#app/database.js";
 import logger from "#app/logger.js";
+import axios from "axios";
 
 class OrderService {
   constructor() {
     this.orderRepo = new OrderRepository();
     this.productRepo = new ProductRepository();
-    this.stockRepo = new StockRepository();
     this.shiftRepo = new ShiftRepository();
     this.settingRepo = new SettingRepository();
-    this.orderHistoryRepo = new OrderHistoryRepository();
     this.notifRepo = new NotificationRepository();
     this.userRepo = new UserRepository();
     this.cache = new CacheManager("order");
@@ -62,21 +58,6 @@ class OrderService {
    */
   async #getTaxRate() {
     return Number(await this.#getSetting("tax_rate", 11));
-  }
-
-  /**
-   * Mendapatkan timestamp berdasarkan status
-   * @param {string} status
-   * @returns {Object}
-   * @private
-   */
-  #getStatusTimestamps(status) {
-    const timestampMap = {
-      IN_PROGRESS: "startedAt",
-      COMPLETED: "completedAt",
-      CLOSED: "closedAt",
-    };
-    return timestampMap[status] ? { [timestampMap[status]]: new Date() } : {};
   }
 
   /**
@@ -142,29 +123,97 @@ class OrderService {
   }
 
   /**
-   * Mengirim notifikasi ke semua admin
-   * @param {string} title
-   * @param {string} message
-   * @param {string} [type="INFO"]
-   * @returns {Promise<void>}
+   * Generate note status history menggunakan AI
+   * @param {string} status - Status baru
+   * @param {string} previousStatus - Status sebelumnya
+   * @param {Object} context - Konteks tambahan (orderNumber, customerName, items, dll)
+   * @returns {Promise<string>}
    * @private
    */
-  async #notifyAdmins(title, message, type = "INFO") {
+  async #generateStatusNote(status, previousStatus, context = {}) {
     try {
-      const admins = await this.userRepo.findByRole("ADMIN");
-      const activeAdmins = admins.filter((a) => a.isActive);
-      if (activeAdmins.length > 0) {
-        await Promise.all(
-          activeAdmins.map((admin) =>
-            this.notifRepo.create({ title, message, type, userId: admin.id })
-          )
-        );
-      }
+      const prompt = `Buatkan catatan singkat (1-2 kalimat, maksimal 100 karakter) dalam bahasa Indonesia untuk perubahan status pesanan bengkel Vespa.
+
+Status sebelumnya: ${previousStatus || "Tidak ada (pesanan baru)"}
+Status baru: ${status}
+
+Konteks tambahan:
+- Nomor Pesanan: ${context.orderNumber || "-"}
+- Pelanggan: ${context.customerName || "Tidak diketahui"}
+- Kendaraan: ${context.vehicleInfo || "Tidak ada"}
+- Total: ${context.total ? Currency.toIDR(context.total) : "-"}
+- Item: ${context.itemCount || 0} item
+
+Catatan harus:
+1. Informatif dan deskriptif
+2. Menjelaskan APA yang terjadi dan MENGAPA (jika relevan)
+3. Natural seperti ditulis oleh staff bengkel
+4. Jangan terlalu teknis
+5. JANGAN gunakan format JSON atau markup apapun
+
+Contoh format yang baik:
+"Pesanan dibuat oleh kasir Budi untuk servis Vespa Sprint 150."
+"Pembayaran lunas via QRIS. Motor masuk antrian pengerjaan."
+"Mekanik Andi mulai pengerjaan servis ringan dan ganti oli."
+"Servis selesai. Motor siap diambil oleh pelanggan."
+"Pesanan ditutup. Motor sudah diambil pelanggan."
+"Pesanan dibatalkan oleh kasir. Stok sparepart dikembalikan."`;
+
+      const response = await axios.post(
+        "https://openrouter.ai/api/v1/chat/completions",
+        {
+          model: "meta-llama/llama-3.1-8b-instruct",
+          messages: [
+            {
+              role: "system",
+              content:
+                "Kamu adalah asisten yang membuat catatan singkat status pesanan bengkel. Jawab HANYA dengan catatan yang diminta, tanpa tambahan apapun.",
+            },
+            { role: "user", content: prompt },
+          ],
+          max_tokens: 100,
+          temperature: 0.7,
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+            "Content-Type": "application/json",
+          },
+          timeout: 10000,
+        }
+      );
+
+      const note = response.data.choices[0].message.content.trim();
+      logger.info("AI generated status note", { status, note });
+      return note;
     } catch (err) {
-      logger.warn("Gagal mengirim notifikasi ke admin", {
+      logger.warn("Gagal generate AI note, pakai fallback", {
+        status,
         error: err.message,
       });
+      return this.#getFallbackNote(status, previousStatus);
     }
+  }
+
+  /**
+   * Fallback note jika AI gagal
+   * @param {string} status
+   * @param {string} previousStatus
+   * @returns {string}
+   * @private
+   */
+  #getFallbackNote(status, previousStatus) {
+    const notes = {
+      DRAFT: "Pesanan baru dibuat sebagai draft. Menunggu pembayaran.",
+      QUEUED: "Pembayaran berhasil. Pesanan masuk antrian pengerjaan.",
+      IN_PROGRESS: "Mekanik mulai mengerjakan pesanan.",
+      COMPLETED: "Pengerjaan selesai. Menunggu penutupan pesanan.",
+      CLOSED: "Pesanan ditutup. Motor sudah diambil pelanggan.",
+      CANCELLED: "Pesanan dibatalkan.",
+    };
+    return (
+      notes[status] || `Status diubah dari "${previousStatus}" ke "${status}".`
+    );
   }
 
   /**
@@ -225,7 +274,6 @@ class OrderService {
     const products = await Promise.all(
       productIds.map((id) => this.productRepo.findById(id))
     );
-
     const productMap = new Map(products.map((p) => [p?.id, p]));
     let subtotal = 0;
     const processedItems = [];
@@ -274,147 +322,10 @@ class OrderService {
     let orderNumber;
     let exists = true;
     while (exists) {
-      orderNumber = await CodeGenerator.orderNumber();
+      orderNumber =  CodeGenerator.orderNumber();
       exists = await this.orderRepo.isOrderNumberExists(orderNumber);
     }
     return orderNumber;
-  }
-
-  /**
-   * Membuat pesanan dalam transaksi database
-   * @param {Object} tx
-   * @param {Object} data
-   * @returns {Promise<Object>}
-   * @private
-   */
-  async #createOrderInTx(tx, data) {
-    return tx.order.create({
-      data: {
-        orderNumber: data.orderNumber,
-        cashierId: data.cashierId,
-        shiftId: data.shiftId,
-        customerId: data.customerId,
-        vehicleId: data.vehicleId,
-        subtotal: data.subtotal,
-        tax: data.tax,
-        total: data.total,
-        items: {
-          create: data.processedItems.map((item) => ({
-            productId: item.productId,
-            productNameSnapshot: item.productNameSnapshot,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            unitCostSnapshot: item.unitCostSnapshot,
-            subtotal: item.subtotal,
-          })),
-        },
-        ...(data.hasService && {
-          histories: {
-            create: {
-              status: "DRAFT",
-              changedById: data.cashierId,
-              note: "Pesanan baru dibuat sebagai draft. Menunggu pembayaran.",
-            },
-          },
-        }),
-      },
-      select: {
-        id: true,
-        orderNumber: true,
-        status: true,
-        subtotal: true,
-        tax: true,
-        total: true,
-        createdAt: true,
-        customer: { select: { name: true } },
-        vehicle: { select: { plateNumber: true, brand: true, model: true } },
-        items: {
-          select: {
-            id: true,
-            productId: true,
-            productNameSnapshot: true,
-            quantity: true,
-            unitPrice: true,
-            unitCostSnapshot: true,
-            subtotal: true,
-            product: { select: { id: true, name: true, type: true } },
-          },
-        },
-      },
-    });
-  }
-
-  /**
-   * Mengurangi stok produk sparepart secara batch
-   * @param {Array} items
-   * @param {Object} tx
-   * @returns {Promise<void>}
-   * @private
-   */
-  async #decrementStock(items, tx) {
-    const updatePromises = items.map((item) =>
-      tx.product.update({
-        where: { id: item.productId },
-        data: { stock: { decrement: item.quantity } },
-      })
-    );
-    await Promise.all(updatePromises);
-  }
-
-  /**
-   * Menambah penjualan shift
-   * @param {Object} tx
-   * @param {string} shiftId
-   * @param {number} amount
-   * @returns {Promise<void>}
-   * @private
-   */
-  async #incrementShiftSales(tx, shiftId, amount) {
-    await tx.shift.update({
-      where: { id: shiftId },
-      data: { cashSales: { increment: amount } },
-    });
-  }
-
-  /**
-   * Mencatat stok keluar untuk item sparepart secara batch
-   * @param {Array} sparepartItems
-   * @param {Object} order
-   * @param {string} cashierId
-   * @returns {Promise<void>}
-   * @private
-   */
-  async #processSparePartItems(sparepartItems, order, cashierId) {
-    const stockOutPromises = sparepartItems.map((item) => {
-      const orderItem = order.items.find(
-        (oi) => oi.productId === item.productId
-      );
-      if (orderItem) {
-        return this.stockRepo.recordStockOut(
-          item.productId,
-          item.quantity,
-          cashierId,
-          orderItem.id,
-          `Stok keluar otomatis dari pesanan ${order.orderNumber}`,
-          "SALE"
-        );
-      }
-    });
-    await Promise.all(stockOutPromises.filter(Boolean));
-  }
-
-  /**
-   * Mendapatkan item sparepart dari pesanan
-   * @param {string} orderId
-   * @returns {Promise<Array>}
-   * @private
-   */
-  async #getSparePartItems(orderId) {
-    const items = await prisma.orderItem.findMany({
-      where: { orderId },
-      include: { product: { select: { type: true } } },
-    });
-    return items.filter((item) => item.product?.type === "SPAREPART");
   }
 
   /**
@@ -432,39 +343,6 @@ class OrderService {
       })
     );
     await Promise.all(restorePromises);
-  }
-
-  /**
-   * Menambahkan signed URL ke gambar produk dalam satu pesanan
-   * @param {Object} order
-   * @returns {Promise<Object>}
-   * @private
-   */
-  async #addSignedUrlsToOrder(order) {
-    if (!order) return order;
-    const urlPromises = [];
-    for (const item of order.items || []) {
-      if (item.product?.image?.path) {
-        urlPromises.push(
-          Storage.getSignedUrl(item.product.image.path).then((url) => {
-            item.product.image.url = url;
-          })
-        );
-      }
-    }
-    await Promise.all(urlPromises);
-    return order;
-  }
-
-  /**
-   * Menambahkan signed URL ke multiple pesanan
-   * @param {Array} orders
-   * @returns {Promise<Array>}
-   * @private
-   */
-  async #addSignedUrlsToOrders(orders) {
-    await Promise.all(orders.map((order) => this.#addSignedUrlsToOrder(order)));
-    return orders;
   }
 
   /**
@@ -517,28 +395,23 @@ class OrderService {
    * Membuat pesanan baru (DRAFT)
    * @param {string} cashierId
    * @param {Object} payload
-   * @param {string} [payload.customerId]
-   * @param {string} [payload.vehicleId]
-   * @param {Array} payload.items
    * @returns {Promise<Object>}
    */
   async createOrder(cashierId, payload) {
     const { customerId, vehicleId, items } = payload;
     const activeShift = await this.#getActiveShift(cashierId);
     const { subtotal, processedItems } = await this.#calculateItems(items);
-
     const hasService = this.#hasServiceItem(processedItems);
+    const cashier = await this.userRepo.findById(cashierId);
 
-    if (hasService && !customerId) {
+    if (hasService && !customerId)
       throw ApiError.badRequest({
         message: "Pesanan service memerlukan customer.",
       });
-    }
-    if (hasService && !vehicleId) {
+    if (hasService && !vehicleId)
       throw ApiError.badRequest({
         message: "Pesanan service memerlukan kendaraan.",
       });
-    }
 
     const orderNumber = await this.#generateUniqueOrderNumber();
     const taxRate = await this.#getTaxRate();
@@ -550,41 +423,110 @@ class OrderService {
     );
     const hasSparepart = sparepartItems.length > 0;
 
+    const vehicle = vehicleId
+      ? await prisma.vehicle.findUnique({
+          where: { id: vehicleId },
+          select: { plateNumber: true, brand: true, model: true },
+        })
+      : null;
+    const customer = customerId
+      ? await prisma.customer.findUnique({
+          where: { id: customerId },
+          select: { name: true },
+        })
+      : null;
+
+    const context = {
+      orderNumber,
+      customerName: customer?.name || "Umum",
+      vehicleInfo: this.#formatVehicleInfo(vehicle),
+      total,
+      itemCount: processedItems.length,
+    };
+
+    const aiNote = await this.#generateStatusNote("DRAFT", null, {
+      ...context,
+      cashierName: cashier?.fullName || "-",
+    });
+
     const order = await prisma.$transaction(async (tx) => {
-      const newOrder = await this.#createOrderInTx(tx, {
-        orderNumber,
-        cashierId,
-        shiftId: activeShift.id,
-        customerId: hasService ? customerId : customerId || null,
-        vehicleId: hasService ? vehicleId : vehicleId || null,
-        subtotal,
-        tax: taxAmount,
-        total,
-        processedItems,
-        hasService,
+      const newOrder = await tx.order.create({
+        data: {
+          orderNumber,
+          cashierId,
+          shiftId: activeShift.id,
+          customerId: hasService ? customerId : customerId || null,
+          vehicleId: hasService ? vehicleId : vehicleId || null,
+          subtotal,
+          tax: taxAmount,
+          total,
+          items: {
+            create: processedItems.map((item) => ({
+              productId: item.productId,
+              productNameSnapshot: item.productNameSnapshot,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              unitCostSnapshot: item.unitCostSnapshot,
+              subtotal: item.subtotal,
+            })),
+          },
+          histories: {
+            create: {
+              status: "DRAFT",
+              changedById: cashierId,
+              note: aiNote,
+            },
+          },
+        },
+        select: {
+          id: true,
+          orderNumber: true,
+          status: true,
+          subtotal: true,
+          tax: true,
+          total: true,
+          createdAt: true,
+          customer: { select: { name: true } },
+          vehicle: { select: { plateNumber: true, brand: true, model: true } },
+          items: {
+            select: {
+              id: true,
+              productId: true,
+              productNameSnapshot: true,
+              quantity: true,
+              unitPrice: true,
+              unitCostSnapshot: true,
+              subtotal: true,
+            },
+          },
+        },
       });
 
       if (hasSparepart) {
-        await this.#decrementStock(sparepartItems, tx);
+        await Promise.all(
+          sparepartItems.map((item) =>
+            tx.product.update({
+              where: { id: item.productId },
+              data: { stock: { decrement: item.quantity } },
+            })
+          )
+        );
       }
-      await this.#incrementShiftSales(tx, activeShift.id, total);
+      await tx.shift.update({
+        where: { id: activeShift.id },
+        data: { cashSales: { increment: total } },
+      });
       return newOrder;
     });
 
-    if (hasSparepart) {
-      await this.#processSparePartItems(sparepartItems, order, cashierId);
-    }
-
-    const cashier = await this.userRepo.findById(cashierId);
     const itemList = this.#formatItemList(processedItems);
-    const orderType = hasService ? "Service" : "Sparepart";
-
     const notificationMessage = [
       `Pesanan Baru Dibuat`,
       ``,
       `Nomor Pesanan  : #${orderNumber}`,
-      `Tipe Pesanan   : ${orderType}`,
       `Kasir          : ${cashier?.fullName || "-"}`,
+      `Pelanggan      : ${context.customerName}`,
+      `Kendaraan      : ${context.vehicleInfo}`,
       ``,
       `Rincian Item (${processedItems.length}):`,
       `${itemList}`,
@@ -596,7 +538,7 @@ class OrderService {
       `Status         : DRAFT`,
       `Waktu          : ${DateTime.toFullID(new Date())}`,
       ``,
-      `Pesanan menunggu pembayaran.`,
+      `${aiNote}`,
     ].join("\n");
 
     await this.#sendNotification(
@@ -611,18 +553,15 @@ class OrderService {
       orderNumber,
       total,
       itemCount: items.length,
-      type: hasService ? "SERVICE" : "SPAREPART",
       cashierId,
     });
-
-    return this.#addSignedUrlsToOrder(await this.orderRepo.findById(order.id));
+    return this.orderRepo.findById(order.id);
   }
 
   /**
    * Mendapatkan pesanan berdasarkan ID atau nomor pesanan
    * @param {string} identifier
    * @returns {Promise<Object>}
-   * @throws {ApiError}
    */
   async getOrder(identifier) {
     const order =
@@ -630,7 +569,7 @@ class OrderService {
       (await this.orderRepo.findById(identifier));
     if (!order)
       throw ApiError.notFound({ message: "Pesanan tidak ditemukan." });
-    return this.#addSignedUrlsToOrder(order);
+    return order;
   }
 
   /**
@@ -640,7 +579,6 @@ class OrderService {
    */
   async getOrders(query = {}) {
     const result = await this.orderRepo.findMany(query);
-    result.data = await this.#addSignedUrlsToOrders(result.data);
     logger.info("Mengambil daftar pesanan", { total: result.metadata.total });
     return result;
   }
@@ -652,43 +590,44 @@ class OrderService {
    * @returns {Promise<{data: Array, metadata: Object}>}
    */
   async getActiveOrders(cashierId, query = {}) {
-    const result = await this.orderRepo.findActiveByCashier(cashierId, query);
-    result.data = await this.#addSignedUrlsToOrders(result.data);
-    return result;
+    return this.orderRepo.findActiveByCashier(cashierId, query);
   }
 
   /**
-   * Membatalkan pesanan (single)
+   * Membatalkan pesanan
    * @param {string} orderId
    * @param {string} userId
    * @returns {Promise<Object>}
-   * @throws {ApiError}
    */
   async cancelOrder(orderId, userId) {
     const order = await this.orderRepo.findById(orderId);
     this.#validateOrderEditable(order, "membatalkan");
 
     const changedById = userId || order.cashierId;
-    const hasService = this.#hasServiceItem(order.items);
-    const sparepartItems = await this.#getSparePartItems(order.id);
+    const sparepartItems = await prisma.orderItem
+      .findMany({
+        where: { orderId: order.id },
+        include: { product: { select: { type: true } } },
+      })
+      .then((items) =>
+        items.filter((item) => item.product?.type === "SPAREPART")
+      );
+
+    const cancelNote = await this.#generateStatusNote(
+      "CANCELLED",
+      order.status,
+      {
+        orderNumber: order.orderNumber,
+        customerName: order.customer?.name || "Umum",
+        vehicleInfo: this.#formatVehicleInfo(order.vehicle),
+        total: order.total,
+        itemCount: order.items?.length || 0,
+      }
+    );
 
     await prisma.$transaction(async (tx) => {
       if (sparepartItems.length > 0) {
         await this.#restoreSparePartStock(sparepartItems, tx);
-        const stockMovementPromises = sparepartItems.map((item) =>
-          tx.stockMovement.create({
-            data: {
-              productId: item.productId,
-              type: "IN",
-              sourceType: "RETURN",
-              quantity: item.quantity,
-              orderItemId: item.id,
-              note: `Stok dikembalikan dari pembatalan pesanan ${order.orderNumber}.`,
-              recordedById: order.cashierId,
-            },
-          })
-        );
-        await Promise.all(stockMovementPromises);
       }
 
       await tx.order.update({
@@ -696,16 +635,14 @@ class OrderService {
         data: { status: "CANCELLED" },
       });
 
-      if (hasService) {
-        await tx.orderStatusHistory.create({
-          data: {
-            orderId: order.id,
-            status: "CANCELLED",
-            changedById,
-            note: "Pesanan dibatalkan. Stok sparepart dikembalikan, shift disesuaikan.",
-          },
-        });
-      }
+      await tx.orderStatusHistory.create({
+        data: {
+          orderId: order.id,
+          status: "CANCELLED",
+          changedById,
+          note: cancelNote,
+        },
+      });
 
       if (order.shiftId) {
         await tx.shift.update({
@@ -718,17 +655,14 @@ class OrderService {
 
     await this.#invalidateOrderCache(order.orderNumber);
 
-    const cashier = await this.userRepo.findById(changedById);
-
     const notificationMessage = [
       `Pesanan Dibatalkan`,
       ``,
       `Nomor Pesanan  : #${order.orderNumber}`,
       `Total          : ${Currency.toIDR(order.total)}`,
-      `Dibatalkan Oleh: ${cashier?.fullName || "-"}`,
       `Waktu          : ${DateTime.toFullID(new Date())}`,
       ``,
-      `Stok sparepart telah dikembalikan dan shift disesuaikan.`,
+      `${cancelNote}`,
     ].join("\n");
 
     await this.#sendNotification(
@@ -742,33 +676,42 @@ class OrderService {
       orderId: order.id,
       orderNumber: order.orderNumber,
     });
-
     return this.orderRepo.findByOrderNumber(order.orderNumber);
   }
 
   /**
-   * Memperbarui status pesanan (selain CANCELLED)
+   * Memperbarui status pesanan
    * @param {string} orderId
    * @param {string} status
    * @param {string} userId
    * @returns {Promise<Object>}
-   * @throws {ApiError}
    */
   async updateOrderStatus(orderId, status, userId) {
     const order = await this.orderRepo.findById(orderId);
     this.#validateOrderEditable(order, "memperbarui status");
 
     const changedById = userId || order.cashierId;
-    const hasService = this.#hasServiceItem(order.items);
+    const timestampMap = {
+      IN_PROGRESS: "startedAt",
+      COMPLETED: "completedAt",
+      CLOSED: "closedAt",
+    };
+    const timestampUpdate = timestampMap[status]
+      ? { [timestampMap[status]]: new Date() }
+      : {};
+
+    const statusNote = await this.#generateStatusNote(status, order.status, {
+      orderNumber: order.orderNumber,
+      customerName: order.customer?.name || "Umum",
+      vehicleInfo: this.#formatVehicleInfo(order.vehicle),
+      total: order.total,
+      itemCount: order.items?.length || 0,
+    });
 
     const updated = await prisma.$transaction(async (tx) => {
       const result = await tx.order.update({
         where: { id: orderId },
-        data: {
-          status,
-          updatedAt: new Date(),
-          ...this.#getStatusTimestamps(status),
-        },
+        data: { status, updatedAt: new Date(), ...timestampUpdate },
         select: {
           id: true,
           orderNumber: true,
@@ -780,16 +723,9 @@ class OrderService {
         },
       });
 
-      if (hasService) {
-        await tx.orderStatusHistory.create({
-          data: {
-            orderId,
-            status,
-            changedById,
-            note: `Status diubah dari "${order.status}" ke "${status}".`,
-          },
-        });
-      }
+      await tx.orderStatusHistory.create({
+        data: { orderId, status, changedById, note: statusNote },
+      });
 
       return result;
     });
@@ -801,129 +737,10 @@ class OrderService {
   }
 
   /**
-   * Membatalkan banyak pesanan sekaligus (hanya status DRAFT)
-   * @param {string[]} orderIds
-   * @param {string} userId
-   * @returns {Promise<{summary: Object, details: Object}>}
-   * @throws {ApiError}
-   */
-  async cancelOrders(orderIds, userId) {
-    if (!orderIds || orderIds.length === 0) {
-      throw ApiError.badRequest({
-        message: "Gagal membatalkan. Tidak ada pesanan yang dipilih.",
-      });
-    }
-
-    const user = await this.userRepo.findById(userId);
-    const validIds = [];
-    const skippedOrders = [];
-
-    for (const id of orderIds) {
-      const order = await this.orderRepo.findById(id);
-      if (!order) {
-        skippedOrders.push({ id, reason: "Pesanan tidak ditemukan" });
-        continue;
-      }
-
-      if (order.status !== "DRAFT") {
-        skippedOrders.push({
-          id,
-          orderNumber: order.orderNumber,
-          reason: `Status pesanan ${order.status}, hanya DRAFT yang dapat dibatalkan`,
-        });
-        continue;
-      }
-
-      validIds.push(id);
-    }
-
-    if (validIds.length === 0) {
-      throw ApiError.badRequest({
-        message:
-          "Gagal membatalkan. Tidak ada pesanan dengan status DRAFT yang bisa dibatalkan.",
-        details: skippedOrders,
-      });
-    }
-
-    const cancelNote = `Dibatalkan oleh ${user.fullName} melalui pembatalan massal. Stok dan shift telah disesuaikan.`;
-
-    for (const id of validIds) {
-      const order = await this.orderRepo.findById(id);
-      const sparepartItems = await this.#getSparePartItems(id);
-
-      await prisma.$transaction(async (tx) => {
-        if (sparepartItems.length > 0) {
-          await this.#restoreSparePartStock(sparepartItems, tx);
-          const stockMovementPromises = sparepartItems.map((item) =>
-            tx.stockMovement.create({
-              data: {
-                productId: item.productId,
-                type: "IN",
-                sourceType: "RETURN",
-                quantity: item.quantity,
-                orderItemId: item.id,
-                note: `Pengembalian stok dari pembatalan pesanan ${order.orderNumber} oleh ${user.fullName}.`,
-                recordedById: order.cashierId,
-              },
-            })
-          );
-          await Promise.all(stockMovementPromises);
-        }
-
-        if (order.shiftId) {
-          await tx.shift.update({
-            where: { id: order.shiftId },
-            data: { cashSales: { decrement: order.total } },
-          });
-        }
-        await tx.payment.deleteMany({ where: { orderId: id } });
-      });
-    }
-
-    const cancelResults = await this.orderRepo.cancelMany(
-      validIds,
-      cancelNote,
-      userId
-    );
-
-    for (const id of cancelResults.success) {
-      const order = await this.orderRepo.findById(id);
-      if (order) {
-        await this.#invalidateOrderCache(order.orderNumber);
-      }
-    }
-
-    const summary = {
-      total: orderIds.length,
-      valid: validIds.length,
-      skipped: skippedOrders.length,
-      cancelled: cancelResults.success.length,
-      failed: cancelResults.failed.length,
-    };
-
-    logger.info("Bulk cancel pesanan selesai", {
-      summary,
-      skippedOrders,
-      failedCancels: cancelResults.failed,
-      userId,
-    });
-
-    return {
-      summary,
-      details: {
-        cancelled: cancelResults.success,
-        failed: cancelResults.failed,
-        skipped: skippedOrders,
-      },
-    };
-  }
-
-  /**
    * Menutup pesanan (COMPLETED -> CLOSED)
    * @param {string} orderId
    * @param {string} userId
    * @returns {Promise<Object>}
-   * @throws {ApiError}
    */
   async closeOrder(orderId, userId) {
     const order = await this.orderRepo.findById(orderId);
@@ -934,14 +751,20 @@ class OrderService {
       throw ApiError.conflict({ message: "Pesanan sudah ditutup." });
     if (order.status === "CANCELLED")
       throw ApiError.conflict({ message: "Pesanan sudah dibatalkan." });
-    if (order.status !== "COMPLETED") {
+    if (order.status !== "COMPLETED")
       throw ApiError.conflict({
-        message: `Hanya pesanan dengan status COMPLETED yang dapat ditutup. Status saat ini: ${order.status}`,
+        message: `Hanya pesanan COMPLETED yang dapat ditutup. Status saat ini: ${order.status}`,
       });
-    }
 
-    const hasService = this.#hasServiceItem(order.items);
     const changedById = userId || order.cashierId;
+
+    const closeNote = await this.#generateStatusNote("CLOSED", order.status, {
+      orderNumber: order.orderNumber,
+      customerName: order.customer?.name || "Umum",
+      vehicleInfo: this.#formatVehicleInfo(order.vehicle),
+      total: order.total,
+      itemCount: order.items?.length || 0,
+    });
 
     const updated = await prisma.$transaction(async (tx) => {
       const result = await tx.order.update({
@@ -956,37 +779,23 @@ class OrderService {
         },
       });
 
-      if (hasService) {
-        await tx.orderStatusHistory.create({
-          data: {
-            orderId,
-            status: "CLOSED",
-            changedById,
-            note: "Pesanan ditutup. Motor sudah diambil oleh pelanggan.",
-          },
-        });
-      }
+      await tx.orderStatusHistory.create({
+        data: { orderId, status: "CLOSED", changedById, note: closeNote },
+      });
 
       return result;
     });
 
     await this.#invalidateOrderCache(order.orderNumber);
 
-    const cashier = await this.userRepo.findById(changedById);
-    const customerName = order.customer?.name || "Pelanggan";
-    const vehicleInfo = this.#formatVehicleInfo(order.vehicle);
-
     const notificationMessage = [
       `Pesanan Ditutup`,
       ``,
       `Nomor Pesanan  : #${order.orderNumber}`,
-      `Pelanggan      : ${customerName}`,
-      `Kendaraan      : ${vehicleInfo}`,
       `Total          : ${Currency.toIDR(order.total)}`,
-      `Ditutup Oleh   : ${cashier?.fullName || "-"}`,
       `Waktu Tutup    : ${DateTime.toFullID(updated.closedAt)}`,
       ``,
-      `Pesanan telah selesai dan motor sudah diambil pelanggan.`,
+      `${closeNote}`,
     ].join("\n");
 
     await this.#sendNotification(
@@ -1001,27 +810,42 @@ class OrderService {
   }
 
   /**
-   * Melacak riwayat lengkap pesanan dengan caching
+   * Melacak riwayat lengkap pesanan
    * @param {string} orderNumber
    * @returns {Promise<Object>}
-   * @throws {ApiError}
    */
   async trackOrderHistory(orderNumber) {
     const cacheKey = `history:${orderNumber}`;
     const cached = await this.cache.get(cacheKey);
-    if (cached) {
-      logger.info("Cache hit untuk order history", { orderNumber });
-      return cached;
-    }
+    if (cached) return cached;
 
-    const order = await this.orderHistoryRepo.findByOrderNumber(orderNumber);
-    if (!order) {
+    const order = await prisma.order.findUnique({
+      where: { orderNumber },
+      include: {
+        cashier: { select: { fullName: true } },
+        customer: { select: { name: true, phone: true } },
+        vehicle: { select: { plateNumber: true, brand: true, model: true } },
+        payment: {
+          select: {
+            method: true,
+            amountPaid: true,
+            change: true,
+            status: true,
+            paidAt: true,
+          },
+        },
+        items: { include: { product: { select: { name: true, type: true } } } },
+        histories: {
+          include: { changedBy: { select: { fullName: true } } },
+          orderBy: { createdAt: "asc" },
+        },
+      },
+    });
+
+    if (!order)
       throw ApiError.notFound({
         message: `Pesanan dengan nomor '${orderNumber}' tidak ditemukan.`,
       });
-    }
-
-    await this.#addSignedUrlsToOrder(order);
 
     const result = {
       orderNumber: order.orderNumber,
@@ -1044,13 +868,6 @@ class OrderService {
     };
 
     await this.cache.set(cacheKey, result, 300);
-
-    logger.info("Melacak riwayat pesanan (cached)", {
-      orderNumber,
-      status: order.status,
-      historyCount: order.histories?.length || 0,
-    });
-
     return result;
   }
 
@@ -1058,7 +875,6 @@ class OrderService {
    * Soft delete pesanan
    * @param {string} orderId
    * @returns {Promise<void>}
-   * @throws {ApiError}
    */
   async softDeleteOrder(orderId) {
     const order = await this.orderRepo.findById(orderId);
@@ -1076,7 +892,6 @@ class OrderService {
    * Restore pesanan
    * @param {string} orderId
    * @returns {Promise<void>}
-   * @throws {ApiError}
    */
   async restoreOrder(orderId) {
     const order = await this.orderRepo.findById(orderId);
@@ -1088,90 +903,6 @@ class OrderService {
       orderId,
       orderNumber: order.orderNumber,
     });
-  }
-
-  /**
-   * Menutup banyak pesanan sekaligus
-   * @param {string[]} orderIds
-   * @param {string} userId
-   * @returns {Promise<{summary: Object, details: Object}>}
-   * @throws {ApiError}
-   */
-  async closeOrders(orderIds, userId) {
-    if (!orderIds || orderIds.length === 0) {
-      throw ApiError.badRequest({
-        message: "Gagal menutup. Tidak ada pesanan yang dipilih.",
-      });
-    }
-
-    const user = await this.userRepo.findById(userId);
-    const validIds = [];
-    const skippedOrders = [];
-
-    for (const id of orderIds) {
-      const order = await this.orderRepo.findById(id);
-      if (!order) {
-        skippedOrders.push({ id, reason: "Pesanan tidak ditemukan" });
-        continue;
-      }
-
-      if (order.status !== "COMPLETED") {
-        skippedOrders.push({
-          id,
-          orderNumber: order.orderNumber,
-          reason: `Status pesanan ${order.status}, hanya COMPLETED yang dapat ditutup`,
-        });
-        continue;
-      }
-
-      validIds.push(id);
-    }
-
-    if (validIds.length === 0) {
-      throw ApiError.badRequest({
-        message:
-          "Gagal menutup. Tidak ada pesanan dengan status COMPLETED yang bisa ditutup.",
-        details: skippedOrders,
-      });
-    }
-
-    const closeNote = `Ditutup oleh ${user.fullName} melalui penutupan massal. Kendaraan telah diambil pelanggan.`;
-    const closeResults = await this.orderRepo.closeMany(
-      validIds,
-      closeNote,
-      userId
-    );
-
-    for (const id of closeResults.success) {
-      const order = await this.orderRepo.findById(id);
-      if (order) {
-        await this.#invalidateOrderCache(order.orderNumber);
-      }
-    }
-
-    const summary = {
-      total: orderIds.length,
-      valid: validIds.length,
-      skipped: skippedOrders.length,
-      closed: closeResults.success.length,
-      failed: closeResults.failed.length,
-    };
-
-    logger.info("Bulk close pesanan selesai", {
-      summary,
-      skippedOrders,
-      failedCloses: closeResults.failed,
-      userId,
-    });
-
-    return {
-      summary,
-      details: {
-        closed: closeResults.success,
-        failed: closeResults.failed,
-        skipped: skippedOrders,
-      },
-    };
   }
 }
 

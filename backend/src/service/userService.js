@@ -638,6 +638,7 @@ class UserService {
    *   role: "MECHANIC"
    * });
    */
+ 
   async updateUser(userId, payload) {
     const user = await this.userRepo.findById(userId);
     if (!user) {
@@ -645,11 +646,11 @@ class UserService {
         message: `Gagal memperbarui. User dengan ID '${userId}' tidak ditemukan.`,
       });
     }
-
+  
     if (payload.role !== undefined) {
       this.#validateUpdatableRole(user.role, payload.role);
     }
-
+  
     if (payload.phone && payload.phone !== user.phone) {
       const existingPhone = await this.userRepo.isPhoneExists(
         payload.phone,
@@ -661,7 +662,7 @@ class UserService {
         });
       }
     }
-
+  
     if (payload.isActive === false && user.isActive === true) {
       const hasActiveShift = await this.shiftRepo.hasActiveShift(userId);
       if (hasActiveShift) {
@@ -670,15 +671,21 @@ class UserService {
         });
       }
     }
-
+  
     const updateData = {};
     if (payload.fullName !== undefined) updateData.fullName = payload.fullName;
     if (payload.phone !== undefined) updateData.phone = payload.phone;
     if (payload.role !== undefined) updateData.role = payload.role;
     if (payload.isActive !== undefined) updateData.isActive = payload.isActive;
-
+  
     const updated = await this.userRepo.update(userId, updateData);
-
+  
+    await this.cache.delete(`email:${user.email}`);
+  
+    if (payload.email && payload.email !== user.email) {
+      await this.cache.delete(`email:${payload.email}`);
+    }
+  
     const changes = [];
     if (payload.fullName !== undefined && payload.fullName !== user.fullName)
       changes.push(`Nama: "${user.fullName}" -> "${payload.fullName}"`);
@@ -698,7 +705,7 @@ class UserService {
           payload.isActive ? "Aktif" : "Nonaktif"
         }"`
       );
-
+  
     if (changes.length > 0) {
       await this.#sendNotification(
         userId,
@@ -707,10 +714,11 @@ class UserService {
         "INFO"
       );
     }
-
+  
     logger.info("User berhasil diperbarui", { userId, changes });
     return updated;
   }
+  
 
   /**
    * Menghapus user dari sistem
