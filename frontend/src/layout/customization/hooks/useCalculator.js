@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { evaluate } from "mathjs";
 
 /**
  * Custom hook untuk kalkulator dengan operasi matematika lanjutan.
@@ -12,25 +13,19 @@ export const useCalculator = () => {
   const [showScientific, setShowScientific] = useState(false);
 
   const evaluateExpression = useCallback((expr) => {
-    const cleaned = expr
-      .replace(/×/g, "*")
-      .replace(/÷/g, "/")
-      .replace(/π/g, String(Math.PI))
-      .replace(/e(?![xp])/g, String(Math.E));
+    try {
+      // Clean the expression for mathjs
+      const cleaned = expr
+        .replace(/×/g, "*")
+        .replace(/÷/g, "/")
+        .replace(/π/g, "pi")
+        .replace(/√/g, "sqrt")
+        .replace(/%/g, "/100");
 
-    const withMathFunctions = cleaned
-      .replace(/sin\(/g, "Math.sin(")
-      .replace(/cos\(/g, "Math.cos(")
-      .replace(/tan\(/g, "Math.tan(")
-      .replace(/log\(/g, "Math.log10(")
-      .replace(/ln\(/g, "Math.log(")
-      .replace(/sqrt\(/g, "Math.sqrt(")
-      .replace(/abs\(/g, "Math.abs(")
-      .replace(/\^/g, "**")
-      .replace(/√/g, "Math.sqrt")
-      .replace(/%/g, "/100");
-
-    return eval(withMathFunctions);
+      return evaluate(cleaned);
+    } catch (error) {
+      throw new Error("Invalid expression");
+    }
   }, []);
 
   const handleNumber = useCallback(
