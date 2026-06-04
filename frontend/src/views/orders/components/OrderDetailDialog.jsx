@@ -259,53 +259,113 @@ const OrderDetailDialog = ({ orderId, onClose, open }) => {
               </Card>
             )}
 
-            {/* History */}
+            {/* History Timeline */}
             {data.histories?.length > 0 && (
               <Card sx={{ border: `1px solid ${alpha(theme.palette.divider, 0.6)}`, boxShadow: "none", borderRadius: `${theme.shape.borderRadius}px` }}>
                 <Box sx={{ p: 3 }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 3 }}>Riwayat Status ({data.histories.length})</Typography>
-                  <Stack sx={{ gap: 2 }}>
-                    {data.histories.map((history) => (
-                      <Box
-                        key={history.id}
-                        sx={{
-                          p: 3,
-                          borderRadius: `${theme.shape.borderRadius}px`,
-                          border: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
-                          borderLeft: `3px solid ${theme.palette[statusColorMap[history.status] || "grey"]?.main || theme.palette.grey[400]}`,
-                          transition: theme.transitions.create(["border-color", "box-shadow"], { duration: theme.transitions.duration.shorter }),
-                          "&:hover": {
-                            borderColor: alpha(theme.palette.secondary.main, 0.3),
-                            boxShadow: `0 2px 8px ${alpha(theme.palette.secondary.main, 0.06)}`,
-                          },
-                        }}
-                      >
-                        <Stack sx={{ gap: 2 }}>
-                          <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center" }}>
-                            <Chip
-                              color={statusColorMap[history.status] || "default"}
-                              label={normalizeEnumText(OrderStatus[history.status] || history.status)}
-                              size="small"
-                              variant="outlined"
-                              sx={{ fontWeight: 500, fontSize: "0.75rem", height: 24 }}
-                            />
-                            <Typography variant="caption" color="text.disabled">
-                              {formatDateTime(history.createdAt)}
-                            </Typography>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 4 }}>
+                    Riwayat Status ({data.histories.length})
+                  </Typography>
+
+                  <Stack sx={{ position: "relative", pl: 4 }}>
+                    {/* Vertical line */}
+                    <Box
+                      sx={{
+                        position: "absolute",
+                        top: 6,
+                        bottom: 6,
+                        left: 6.5,
+                        width: 2,
+                        bgcolor: alpha(theme.palette.divider, 0.6),
+                        borderRadius: 1,
+                      }}
+                    />
+
+                    {data.histories.map((history, index) => {
+                      const statusColor =
+                        theme.palette[statusColorMap[history.status] || "grey"]?.main ||
+                        theme.palette.grey[400];
+                      const isLast = index === data.histories.length - 1;
+
+                      return (
+                        <Box
+                          key={history.id}
+                          sx={{
+                            position: "relative",
+                            pb: isLast ? 0 : 5,
+                          }}
+                        >
+                          {/* Dot */}
+                          <Box
+                            sx={{
+                              position: "absolute",
+                              top: 5,
+                              left: -25.5,
+                              width: 11,
+                              height: 11,
+                              borderRadius: "50%",
+                              bgcolor: statusColor,
+                              border: `2px solid ${theme.palette.background.paper}`,
+                              boxShadow: `0 0 0 3px ${alpha(statusColor, 0.15)}`,
+                              zIndex: 1,
+                            }}
+                          />
+
+                          {/* Content */}
+                          <Stack sx={{ gap: 1 }}>
+                            <Stack
+                              direction="row"
+                              sx={{
+                                justifyContent: "space-between",
+                                alignItems: "center",
+                                flexWrap: "wrap",
+                                gap: 1,
+                              }}
+                            >
+                              <Chip
+                                color={statusColorMap[history.status] || "default"}
+                                label={normalizeEnumText(OrderStatus[history.status] || history.status)}
+                                size="small"
+                                variant="outlined"
+                                sx={{
+                                  fontWeight: 600,
+                                  fontSize: "0.75rem",
+                                  height: 24,
+                                }}
+                              />
+                              <Typography variant="caption" color="text.disabled" sx={{ fontSize: "0.75rem" }}>
+                                {formatDateTime(history.createdAt)}
+                              </Typography>
+                            </Stack>
+
+                            {history.changedBy?.fullName && (
+                              <Typography variant="body2" color="text.secondary" sx={{ fontSize: "0.8125rem" }}>
+                                Oleh: <Box component="span" sx={{ fontWeight: 500, color: "text.primary" }}>{history.changedBy.fullName}</Box>
+                              </Typography>
+                            )}
+
+                            {history.note && (
+                              <Typography
+                                variant="body2"
+                                color="text.secondary"
+                                sx={{
+                                  fontStyle: "italic",
+                                  bgcolor: alpha(theme.palette.secondary.main, 0.04),
+                                  px: 2,
+                                  py: 1.25,
+                                  borderRadius: 2,
+                                  mt: 0.5,
+                                  fontSize: "0.8125rem",
+                                  lineHeight: 1.6,
+                                }}
+                              >
+                                "{history.note}"
+                              </Typography>
+                            )}
                           </Stack>
-                          {history.changedBy?.fullName && (
-                            <Typography variant="caption" color="text.secondary">
-                              Oleh: {history.changedBy.fullName}
-                            </Typography>
-                          )}
-                          {history.note && (
-                            <Typography variant="caption" color="text.secondary" sx={{ fontStyle: "italic" }}>
-                              "{history.note}"
-                            </Typography>
-                          )}
-                        </Stack>
-                      </Box>
-                    ))}
+                        </Box>
+                      );
+                    })}
                   </Stack>
                 </Box>
               </Card>

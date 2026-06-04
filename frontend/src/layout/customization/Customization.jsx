@@ -5,13 +5,14 @@ import {
   Calculator as CalcIcon,
   ListTodo,
   Bot,
-  X,
+  Receipt ,
   Plus,
 } from "lucide-react";
-import { Calculator, Chat, Todo } from "./components";
+import { Calculator, Chat, Todo, TaxCalculator } from "./components";
 
 const menuItems = [
   { id: "calculator", icon: CalcIcon, label: "Kalkulator" },
+  { id: "tax", icon: Receipt, label: "Kalkulator Pajak" },
   { id: "todos", icon: ListTodo, label: "Catatan Cepat" },
   { id: "chat", icon: Bot, label: "Chat" },
 ];
@@ -59,26 +60,32 @@ const Customization = () => {
         ref={fabRef}
         sx={{
           position: "fixed",
-          top: "50%",
-          transform: "translateY(-50%)",
-          right: theme.spacing(1.5),
+          bottom: { xs: 16, sm: 24 },
+          right: { xs: 16, sm: 24 },
           zIndex: theme.zIndex.fab,
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "flex-end",
+          gap: 1.5,
         }}
       >
-        <Box
-          sx={{
-            position: "absolute",
-            bottom: 60,
-            right: 0,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "flex-end",
-            gap: theme.spacing(1.25),
-          }}
-        >
-          <AnimatePresence>
-            {open &&
-              menuItems.map((item, i) => (
+        {/* Menu Items */}
+        <AnimatePresence>
+          {open && (
+            <Box
+              component={motion.div}
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              sx={{
+                display: "flex",
+                flexDirection: "column-reverse",
+                alignItems: "flex-end",
+                gap: 1.5,
+                mb: 0.5,
+              }}
+            >
+              {menuItems.map((item, i) => (
                 <Tooltip
                   key={item.id}
                   title={item.label}
@@ -87,7 +94,7 @@ const Customization = () => {
                 >
                   <Box
                     component={motion.div}
-                    custom={i}
+                    custom={menuItems.length - 1 - i}
                     variants={menuVariants}
                     initial="hidden"
                     animate="visible"
@@ -119,9 +126,11 @@ const Customization = () => {
                   </Box>
                 </Tooltip>
               ))}
-          </AnimatePresence>
-        </Box>
+            </Box>
+          )}
+        </AnimatePresence>
 
+        {/* Main FAB */}
         <Tooltip
           title={open ? "Tutup menu" : "Tools"}
           placement="left"
@@ -133,10 +142,9 @@ const Customization = () => {
             sx={{
               width: 48,
               height: 48,
-              borderRadius: "50%",
               boxShadow: theme.shadows[4],
               transition: theme.transitions.create(
-                ["transform", "box-shadow", "border-radius"],
+                ["transform", "box-shadow"],
                 { duration: theme.transitions.duration.standard }
               ),
               "&:hover": {
@@ -163,8 +171,13 @@ const Customization = () => {
         </Tooltip>
       </Box>
 
+      {/* Portals */}
       <Calculator
         open={portalContent === "calculator"}
+        onClose={handleClosePortal}
+      />
+      <TaxCalculator
+        open={portalContent === "tax"}
         onClose={handleClosePortal}
       />
       <Todo open={portalContent === "todos"} onClose={handleClosePortal} />

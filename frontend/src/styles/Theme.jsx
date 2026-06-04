@@ -199,10 +199,8 @@ const componentsOverride = (theme) => ({
         backgroundColor: theme.palette.background.paper,
         border: `1px solid ${theme.palette.divider}`,
         boxShadow: theme.shadows[1],
-        transition: "box-shadow 0.2s ease, border-color 0.2s ease",
-        "&:hover": {
-          borderColor: theme.palette.secondary.main,
-        },
+  
+   
       },
     },
   },

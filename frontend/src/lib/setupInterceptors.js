@@ -97,26 +97,58 @@ export function setupInterceptors({ store }) {
           errorCode,
           message,
         });
-      } else if (
-        error.code === "ECONNABORTED" ||
-        error.message?.includes("timeout")
-      ) {
+      } else if (error.code === "ECONNABORTED") {
+        // Handling khusus untuk ECONNABORTED
+        errorCode = "CONNECTION_ABORTED";
+        message =
+          "Koneksi terputus secara tiba-tiba. Periksa koneksi internet Anda dan coba kembali.";
+        logger.warn("🔌 Connection aborted (ECONNABORTED):", {
+          url: config?.url,
+          timeout: config?.timeout,
+          message: error.message,
+        });
+      } else if (error.message?.includes("timeout")) {
         errorCode = "REQUEST_TIMEOUT";
         message =
           "Permintaan membutuhkan waktu terlalu lama. Periksa koneksi internet Anda dan coba kembali.";
-        logger.warn("⏰ Request timeout:", config?.url);
+        logger.warn("⏰ Request timeout:", {
+          url: config?.url,
+          timeout: config?.timeout,
+        });
       } else if (!navigator.onLine) {
         errorCode = "NO_INTERNET_CONNECTION";
         message =
           "Koneksi internet terputus. Periksa jaringan Anda dan coba kembali saat sudah terhubung.";
         logger.warn("📡 Tidak ada koneksi internet");
-      } else if (error.message?.includes("Network Error")) {
+      } else if (
+        error.message?.includes("Network Error") ||
+        error.code === "ERR_NETWORK"
+      ) {
         errorCode = "SERVER_UNREACHABLE";
         message =
           "Layanan sedang tidak dapat dijangkau. Periksa koneksi internet Anda atau coba beberapa saat lagi.";
-        logger.error("🌐 Network error:", config?.url);
+        logger.error("🌐 Network error:", {
+          url: config?.url,
+          code: error.code,
+          message: error.message,
+        });
+      } else if (error.code === "ECONNREFUSED") {
+        // Handling khusus untuk ECONNREFUSED
+        errorCode = "CONNECTION_REFUSED";
+        message =
+          "Koneksi ke server ditolak. Server mungkin sedang dalam pemeliharaan. Silakan coba beberapa saat lagi.";
+        logger.error("🚫 Connection refused (ECONNREFUSED):", {
+          url: config?.url,
+          message: error.message,
+        });
+      } else if (error.code === "ERR_CANCELED") {
+        // Handling untuk request yang dibatalkan
+        errorCode = "REQUEST_CANCELED";
+        message = "Permintaan dibatalkan.";
+        logger.debug("🛑 Request canceled:", config?.url);
       }
 
+      // Handling untuk status 401 (Unauthorized)
       if (statusCode === 401 && !isRedirecting) {
         const currentPath = window.location.pathname;
 
@@ -156,21 +188,28 @@ export function setupInterceptors({ store }) {
         });
       }
 
+      // Tampilkan notifikasi untuk error koneksi yang critical
+      const connectionErrors = [
+        "NO_INTERNET_CONNECTION",
+        "REQUEST_TIMEOUT",
+        "CONNECTION_ABORTED",
+        "CONNECTION_REFUSED",
+        "SERVER_UNREACHABLE",
+      ];
+
       if (
-        errorCode === "NO_INTERNET_CONNECTION" ||
-        errorCode === "REQUEST_TIMEOUT"
+        connectionErrors.includes(errorCode) &&
+        !config?.skipErrorNotification
       ) {
-        if (!config?.skipErrorNotification) {
-          store.dispatch(
-            showNotification({
-              title: getErrorTitle(errorCode),
-              message,
-              type: "error",
-              variant: "dialog",
-              autoHide: 6000,
-            })
-          );
-        }
+        store.dispatch(
+          showNotification({
+            title: getErrorTitle(errorCode),
+            message,
+            type: "error",
+            variant: "dialog",
+            autoHide: 6000,
+          })
+        );
       }
 
       const normalizedError = {
@@ -200,6 +239,15 @@ function getErrorTitle(code) {
 
     case "REQUEST_TIMEOUT":
       return "Waktu Permintaan Habis";
+
+    case "CONNECTION_ABORTED":
+      return "Koneksi Terputus";
+
+    case "CONNECTION_REFUSED":
+      return "Server Tidak Tersedia";
+
+    case "SERVER_UNREACHABLE":
+      return "Server Tidak Dapat Dijangkau";
 
     default:
       return "Gangguan Koneksi";

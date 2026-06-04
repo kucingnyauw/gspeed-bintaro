@@ -33,8 +33,6 @@ const MainContentStyled = styled("main", {
     backgroundColor: theme.palette.background.default,
     borderRadius: `${theme.shape.borderRadius}px`,
     border: "none",
-  
-
 
     transition: theme.transitions.create(["margin-left", "width"], {
       easing: theme.transitions.easing.sharp,
@@ -67,8 +65,12 @@ const MainContentStyled = styled("main", {
         duration: theme.transitions.duration.standard,
       }),
 
+      [theme.breakpoints.up("xs")]: {
+        padding: theme.spacing(3),
+      },
+
       [theme.breakpoints.up("sm")]: {
-        padding: theme.spacing(2.5),
+        padding: theme.spacing(3, 3.5),
       },
 
       [theme.breakpoints.up("md")]: {

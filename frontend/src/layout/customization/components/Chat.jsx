@@ -9,10 +9,9 @@ import {
   useTheme,
   Avatar,
   InputAdornment,
-  Collapse,
 } from "@mui/material";
 import { keyframes } from "@mui/material/styles";
-import { X, Send, Bot, ChevronDown, ChevronUp } from "lucide-react";
+import { X, Send, Bot } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
@@ -24,17 +23,13 @@ const fadeInUp = keyframes`
   to { opacity: 1; transform: translateY(0); }
 `;
 
-const fadeIn = keyframes`
-  from { opacity: 0; transform: translateY(8px); }
-  to { opacity: 1; transform: translateY(0); }
-`;
-
 const jumpDots = keyframes`
   0%, 80%, 100% { transform: translateY(0); }
   40% { transform: translateY(-5px); }
 `;
 
 /**
+ * TypewriterMessage - Menampilkan teks dengan efek ketik.
  * @param {Object} props
  * @param {string} props.content
  */
@@ -59,6 +54,7 @@ const TypewriterMessage = ({ content }) => {
 };
 
 /**
+ * MarkdownContent - Render markdown dengan styling theme.
  * @param {Object} props
  * @param {string} props.content
  */
@@ -66,34 +62,13 @@ const MarkdownContent = ({ content }) => {
   const theme = useTheme();
 
   const markdownStyles = {
-    "& p": {
-      m: 0,
-      lineHeight: 1.7,
-      color: "inherit",
-    },
-    "& p:not(:last-child)": {
-      mb: 1,
-    },
-    "& ul, & ol": {
-      m: 0,
-      pl: 2.5,
-      lineHeight: 1.7,
-      color: "inherit",
-    },
-    "& li:not(:last-child)": {
-      mb: 0.25,
-    },
-    "& strong": {
-      fontWeight: theme.typography.fontWeightBold,
-      color: "inherit",
-    },
-    "& em": {
-      fontStyle: "italic",
-    },
-    "& del": {
-      textDecoration: "line-through",
-      opacity: 0.7,
-    },
+    "& p": { m: 0, lineHeight: 1.7, color: "inherit" },
+    "& p:not(:last-child)": { mb: 1 },
+    "& ul, & ol": { m: 0, pl: 2.5, lineHeight: 1.7, color: "inherit" },
+    "& li:not(:last-child)": { mb: 0.25 },
+    "& strong": { fontWeight: theme.typography.fontWeightBold, color: "inherit" },
+    "& em": { fontStyle: "italic" },
+    "& del": { textDecoration: "line-through", opacity: 0.7 },
     "& code": {
       px: 0.75,
       py: 0.25,
@@ -138,11 +113,7 @@ const MarkdownContent = ({ content }) => {
       opacity: 0.8,
       fontStyle: "italic",
     },
-    "& hr": {
-      my: 1.5,
-      border: "none",
-      borderTop: `1px solid rgba(0,0,0,0.1)`,
-    },
+    "& hr": { my: 1.5, border: "none", borderTop: `1px solid rgba(0,0,0,0.1)` },
     "& h1, & h2, & h3, & h4, & h5, & h6": {
       m: 0,
       mt: 1.25,
@@ -150,16 +121,10 @@ const MarkdownContent = ({ content }) => {
       fontWeight: theme.typography.fontWeightBold,
       lineHeight: 1.3,
       color: "inherit",
-      "&:first-of-type": {
-        mt: 0,
-      },
+      "&:first-of-type": { mt: 0 },
     },
-    "& h3": {
-      fontSize: theme.typography.h6.fontSize,
-    },
-    "& h4": {
-      fontSize: theme.typography.body1.fontSize,
-    },
+    "& h3": { fontSize: theme.typography.h6.fontSize },
+    "& h4": { fontSize: theme.typography.body1.fontSize },
   };
 
   return (
@@ -172,6 +137,8 @@ const MarkdownContent = ({ content }) => {
 };
 
 /**
+ * Chat - Chatbot dialog dengan typewriter effect dan markdown rendering.
+ * Riwayat chat tetap tersimpan selama sesi (tidak di-reset saat buka/tutup).
  * @param {Object} props
  * @param {boolean} props.open
  * @param {Function} props.onClose
@@ -190,33 +157,20 @@ const Chat = ({ open, onClose }) => {
   } = useChat();
   const inputRef = useRef(null);
 
+  /**
+   * Flag untuk menandai apakah chat sudah pernah diinisialisasi.
+   * Hanya panggil initChat() sekali — saat pertama kali komponen mount.
+   */
+  const hasInitialized = useRef(false);
+
   const firstName = user?.fullName?.split(" ")[0] || "Sobat";
 
-  const [selectedItem, setSelectedItem] = useState(null);
-  const [showSuggestions, setShowSuggestions] = useState(true);
-
-  const suggestionsMap = {
-    ADMIN: [
-      { label: "Bagaimana kabar bengkel hari ini?", icon: "🏍️" },
-      { label: "Siapa mekanik dengan performa terbaik?", icon: "⭐" },
-      { label: "Sparepart apa yang paling laris?", icon: "🔥" },
-      { label: "Bagaimana target revenue bulan ini?", icon: "🎯" },
-    ],
-    CASHIER: [
-      { label: "Bagaimana penjualan saya hari ini?", icon: "💰" },
-      { label: "Shift saya sedang apa?", icon: "🔄" },
-    ],
-    MECHANIC: [
-      { label: "Job apa yang sedang saya kerjakan?", icon: "🔧" },
-      { label: "Bagaimana performa saya?", icon: "📊" },
-    ],
-  };
-
-  const availableSuggestions = suggestionsMap[user?.role] || [];
-
   useEffect(() => {
-    if (open) {
+    if (open && !hasInitialized.current) {
       initChat();
+      hasInitialized.current = true;
+    }
+    if (open) {
       setTimeout(() => inputRef.current?.focus(), 150);
     }
   }, [open, initChat]);
@@ -226,23 +180,6 @@ const Chat = ({ open, onClose }) => {
       e.preventDefault();
       sendMessage();
     }
-  };
-
-  /**
-   * @param {Object} suggestion
-   */
-  const handleSelectSuggestion = (suggestion) => {
-    setSelectedItem(suggestion);
-    setInput(suggestion.label);
-    setShowSuggestions(false);
-    setTimeout(() => inputRef.current?.focus(), 50);
-  };
-
-  const handleClearItem = () => {
-    setSelectedItem(null);
-    setInput("");
-    setShowSuggestions(true);
-    inputRef.current?.focus();
   };
 
   return (
@@ -256,92 +193,74 @@ const Chat = ({ open, onClose }) => {
         inset: 0,
         zIndex: theme.zIndex.modal + 1,
         display: open ? "flex" : "none",
-        alignItems: { xs: "flex-end", sm: "flex-end" },
-        justifyContent: { xs: "center", sm: "flex-end" },
-        p: { xs: theme.spacing(2), sm: theme.spacing(3) },
+        alignItems: { xs: "flex-end", sm: "center" },
+        justifyContent: "center",
+        p: { xs: 2, sm: 3 },
         bgcolor: "rgba(0,0,0,0.4)",
-        backdropFilter: `blur(6px)`,
+        backdropFilter: "blur(6px)",
       }}
     >
       <Box
         onClick={(e) => e.stopPropagation()}
         sx={{
-          width: { xs: "100%", sm: 420 },
-          maxWidth: 420,
-          height: { xs: "90vh", sm: 580 },
-          maxHeight: "90vh",
+          width: { xs: "100%", sm: 460 },
+          maxWidth: 460,
+          height: { xs: "92vh", sm: 620 },
+          maxHeight: "92vh",
           display: "flex",
           flexDirection: "column",
-          borderRadius: `${theme.shape.borderRadius}px`,
-          bgcolor: theme.palette.background.paper,
+          borderRadius: 3,
+          bgcolor: "background.paper",
           border: `1px solid ${theme.palette.divider}`,
-          boxShadow: theme.shadows[4],
+          boxShadow: `0 16px 48px rgba(0,0,0,0.18)`,
           overflow: "hidden",
-          animation: `${fadeInUp} ${theme.transitions.duration.standard}ms ${theme.transitions.easing.easeOut}`,
+          animation: `${fadeInUp} 0.35s ${theme.transitions.easing.easeOut}`,
         }}
       >
+        {/* HEADER */}
         <Stack
           direction="row"
           sx={{
             alignItems: "center",
             justifyContent: "space-between",
-            px: theme.spacing(3),
-            py: theme.spacing(3),
+            px: 3,
+            py: 2.5,
             borderBottom: `1px solid ${theme.palette.divider}`,
-            bgcolor: theme.palette.background.default,
+            bgcolor: "background.default",
             flexShrink: 0,
           }}
         >
-          <Stack
-            direction="row"
-            sx={{ gap: theme.spacing(2), alignItems: "center" }}
-          >
+          <Stack direction="row" sx={{ gap: 2, alignItems: "center" }}>
             <Avatar
               sx={{
-                width: 42,
-                height: 42,
-                bgcolor: theme.palette.secondary.main,
-                color: theme.palette.secondary.contrastText,
+                width: 44,
+                height: 44,
+                bgcolor: "secondary.main",
+                color: "secondary.contrastText",
                 borderRadius: "50%",
-                border: "none",
               }}
             >
-              <Bot size={22} strokeWidth={1.5} />
+              <Bot size={24} strokeWidth={1.5} />
             </Avatar>
             <Box>
               <Typography
                 variant="subtitle2"
-                sx={{
-                  fontWeight: theme.typography.fontWeightBold,
-                  lineHeight: 1.4,
-                  color: theme.palette.text.primary,
-                  mb: 0.5,
-                }}
+                sx={{ fontWeight: 700, lineHeight: 1.3 }}
               >
                 G-Speed Copilot
               </Typography>
-              <Stack
-                direction="row"
-                sx={{ gap: theme.spacing(1), alignItems: "center" }}
-              >
+              <Stack direction="row" sx={{ gap: 1, alignItems: "center", mt: 0.25 }}>
                 <Box
                   sx={{
-                    width: 7,
-                    height: 7,
+                    width: 8,
+                    height: 8,
                     borderRadius: "50%",
-                    bgcolor: theme.palette.success.main,
+                    bgcolor: "success.main",
+                    boxShadow: `0 0 0 3px rgba(46, 125, 50, 0.2)`,
                   }}
                 />
-                <Typography
-                  variant="caption"
-                  color="text.secondary"
-                  sx={{
-                    fontSize: theme.typography.caption.fontSize,
-                    fontWeight: theme.typography.fontWeightRegular,
-                    lineHeight: 1,
-                  }}
-                >
-                  Online
+                <Typography variant="caption" color="text.secondary">
+                  Online &bull; Siap membantu
                 </Typography>
               </Stack>
             </Box>
@@ -351,57 +270,71 @@ const Chat = ({ open, onClose }) => {
             size="small"
             aria-label="Tutup Chat"
             sx={{
-              color: theme.palette.text.secondary,
-              "&:hover": {
-                color: theme.palette.text.primary,
-                bgcolor: theme.palette.action.hover,
-              },
+              color: "text.secondary",
+              borderRadius: 2,
+              "&:hover": { color: "text.primary", bgcolor: "action.hover" },
             }}
           >
-            <X size={18} strokeWidth={1.5} />
+            <X size={20} strokeWidth={1.5} />
           </IconButton>
         </Stack>
 
+        {/* MESSAGES AREA */}
         <Box
           ref={scrollRef}
           sx={{
             flex: 1,
             overflowY: "auto",
-            px: theme.spacing(3),
-            py: theme.spacing(3),
+            px: 3,
+            py: 3,
             display: "flex",
             flexDirection: "column",
-            gap: theme.spacing(2.5),
+            gap: 3,
+            "&::-webkit-scrollbar": { width: 5 },
+            "&::-webkit-scrollbar-track": { bgcolor: "transparent" },
+            "&::-webkit-scrollbar-thumb": {
+              bgcolor: "divider",
+              borderRadius: 10,
+            },
           }}
         >
+          {/* EMPTY STATE */}
           {messages.length === 0 && !isPending && (
             <Stack
               sx={{
                 flex: 1,
                 alignItems: "center",
                 justifyContent: "center",
-                gap: theme.spacing(3),
-                py: theme.spacing(8),
+                gap: 3,
+                py: 6,
+                textAlign: "center",
               }}
             >
               <Avatar
                 sx={{
-                  width: 72,
-                  height: 72,
-                  bgcolor: theme.palette.secondary.main,
-                  color: theme.palette.secondary.contrastText,
+                  width: 80,
+                  height: 80,
+                  bgcolor: "secondary.main",
+                  color: "secondary.contrastText",
                   borderRadius: "50%",
-                  border: "none",
+                  boxShadow: `0 8px 24px rgba(0,0,0,0.12)`,
                 }}
               >
-                <Bot size={36} strokeWidth={1.5} />
+                <Bot size={40} strokeWidth={1.5} />
               </Avatar>
-              <MarkdownContent
-                content={`Halo **${firstName}**! 👋\n\nSelamat datang di **G-Speed Copilot**, asisten AI yang siap membantu operasional bengkel.\n\nKamu bisa tanya seputar performa bengkel, penjualan, stok barang, atau progress pekerjaan.\n\nYuk, mulai dengan pilih saran di bawah atau ketik langsung pertanyaanmu! 🚀`}
-              />
+              <Box sx={{ maxWidth: 320 }}>
+                <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
+                  Hai, {firstName}! 👋
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7 }}>
+                  Aku asisten AI-mu untuk operasional bengkel. Tanyakan apapun
+                  seputar performa, penjualan, stok, atau progress pekerjaan.
+                </Typography>
+              </Box>
             </Stack>
           )}
 
+          {/* MESSAGES */}
           {messages.map((msg, i) => {
             const isAgent = msg.role === "AGENT";
             const isLastAgentMessage =
@@ -414,43 +347,42 @@ const Chat = ({ open, onClose }) => {
                 sx={{
                   justifyContent: isAgent ? "flex-start" : "flex-end",
                   alignItems: "flex-end",
-                  gap: theme.spacing(1.5),
-                  animation: `${fadeInUp} ${theme.transitions.duration.shorter}ms ${theme.transitions.easing.easeOut}`,
+                  gap: 1.5,
+                  animation: `${fadeInUp} 0.25s ${theme.transitions.easing.easeOut}`,
                 }}
               >
                 {isAgent && (
                   <Avatar
                     sx={{
-                      width: 30,
-                      height: 30,
-                      bgcolor: theme.palette.secondary.main,
-                      color: theme.palette.secondary.contrastText,
+                      width: 32,
+                      height: 32,
+                      bgcolor: "secondary.main",
+                      color: "secondary.contrastText",
                       flexShrink: 0,
                       borderRadius: "50%",
-                      border: "none",
-                      mb: 0.5,
+                      mb: 0.25,
                     }}
                   >
-                    <Bot size={15} strokeWidth={1.5} />
+                    <Bot size={16} strokeWidth={1.5} />
                   </Avatar>
                 )}
+
                 <Box
                   sx={{
-                    maxWidth: isAgent ? "82%" : "75%",
-                    px: theme.spacing(2),
-                    py: theme.spacing(1.5),
+                    maxWidth: isAgent ? "82%" : "72%",
+                    px: 2.5,
+                    py: 2,
                     borderRadius: isAgent
-                      ? `4px ${theme.shape.borderRadius}px ${theme.shape.borderRadius}px 4px`
-                      : `${theme.shape.borderRadius}px 4px 4px ${theme.shape.borderRadius}px`,
-                    bgcolor: isAgent
-                      ? theme.palette.action.hover
-                      : theme.palette.secondary.main,
-                    color: isAgent
-                      ? theme.palette.text.primary
-                      : theme.palette.secondary.contrastText,
+                      ? `6px 20px 20px 6px`
+                      : `20px 6px 6px 20px`,
+                    bgcolor: isAgent ? "action.hover" : "secondary.main",
+                    color: isAgent ? "text.primary" : "secondary.contrastText",
+                    boxShadow: isAgent
+                      ? "none"
+                      : `0 4px 12px rgba(0,0,0,0.1)`,
                     ...(msg.isError && {
-                      bgcolor: theme.palette.error.main,
-                      color: theme.palette.error.contrastText,
+                      bgcolor: "error.main",
+                      color: "error.contrastText",
                     }),
                   }}
                 >
@@ -468,51 +400,51 @@ const Chat = ({ open, onClose }) => {
             );
           })}
 
+          {/* LOADING DOTS */}
           {isPending && (
             <Stack
               direction="row"
               sx={{
                 alignItems: "flex-end",
-                gap: theme.spacing(1.5),
-                animation: `${fadeInUp} ${theme.transitions.duration.shorter}ms ${theme.transitions.easing.easeOut}`,
+                gap: 1.5,
+                animation: `${fadeInUp} 0.25s ${theme.transitions.easing.easeOut}`,
               }}
             >
               <Avatar
                 sx={{
-                  width: 30,
-                  height: 30,
-                  bgcolor: theme.palette.secondary.main,
-                  color: theme.palette.secondary.contrastText,
+                  width: 32,
+                  height: 32,
+                  bgcolor: "secondary.main",
+                  color: "secondary.contrastText",
                   flexShrink: 0,
                   borderRadius: "50%",
-                  border: "none",
-                  mb: 0.5,
+                  mb: 0.25,
                 }}
               >
-                <Bot size={15} strokeWidth={1.5} />
+                <Bot size={16} strokeWidth={1.5} />
               </Avatar>
               <Box
                 sx={{
-                  px: theme.spacing(2.5),
-                  py: theme.spacing(2),
-                  borderRadius: `4px ${theme.shape.borderRadius}px ${theme.shape.borderRadius}px 4px`,
-                  bgcolor: theme.palette.action.hover,
+                  px: 3,
+                  py: 2.5,
+                  borderRadius: `6px 20px 20px 6px`,
+                  bgcolor: "action.hover",
                   display: "flex",
                   alignItems: "center",
-                  gap: theme.spacing(0.75),
+                  gap: 0.75,
                 }}
               >
                 {[0, 1, 2].map((i) => (
                   <Box
                     key={`dot-${i}`}
                     sx={{
-                      width: 6,
-                      height: 6,
+                      width: 8,
+                      height: 8,
                       borderRadius: "50%",
-                      bgcolor: theme.palette.secondary.main,
-                      opacity: theme.palette.action.disabledOpacity,
+                      bgcolor: "secondary.main",
+                      opacity: 0.5,
                       animation: `${jumpDots} 1.4s ease-in-out infinite`,
-                      animationDelay: `${i * 0.16}s`,
+                      animationDelay: `${i * 0.18}s`,
                     }}
                   />
                 ))}
@@ -520,268 +452,20 @@ const Chat = ({ open, onClose }) => {
             </Stack>
           )}
 
-          <Box sx={{ height: theme.spacing(0.5), flexShrink: 0 }} />
+          {/* Bottom spacer */}
+          <Box sx={{ height: 4, flexShrink: 0 }} />
         </Box>
 
-        {selectedItem && (
-          <Box
-            sx={{
-              px: theme.spacing(3),
-              py: theme.spacing(2),
-              borderTop: `1px solid ${theme.palette.divider}`,
-              bgcolor: theme.palette.background.default,
-              flexShrink: 0,
-            }}
-          >
-            <Stack
-              direction="row"
-              sx={{
-                alignItems: "center",
-                justifyContent: "space-between",
-                mb: theme.spacing(1.5),
-              }}
-            >
-              <Typography
-                variant="caption"
-                sx={{
-                  fontWeight: theme.typography.fontWeightMedium,
-                  color: theme.palette.text.secondary,
-                  fontSize: theme.typography.caption.fontSize,
-                }}
-              >
-                Pertanyaan terpilih
-              </Typography>
-              <IconButton
-                onClick={handleClearItem}
-                size="small"
-                aria-label="Hapus pertanyaan"
-                sx={{
-                  width: 22,
-                  height: 22,
-                  color: theme.palette.text.secondary,
-                  "&:hover": {
-                    color: theme.palette.error.main,
-                    bgcolor: theme.palette.action.hover,
-                  },
-                }}
-              >
-                <X size={14} strokeWidth={1.5} />
-              </IconButton>
-            </Stack>
-            <Box
-              sx={{
-                px: theme.spacing(2),
-                py: theme.spacing(1),
-                borderRadius: `${theme.shape.borderRadius}px`,
-                bgcolor: theme.palette.secondary.main,
-                color: theme.palette.secondary.contrastText,
-                display: "inline-flex",
-                alignItems: "center",
-                gap: theme.spacing(1),
-              }}
-            >
-              <Typography
-                variant="caption"
-                sx={{
-                  fontSize: theme.typography.caption.fontSize,
-                  fontWeight: theme.typography.fontWeightMedium,
-                }}
-              >
-                {selectedItem.icon} {selectedItem.label}
-              </Typography>
-            </Box>
-          </Box>
-        )}
-
-        <Collapse
-          in={
-            showSuggestions && !selectedItem && availableSuggestions.length > 0
-          }
-        >
-          <Box
-            sx={{
-              px: theme.spacing(3),
-              pt: theme.spacing(2.5),
-              pb: theme.spacing(2.5),
-              borderTop: `1px solid ${theme.palette.divider}`,
-              bgcolor: theme.palette.background.default,
-              flexShrink: 0,
-            }}
-          >
-            <Stack
-              direction="row"
-              sx={{
-                alignItems: "center",
-                justifyContent: "space-between",
-                mb: theme.spacing(2),
-              }}
-            >
-              <Typography
-                variant="caption"
-                color="text.secondary"
-                sx={{
-                  fontWeight: theme.typography.fontWeightMedium,
-                  fontSize: theme.typography.caption.fontSize,
-                  textTransform: "uppercase",
-                  letterSpacing: "0.05em",
-                }}
-              >
-                Saran Pertanyaan
-              </Typography>
-              <IconButton
-                onClick={() => setShowSuggestions(false)}
-                size="small"
-                aria-label="Sembunyikan saran"
-                sx={{
-                  width: 22,
-                  height: 22,
-                  color: theme.palette.text.secondary,
-                  "&:hover": {
-                    color: theme.palette.text.primary,
-                    bgcolor: theme.palette.action.hover,
-                  },
-                }}
-              >
-                <ChevronDown size={14} strokeWidth={1.5} />
-              </IconButton>
-            </Stack>
-            <Stack direction="column" sx={{ gap: theme.spacing(1.25) }}>
-              {availableSuggestions.map((suggestion, idx) => (
-                <Box
-                  key={`suggestion-${idx}`}
-                  onClick={() => handleSelectSuggestion(suggestion)}
-                  role="button"
-                  tabIndex={0}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === " ") {
-                      e.preventDefault();
-                      handleSelectSuggestion(suggestion);
-                    }
-                  }}
-                  sx={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: theme.spacing(2),
-                    px: theme.spacing(2),
-                    py: theme.spacing(1.5),
-                    borderRadius: `${theme.shape.borderRadius}px`,
-                    border: `1px solid ${theme.palette.divider}`,
-                    bgcolor: theme.palette.background.paper,
-                    cursor: "pointer",
-                    transition: theme.transitions.create(
-                      ["background-color", "border-color", "transform"],
-                      {
-                        duration: theme.transitions.duration.shorter,
-                      }
-                    ),
-                    "&:hover": {
-                      bgcolor: theme.palette.action.hover,
-                      borderColor: theme.palette.secondary.main,
-                      transform: "translateX(4px)",
-                    },
-                    "&:active": {
-                      transform: "translateX(2px) scale(0.99)",
-                    },
-                    "&:focus-visible": {
-                      outline: "none",
-                      borderColor: theme.palette.secondary.main,
-                    },
-                  }}
-                >
-                  <Avatar
-                    sx={{
-                      width: 36,
-                      height: 36,
-                      bgcolor: theme.palette.action.hover,
-                      borderRadius: "50%",
-                      border: "none",
-                      fontSize: "1rem",
-                      flexShrink: 0,
-                    }}
-                  >
-                    {suggestion.icon}
-                  </Avatar>
-                  <Typography
-                    variant="body2"
-                    sx={{
-                      fontWeight: theme.typography.fontWeightRegular,
-                      lineHeight: 1.5,
-                      color: theme.palette.text.primary,
-                      fontSize: theme.typography.body2.fontSize,
-                    }}
-                  >
-                    {suggestion.label}
-                  </Typography>
-                </Box>
-              ))}
-            </Stack>
-          </Box>
-        </Collapse>
-
-        {!showSuggestions &&
-          !selectedItem &&
-          availableSuggestions.length > 0 && (
-            <Box
-              sx={{
-                px: theme.spacing(3),
-                py: theme.spacing(2),
-                bgcolor: theme.palette.background.default,
-                borderTop: `1px solid ${theme.palette.divider}`,
-                flexShrink: 0,
-                display: "flex",
-                justifyContent: "center",
-              }}
-            >
-              <Box
-                onClick={() => setShowSuggestions(true)}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    setShowSuggestions(true);
-                  }
-                }}
-                sx={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: theme.spacing(1),
-                  px: theme.spacing(2),
-                  py: theme.spacing(1),
-                  borderRadius: `${theme.shape.borderRadius}px`,
-                  cursor: "pointer",
-                  color: theme.palette.secondary.main,
-                  transition: theme.transitions.create(["background-color"], {
-                    duration: theme.transitions.duration.shorter,
-                  }),
-                  "&:hover": {
-                    bgcolor: theme.palette.action.hover,
-                  },
-                }}
-              >
-                <ChevronUp size={14} strokeWidth={1.5} />
-                <Typography
-                  variant="caption"
-                  sx={{
-                    fontWeight: theme.typography.fontWeightMedium,
-                    fontSize: theme.typography.caption.fontSize,
-                  }}
-                >
-                  Saran pertanyaan
-                </Typography>
-              </Box>
-            </Box>
-          )}
-
+        {/* INPUT AREA */}
         <Stack
           direction="row"
           sx={{
             alignItems: "flex-end",
-            gap: theme.spacing(1.5),
-            px: theme.spacing(3),
-            py: theme.spacing(2.5),
+            gap: 1.5,
+            px: 3,
+            py: 3,
             borderTop: `1px solid ${theme.palette.divider}`,
-            bgcolor: theme.palette.background.default,
+            bgcolor: "background.default",
             flexShrink: 0,
           }}
         >
@@ -791,23 +475,19 @@ const Chat = ({ open, onClose }) => {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Tanyakan sesuatu..."
+            placeholder="Ketik pesan..."
             inputRef={inputRef}
             disabled={isPending}
             multiline
             maxRows={4}
             sx={{
               "& .MuiOutlinedInput-root": {
-                borderRadius: `${theme.shape.borderRadius}px`,
-                bgcolor: theme.palette.background.paper,
-                "& fieldset": {
-                  borderColor: theme.palette.divider,
-                },
-                "&:hover fieldset": {
-                  borderColor: theme.palette.secondary.main,
-                },
+                borderRadius: 3,
+                bgcolor: "background.paper",
+                "& fieldset": { borderColor: "divider" },
+                "&:hover fieldset": { borderColor: "secondary.main" },
                 "&.Mui-focused fieldset": {
-                  borderColor: theme.palette.secondary.main,
+                  borderColor: "secondary.main",
                   borderWidth: 1,
                 },
               },
@@ -823,27 +503,28 @@ const Chat = ({ open, onClose }) => {
                       size="small"
                       aria-label="Kirim pesan"
                       sx={{
-                        width: 36,
-                        height: 36,
-                        bgcolor: theme.palette.secondary.main,
-                        color: theme.palette.secondary.contrastText,
+                        width: 40,
+                        height: 40,
+                        bgcolor: "secondary.main",
+                        color: "secondary.contrastText",
                         borderRadius: "50%",
-                        transition: theme.transitions.create(
-                          ["background-color"],
-                          {
-                            duration: theme.transitions.duration.shorter,
-                          }
-                        ),
+                        boxShadow: `0 4px 12px rgba(0,0,0,0.15)`,
+                        transition: (t) =>
+                          t.transitions.create(["background-color", "transform"], {
+                            duration: t.transitions.duration.shorter,
+                          }),
                         "&:hover": {
-                          bgcolor: theme.palette.secondary.dark,
+                          bgcolor: "secondary.dark",
+                          transform: "scale(1.05)",
                         },
                         "&.Mui-disabled": {
-                          bgcolor: theme.palette.action.disabledBackground,
-                          color: theme.palette.action.disabled,
+                          bgcolor: "action.disabledBackground",
+                          color: "action.disabled",
+                          boxShadow: "none",
                         },
                       }}
                     >
-                      <Send size={15} strokeWidth={2} />
+                      <Send size={18} strokeWidth={2} />
                     </IconButton>
                   </InputAdornment>
                 ),

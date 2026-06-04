@@ -20,6 +20,8 @@ import {
   IconButton,
   Stack,
   useTheme,
+  Typography,
+  Divider,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { useDispatch, useSelector } from "react-redux";
@@ -34,27 +36,77 @@ import {
   selectNotificationAutoHide,
 } from "@store/notifications/notificationsSelector.js";
 
+/**
+ * MotionAlert - Alert component dengan animasi Framer Motion.
+ * Menggunakan spring animation untuk transisi masuk/keluar.
+ *
+ * @type {React.ComponentType}
+ */
 const MotionAlert = motion.create(Alert);
 
+/**
+ * NotificationHandler - Komponen global untuk menampilkan notifikasi.
+ *
+ * Mendukung dua variant:
+ * - `snackbar`: Notifikasi popup di bottom-right dengan animasi spring
+ * - `dialog`: Modal dialog untuk pesan penting yang memerlukan perhatian
+ *
+ * Fitur:
+ * - Animasi masuk/keluar dengan Framer Motion (snackbar)
+ * - Auto-hide dengan durasi yang dapat dikonfigurasi
+ * - Tombol "Segarkan" pada dialog untuk reload halaman
+ * - Tampilan responsif untuk mobile dan desktop
+ * - Warna dinamis berdasarkan tipe notifikasi (success/error/warning/info)
+ *
+ * @component
+ * @returns {JSX.Element|null} Komponen notifikasi atau null jika tidak ada
+ */
 const NotificationHandler = () => {
   const theme = useTheme();
   const dispatch = useDispatch();
 
+  /** @type {boolean} Status notifikasi dari Redux store */
   const open = useSelector(selectNotificationOpen);
+
+  /** @type {string} Tipe notifikasi (success/error/warning/info) */
   const type = useSelector(selectNotificationType) || "info";
+
+  /** @type {string} Judul notifikasi */
   const title = useSelector(selectNotificationTitle);
+
+  /** @type {string} Pesan notifikasi */
   const message = useSelector(selectNotificationMessage);
+
+  /** @type {string} Variant notifikasi (snackbar/dialog) */
   const variant = useSelector(selectNotificationVariant);
+
+  /** @type {number} Durasi auto-hide dalam milidetik */
   const autoHide = useSelector(selectNotificationAutoHide);
 
+  /**
+   * State lokal untuk mengontrol animasi keluar.
+   * Dipisahkan dari Redux state agar animasi bisa selesai sebelum unmount.
+   * @type {[boolean, Function]}
+   */
   const [localOpen, setLocalOpen] = useState(false);
 
+  /**
+   * Effect: Sinkronisasi Redux open state ke local state.
+   * Memastikan animasi masuk terpicu saat notifikasi muncul.
+   */
   useEffect(() => {
     if (open) {
       setLocalOpen(true);
     }
   }, [open]);
 
+  /**
+   * Handler untuk menutup notifikasi.
+   * Menjalankan animasi keluar terlebih dahulu, lalu dispatch hideNotification.
+   *
+   * @param {Object} event - Event yang memicu penutupan
+   * @param {string} reason - Alasan penutupan ("clickaway" untuk mencegah tutup saat klik luar)
+   */
   const handleClose = useCallback(
     (event, reason) => {
       if (reason === "clickaway") return;
@@ -64,6 +116,10 @@ const NotificationHandler = () => {
     [dispatch]
   );
 
+  /**
+   * Handler untuk tombol "Segarkan" pada dialog.
+   * Menutup notifikasi lalu reload halaman.
+   */
   const handleRefresh = () => {
     setLocalOpen(false);
     setTimeout(() => {
@@ -78,38 +134,36 @@ const NotificationHandler = () => {
     return (
       <Dialog open={open} onClose={handleClose} maxWidth="xs" fullWidth>
         {title && (
-          <DialogTitle
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              pb: 1.5,
-            }}
-          >
-            {title}
-            <IconButton
-              onClick={handleClose}
-              size="small"
-              sx={{
-                color: "text.secondary",
-                mr: -1,
-                "&:hover": {
-                  bgcolor: alpha(theme.palette.secondary.main, 0.08),
-                },
-              }}
+          <DialogTitle sx={{ pb: 1.5 }}>
+            <Stack
+              direction="row"
+              sx={{ justifyContent: "space-between", alignItems: "center" }}
             >
-              <X size={18} strokeWidth={2} />
-            </IconButton>
+              <Typography variant="h6" component="span" sx={{ fontWeight: 600 }}>
+                {title}
+              </Typography>
+              <IconButton
+                onClick={handleClose}
+                size="small"
+                sx={{ mr: -0.5 }}
+              >
+                <X size={18} strokeWidth={2} />
+              </IconButton>
+            </Stack>
           </DialogTitle>
         )}
 
-        <DialogContent dividers={!!title} sx={{ py: 3 }}>
-          <DialogContentText color="text.primary" sx={{ lineHeight: 1.6 }}>
+        <Divider />
+
+        <DialogContent sx={{ py: 3 }}>
+          <DialogContentText color="text.primary" sx={{ lineHeight: 1.7 }}>
             {message}
           </DialogContentText>
         </DialogContent>
 
-        <DialogActions sx={{ px: 3, py: 2 }}>
+        <Divider />
+
+        <DialogActions sx={{ px: 3, py: 2.5 }}>
           <Stack
             direction="row"
             sx={{
@@ -121,10 +175,14 @@ const NotificationHandler = () => {
             <Button
               color="inherit"
               onClick={handleRefresh}
-              startIcon={<RotateCcw size={16} strokeWidth={1.5} />}
               sx={{
+                fontWeight: 500,
+                textTransform: "none",
                 color: "text.secondary",
-                "&:hover": { color: "text.primary", bgcolor: "transparent" },
+                "&:hover": {
+                  color: "text.primary",
+                  bgcolor: "transparent",
+                },
               }}
             >
               Segarkan
@@ -134,6 +192,10 @@ const NotificationHandler = () => {
               disableElevation
               onClick={handleClose}
               color={type === "error" ? "error" : "primary"}
+              sx={{
+                fontWeight: 600,
+                textTransform: "none",
+              }}
             >
               Tutup
             </Button>

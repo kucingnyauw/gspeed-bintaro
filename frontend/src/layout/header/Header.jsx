@@ -1,3 +1,9 @@
+/**
+ * Header - Application header dengan branding, search, notifikasi, dan action icons
+ * Mobile/tablet: search menutupi seluruh header dengan icon dalam TextField, X button bg danger alpha
+ * @component
+ * @returns {JSX.Element} Rendered header component
+ */
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { useSelector, useDispatch } from "react-redux";
 import { useNavigate } from "react-router-dom";
@@ -15,11 +21,20 @@ import {
   TextField,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { Bell, Menu, Moon, ShoppingCart, Sun, Search, Maximize, Minimize } from "lucide-react";
+import {
+  Bell,
+  Menu,
+  Moon,
+  ShoppingCart,
+  Sun,
+  Search,
+  Maximize,
+  Minimize,
+  X,
+} from "lucide-react";
 
-import { selectSidebarIsOpen } from "@store/sidebar/sidebarSelector.js";
-import { toggleSidebar } from "@store/sidebar/sidebarSlices.js";
 import { selectCartItems } from "@store/cart/cartSelector.js";
+import { toggleSidebar } from "@store/sidebar/sidebarSlices.js";
 import { toggleTheme } from "@store/theme/themeSlices.js";
 import { selectThemeMode } from "@store/theme/themeSelector.js";
 import { selectUser } from "@store/auth/authSelector.js";
@@ -49,10 +64,12 @@ const Header = () => {
   const theme = useTheme();
   const dispatch = useDispatch();
   const navigate = useNavigate();
-  const { isMobile } = useDevice();
+  const { isMobile, isTablet } = useDevice();
   const isCashier = usePermission({ role: "CASHIER" });
 
-  const isOpen = useSelector(selectSidebarIsOpen);
+  /** Device kecil: mobile + tablet */
+  const isSmallDevice = isMobile || isTablet;
+
   const items = useSelector(selectCartItems);
   const mode = useSelector(selectThemeMode);
   const user = useSelector(selectUser);
@@ -183,6 +200,14 @@ const Header = () => {
   };
   const handleRefresh = () => refetch();
 
+  /**
+   * Buka/tutup search overlay (mobile & tablet)
+   */
+  const handleToggleMobileSearch = () => {
+    setShowMobileSearch((prev) => !prev);
+    setSearchVal("");
+  };
+
   const iconBtnStyle = {
     border: "1px solid",
     borderColor: alpha(theme.palette.divider, 0.8),
@@ -196,6 +221,24 @@ const Header = () => {
     },
   };
 
+  /**
+   * Style untuk icon wrapper di dalam TextField (search & close)
+   */
+  const adornmentIconWrapperStyle = {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: 28,
+    height: 26,
+    borderRadius: `${theme.shape.borderRadius}px`,
+  };
+
+  /**
+   * Padding left logo/menu header agar sejajar dengan menu items collapsed sidebar
+   */
+  const logoPl = `${3 * 8 - 4}px`;
+  const menuPl = `${2 * 8 - 4}px`;
+
   return (
     <>
       <AppBar
@@ -203,34 +246,113 @@ const Header = () => {
         elevation={0}
         sx={{
           width: "100%",
-          height: isMobile ? HEADER.MOBILE_HEIGHT : HEADER.DESKTOP_HEIGHT,
+          height: isSmallDevice ? HEADER.MOBILE_HEIGHT : HEADER.DESKTOP_HEIGHT,
           justifyContent: "center",
           bgcolor: "background.paper",
-          border : "none",
+          border: "none",
           zIndex: theme.zIndex.appBar,
         }}
       >
+        {/* MOBILE/TABLET SEARCH OVERLAY */}
+        {isSmallDevice && showMobileSearch && (
+          <Toolbar
+            sx={{
+              minHeight: `${HEADER.MOBILE_HEIGHT}px !important`,
+              px: 6,
+              display: "flex",
+              alignItems: "center",
+              bgcolor: "background.paper",
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              zIndex: 2,
+            }}
+          >
+            <TextField
+              fullWidth
+              autoFocus
+              size="small"
+              value={searchVal}
+              onChange={(e) => setSearchVal(e.target.value)}
+              placeholder="Cari halaman..."
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <Box
+                      sx={{
+                        ...adornmentIconWrapperStyle,
+                        bgcolor: alpha(theme.palette.secondary.main, 0.08),
+                        color: theme.palette.secondary.main,
+                        mr: 1,
+                      }}
+                    >
+                      <Search size={16} strokeWidth={1.5} />
+                    </Box>
+                  ),
+                  endAdornment: (
+                    <IconButton
+                      onClick={handleToggleMobileSearch}
+                      size="small"
+                      sx={{
+                        ml: 0.5,
+                        width: 28,
+                        height: 26,
+                        borderRadius: `${theme.shape.borderRadius}px`,
+                        bgcolor: alpha(theme.palette.error.main, 0.15),
+                        color: theme.palette.error.main,
+                        "&:hover": {
+                          bgcolor: alpha(theme.palette.error.main, 0.25),
+                          color: theme.palette.error.dark,
+                        },
+                      }}
+                    >
+                      <X size={16} strokeWidth={2} />
+                    </IconButton>
+                  ),
+                },
+              }}
+              sx={{
+                "& .MuiOutlinedInput-root": {
+                  borderRadius: `${theme.shape.borderRadius}px`,
+                  bgcolor: alpha(theme.palette.secondary.main, 0.04),
+                  "&:hover": {
+                    bgcolor: alpha(theme.palette.secondary.main, 0.06),
+                  },
+                  "&.Mui-focused": {
+                    bgcolor: "background.paper",
+                    boxShadow: `0 0 0 2px ${alpha(
+                      theme.palette.secondary.main,
+                      0.2
+                    )}`,
+                  },
+                },
+              }}
+            />
+          </Toolbar>
+        )}
+
+        {/* TOOLBAR UTAMA */}
         <Toolbar
           sx={{
             minHeight: `${
-              isMobile ? HEADER.MOBILE_HEIGHT : HEADER.DESKTOP_HEIGHT
+              isSmallDevice ? HEADER.MOBILE_HEIGHT : HEADER.DESKTOP_HEIGHT
             }px !important`,
-            pl: { xs: 1.5, sm: 2, md: 0 },
-            pr: { xs: 1.5, sm: 2, md: 2 },
-            display: "flex",
+            pl: { xs: 4, sm: 2, md: 0 },
+            pr: { xs: 4, sm: 2, md: 2 },
+            display: isSmallDevice && showMobileSearch ? "none" : "flex",
             gap: { xs: 1, sm: 2 },
           }}
         >
-          {/* LEFT BOX */}
+          {/* LEFT BOX — Logo & Sidebar Toggle */}
           <Box
             sx={{
-              display: showMobileSearch ? "none" : "flex",
+              display: "flex",
               alignItems: "center",
-              gap: 1.5,
+              justifyContent: { xs: "flex-start", md: "space-between" },
               width: { xs: "auto", md: `${SIDEBAR.EXPANDED_WIDTH}px` },
-              justifyContent: "flex-start",
-              pl: { xs: 0, md: 3 },
-              pr: { xs: 0, md: 2 },
+              pl: { xs: 0, md: logoPl },
+              pr: { xs: 0, md: 3 },
               flexShrink: 0,
             }}
           >
@@ -240,7 +362,7 @@ const Header = () => {
               alt={INFO.name}
               sx={{
                 display: { xs: "none", md: "block" },
-                height: 40,
+                height: 36,
                 width: "auto",
                 maxWidth: 120,
                 objectFit: "contain",
@@ -253,8 +375,8 @@ const Header = () => {
                 size="small"
                 sx={{
                   ...iconBtnStyle,
-                  ml: { xs: 0, md: "auto" },
                   flexShrink: 0,
+                  ml: { xs: menuPl, md: menuPl },
                 }}
               >
                 <Menu size={18} strokeWidth={1.5} />
@@ -262,12 +384,12 @@ const Header = () => {
             </Tooltip>
           </Box>
 
-          {/* CENTER BOX (Search Bar) */}
+          {/* CENTER BOX — Search Bar (Desktop only) */}
           <Box
             sx={{
               flex: 1,
-              display: { xs: showMobileSearch ? "flex" : "none", md: "flex" },
-              justifyContent: { xs: "flex-start", md: "center" },
+              display: { xs: "none", md: "flex" },
+              justifyContent: "center",
               position: "relative",
               minWidth: 0,
             }}
@@ -283,12 +405,7 @@ const Header = () => {
                   startAdornment: (
                     <Box
                       sx={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        width: 32,
-                        height: 26,
-                        borderRadius: `${theme.shape.borderRadius}px`,
+                        ...adornmentIconWrapperStyle,
                         bgcolor: alpha(theme.palette.secondary.main, 0.08),
                         color: theme.palette.secondary.main,
                         mr: 1,
@@ -297,19 +414,34 @@ const Header = () => {
                       <Search size={14} strokeWidth={1.5} />
                     </Box>
                   ),
+                  endAdornment: searchVal ? (
+                    <IconButton
+                      onClick={() => setSearchVal("")}
+                      size="small"
+                      sx={{
+                        ml: 0.5,
+                        color: "text.secondary",
+                        "&:hover": {
+                          color: theme.palette.secondary.main,
+                        },
+                      }}
+                    >
+                      <X size={14} strokeWidth={1.5} />
+                    </IconButton>
+                  ) : null,
                 },
               }}
-              sx={{ maxWidth: { xs: "100%", md: 320 } }}
+              sx={{ maxWidth: 320 }}
             />
             {filteredPages.length > 0 && (
               <Box
                 sx={{
                   position: "absolute",
                   top: "calc(100% + 8px)",
-                  left: { xs: 0, md: "50%" },
-                  transform: { xs: "none", md: "translateX(-50%)" },
+                  left: "50%",
+                  transform: "translateX(-50%)",
                   width: "100%",
-                  maxWidth: { xs: "100%", md: 320 },
+                  maxWidth: 320,
                   bgcolor: "background.paper",
                   borderRadius: `${theme.shape.borderRadius}px`,
                   border: `1px solid ${theme.palette.divider}`,
@@ -328,7 +460,6 @@ const Header = () => {
                     onClick={() => {
                       navigate(page.path);
                       setSearchVal("");
-                      setShowMobileSearch(false);
                     }}
                     sx={{
                       px: 2,
@@ -358,28 +489,28 @@ const Header = () => {
             )}
           </Box>
 
-          {/* SPACER */}
+          {/* SPACER — Mobile only */}
           <Box
             sx={{
               flexGrow: 1,
-              display: { xs: showMobileSearch ? "none" : "block", md: "none" },
+              display: { xs: "block", md: "none" },
             }}
           />
 
-          {/* RIGHT BOX (Action Icons) */}
+          {/* RIGHT BOX — Action Icons */}
           <Box
             sx={{
               display: "flex",
               alignItems: "center",
               justifyContent: "flex-end",
-              gap: "10px", // Memberikan gap statis 10px antar setiap elemen
+              gap: "10px",
               flexShrink: 0,
             }}
           >
-            {/* Search Tooltip (hanya muncul di mobile jika search disembunyikan) */}
-            <Tooltip title="Pencarian">
+            {/* Search — Mobile/tablet only */}
+            <Tooltip title="Pencarian" enterDelay={300} leaveDelay={0}>
               <IconButton
-                onClick={() => setShowMobileSearch(!showMobileSearch)}
+                onClick={handleToggleMobileSearch}
                 sx={{
                   ...iconBtnStyle,
                   display: { xs: "inline-flex", md: "none" },
@@ -389,8 +520,12 @@ const Header = () => {
               </IconButton>
             </Tooltip>
 
-            {/* Fullscreen Tooltip */}
-            <Tooltip title={isFullscreen ? "Keluar Layar Penuh" : "Layar Penuh"}>
+            {/* Fullscreen */}
+            <Tooltip
+              title={isFullscreen ? "Keluar Layar Penuh" : "Layar Penuh"}
+              enterDelay={300}
+              leaveDelay={0}
+            >
               <IconButton
                 onClick={handleToggleFullscreen}
                 sx={{
@@ -406,8 +541,12 @@ const Header = () => {
               </IconButton>
             </Tooltip>
 
-            {/* Theme Tooltip */}
-            <Tooltip title={mode === "dark" ? "Mode Terang" : "Mode Gelap"}>
+            {/* Theme */}
+            <Tooltip
+              title={mode === "dark" ? "Mode Terang" : "Mode Gelap"}
+              enterDelay={300}
+              leaveDelay={0}
+            >
               <IconButton
                 onClick={handleToggleTheme}
                 sx={{
@@ -423,8 +562,8 @@ const Header = () => {
               </IconButton>
             </Tooltip>
 
-            {/* Notifikasi Tooltip */}
-            <Tooltip title="Notifikasi">
+            {/* Notifikasi */}
+            <Tooltip title="Notifikasi" enterDelay={300} leaveDelay={0}>
               <IconButton onClick={handleNotifOpen} sx={iconBtnStyle}>
                 <Badge
                   badgeContent={unreadCount}
@@ -443,9 +582,9 @@ const Header = () => {
               </IconButton>
             </Tooltip>
 
-            {/* Keranjang Tooltip (Hanya untuk Cashier) */}
+            {/* Keranjang — Cashier only */}
             {isCashier && (
-              <Tooltip title="Keranjang">
+              <Tooltip title="Keranjang" enterDelay={300} leaveDelay={0}>
                 <IconButton
                   onClick={handleToggleCart}
                   sx={{
@@ -477,14 +616,14 @@ const Header = () => {
               sx={{ height: 24, alignSelf: "center", mx: "2px" }}
             />
 
-            {/* Profil Avatar Tooltip */}
-            <Tooltip title="Profil Pengguna">
+            {/* Profil */}
+            <Tooltip title="Profil Pengguna" enterDelay={300} leaveDelay={0}>
               <Avatar
                 onClick={handleProfileOpen}
                 src={getAvatarUrl(user?.fullName)}
                 sx={{
-                  width: { xs: 30, sm: 36 },
-                  height: { xs: 30, sm: 36 },
+                  width: { xs: 32, sm: 36 },
+                  height: { xs: 32, sm: 36 },
                   cursor: "pointer",
                   border: "1px solid",
                   borderRadius: "50%",
@@ -498,6 +637,59 @@ const Header = () => {
             </Tooltip>
           </Box>
         </Toolbar>
+
+        {/* SEARCH RESULTS DROPDOWN — Mobile */}
+        {isSmallDevice && showMobileSearch && filteredPages.length > 0 && (
+          <Box
+            sx={{
+              position: "fixed",
+              top: HEADER.MOBILE_HEIGHT,
+              left: 0,
+              right: 0,
+              bgcolor: "background.paper",
+              borderBottom: `1px solid ${theme.palette.divider}`,
+              boxShadow: `0 8px 24px ${alpha(theme.palette.common.black, 0.1)}`,
+              maxHeight: "calc(100vh - 56px)",
+              overflowY: "auto",
+              zIndex: theme.zIndex.appBar + 1,
+            }}
+          >
+            {filteredPages.map((page) => (
+              <Box
+                key={page.path}
+                onClick={() => {
+                  navigate(page.path);
+                  setSearchVal("");
+                  setShowMobileSearch(false);
+                }}
+                sx={{
+                  px: 2,
+                  py: 2,
+                  cursor: "pointer",
+                  display: "flex",
+                  flexDirection: "column",
+                  transition: "background-color 0.15s ease",
+                  "&:hover": {
+                    bgcolor: alpha(theme.palette.secondary.main, 0.06),
+                  },
+                  "&:not(:last-child)": {
+                    borderBottom: `1px solid ${alpha(
+                      theme.palette.divider,
+                      0.4
+                    )}`,
+                  },
+                }}
+              >
+                <Typography variant="body1" fontWeight={500}>
+                  {page.label}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {page.path}
+                </Typography>
+              </Box>
+            ))}
+          </Box>
+        )}
       </AppBar>
 
       {isCashier && <HeaderCart open={cartOpen} onClose={handleToggleCart} />}

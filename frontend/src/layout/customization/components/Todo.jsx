@@ -26,6 +26,9 @@ import {
   selectCompletedTodos,
 } from "@store/todo/todoSelector.js";
 
+/**
+ * EmptyState - Tampilan saat belum ada catatan.
+ */
 const EmptyState = () => {
   const theme = useTheme();
 
@@ -35,30 +38,43 @@ const EmptyState = () => {
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        py: theme.spacing(8),
-        gap: theme.spacing(3),
+        py: 10,
+        gap: 3,
       }}
     >
       <Box
         sx={{
-          width: 80,
-          height: 80,
+          width: 88,
+          height: 88,
           borderRadius: "50%",
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           bgcolor: alpha(theme.palette.secondary.main, 0.06),
-          fontSize: "2rem",
+          border: `2px dashed ${alpha(theme.palette.secondary.main, 0.15)}`,
         }}
       >
-        📝
+        <svg
+          width="32"
+          height="32"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke={theme.palette.secondary.main}
+          strokeWidth="1.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          opacity={0.6}
+        >
+          <path d="M9 11l3 3L22 4" />
+          <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
+        </svg>
       </Box>
-      <Box sx={{ textAlign: "center" }}>
+      <Box sx={{ textAlign: "center", maxWidth: 260 }}>
         <Typography
-          variant="body1"
+          variant="subtitle1"
           sx={{
-            fontWeight: theme.typography.fontWeightMedium,
-            color: theme.palette.text.secondary,
+            fontWeight: 600,
+            color: "text.secondary",
             mb: 0.75,
           }}
         >
@@ -67,8 +83,8 @@ const EmptyState = () => {
         <Typography
           variant="body2"
           sx={{
-            color: theme.palette.text.disabled,
-            fontSize: theme.typography.body2.fontSize,
+            color: "text.disabled",
+            lineHeight: 1.6,
           }}
         >
           Tulis catatan baru untuk memulai
@@ -95,6 +111,7 @@ const itemVariants = {
 };
 
 /**
+ * Todo - Dialog catatan cepat dengan fitur tambah, checklist, hapus, dan bersihkan.
  * @param {Object} props
  * @param {boolean} props.open
  * @param {Function} props.onClose
@@ -149,45 +166,47 @@ const Todo = ({ open, onClose }) => {
         display: open ? "flex" : "none",
         alignItems: "center",
         justifyContent: "center",
-        bgcolor: alpha(theme.palette.common.black, 0.3),
-        backdropFilter: "blur(4px)",
+        p: 2,
+        bgcolor: alpha(theme.palette.common.black, 0.45),
+        backdropFilter: "blur(8px)",
       }}
     >
       <Box
         onClick={(e) => e.stopPropagation()}
         sx={{
-          width: { xs: "94vw", sm: 480 },
-          maxWidth: 480,
-          minHeight: 420,
-          maxHeight: "85vh",
+          width: { xs: "100%", sm: 500 },
+          maxWidth: 500,
+          minHeight: 460,
+          maxHeight: "88vh",
           display: "flex",
           flexDirection: "column",
-          borderRadius: `${theme.shape.borderRadius * 1.5}px`,
-          bgcolor: theme.palette.background.paper,
+          borderRadius: 3,
+          bgcolor: "background.paper",
           border: `1px solid ${theme.palette.divider}`,
-          boxShadow: theme.shadows[12],
+          boxShadow: `0 24px 64px ${alpha(theme.palette.common.black, 0.2)}`,
           overflow: "hidden",
         }}
       >
+        {/* HEADER */}
         <Stack
           direction="row"
           sx={{
             alignItems: "center",
             justifyContent: "space-between",
-            px: theme.spacing(3),
-            py: theme.spacing(2.5),
+            px: 3,
+            py: 2.5,
             borderBottom: `1px solid ${theme.palette.divider}`,
-            bgcolor: alpha(theme.palette.background.default, 0.5),
+            bgcolor: alpha(theme.palette.background.default, 0.6),
             flexShrink: 0,
           }}
         >
-          <Stack direction="row" sx={{ gap: theme.spacing(1.5), alignItems: "center" }}>
+          <Stack direction="row" sx={{ gap: 1.5, alignItems: "center" }}>
             <Typography
               variant="h6"
               sx={{
-                fontWeight: theme.typography.fontWeightBold,
-                color: theme.palette.text.primary,
-                fontSize: "1rem",
+                fontWeight: 700,
+                color: "text.primary",
+                fontSize: "1.0625rem",
                 letterSpacing: "-0.01em",
               }}
             >
@@ -198,15 +217,16 @@ const Todo = ({ open, onClose }) => {
                 sx={{
                   px: 1.25,
                   py: 0.375,
-                  borderRadius: `${theme.shape.borderRadius}px`,
+                  borderRadius: 1.5,
                   bgcolor: alpha(theme.palette.secondary.main, 0.1),
+                  border: `1px solid ${alpha(theme.palette.secondary.main, 0.15)}`,
                 }}
               >
                 <Typography
                   variant="caption"
                   sx={{
-                    fontWeight: theme.typography.fontWeightBold,
-                    color: theme.palette.secondary.main,
+                    fontWeight: 700,
+                    color: "secondary.main",
                     fontSize: "0.75rem",
                   }}
                 >
@@ -221,22 +241,34 @@ const Todo = ({ open, onClose }) => {
               size="small"
               aria-label="Tutup catatan"
               sx={{
-                width: 32,
-                height: 32,
-                color: theme.palette.text.secondary,
+                color: "text.secondary",
+                borderRadius: 2,
                 "&:hover": {
-                  color: theme.palette.text.primary,
-                  bgcolor: theme.palette.action.hover,
+                  color: "error.main",
+                  bgcolor: alpha(theme.palette.error.main, 0.08),
                 },
               }}
             >
-              <X size={18} strokeWidth={1.5} />
+              <X size={20} strokeWidth={1.5} />
             </IconButton>
           </Tooltip>
         </Stack>
 
-        <Box sx={{ p: theme.spacing(3), flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-          <Stack direction="row" sx={{ gap: theme.spacing(1.5), mb: theme.spacing(3), flexShrink: 0 }}>
+        {/* BODY */}
+        <Box
+          sx={{
+            p: 3,
+            flex: 1,
+            display: "flex",
+            flexDirection: "column",
+            overflow: "hidden",
+          }}
+        >
+          {/* INPUT ROW */}
+          <Stack
+            direction="row"
+            sx={{ gap: 1.5, mb: 3, flexShrink: 0 }}
+          >
             <TextField
               fullWidth
               size="medium"
@@ -247,17 +279,17 @@ const Todo = ({ open, onClose }) => {
               autoFocus
               sx={{
                 "& .MuiOutlinedInput-root": {
-                  borderRadius: `${theme.shape.borderRadius}px`,
-                  bgcolor: theme.palette.background.default,
+                  borderRadius: 2,
+                  bgcolor: "background.default",
                   fontSize: "0.9375rem",
                   "& fieldset": {
-                    borderColor: theme.palette.divider,
+                    borderColor: "divider",
                   },
                   "&:hover fieldset": {
-                    borderColor: theme.palette.secondary.main,
+                    borderColor: "secondary.main",
                   },
                   "&.Mui-focused fieldset": {
-                    borderColor: theme.palette.secondary.main,
+                    borderColor: "secondary.main",
                     borderWidth: 1,
                   },
                 },
@@ -267,42 +299,53 @@ const Todo = ({ open, onClose }) => {
               <IconButton
                 onClick={handleAdd}
                 disabled={!text.trim()}
-                size="medium"
                 sx={{
-                  width: 48,
-                  height: 48,
-                  borderRadius: `${theme.shape.borderRadius}px`,
-                  color: theme.palette.secondary.contrastText,
-                  bgcolor: theme.palette.secondary.main,
-                  transition: theme.transitions.create(
-                    ["background-color", "transform"],
-                    { duration: theme.transitions.duration.shorter }
-                  ),
+                  width: 50,
+                  height: 50,
+                  borderRadius: 2,
+                  color: "secondary.contrastText",
+                  bgcolor: "secondary.main",
+                  boxShadow: `0 4px 14px ${alpha(theme.palette.secondary.main, 0.3)}`,
+                  transition: (t) =>
+                    t.transitions.create(
+                      ["background-color", "transform", "box-shadow"],
+                      { duration: t.transitions.duration.shorter }
+                    ),
                   "&:hover": {
-                    bgcolor: theme.palette.secondary.dark,
+                    bgcolor: "secondary.dark",
+                    boxShadow: `0 6px 20px ${alpha(theme.palette.secondary.main, 0.4)}`,
                   },
                   "&:active": {
-                    transform: "scale(0.95)",
+                    transform: "scale(0.94)",
                   },
                   "&.Mui-disabled": {
-                    bgcolor: theme.palette.action.disabledBackground,
-                    color: theme.palette.action.disabled,
+                    bgcolor: "action.disabledBackground",
+                    color: "action.disabled",
+                    boxShadow: "none",
                   },
                 }}
               >
-                <Plus size={22} strokeWidth={2} />
+                <Plus size={24} strokeWidth={2} />
               </IconButton>
             </Tooltip>
           </Stack>
 
+          {/* EMPTY STATE */}
           {todos.length === 0 ? (
             <EmptyState />
           ) : (
+            /* TODO LIST */
             <Stack
               sx={{
                 gap: 0.5,
                 flex: 1,
                 overflowY: "auto",
+                "&::-webkit-scrollbar": { width: 5 },
+                "&::-webkit-scrollbar-track": { bgcolor: "transparent" },
+                "&::-webkit-scrollbar-thumb": {
+                  bgcolor: "divider",
+                  borderRadius: 10,
+                },
               }}
             >
               <AnimatePresence>
@@ -320,46 +363,73 @@ const Todo = ({ open, onClose }) => {
                       direction="row"
                       sx={{
                         alignItems: "center",
-                        gap: theme.spacing(1.5),
-                        py: theme.spacing(1.5),
-                        px: theme.spacing(1.5),
-                        borderRadius: `${theme.shape.borderRadius}px`,
-                        transition: theme.transitions.create(["background-color"], {
-                          duration: theme.transitions.duration.shorter,
-                        }),
+                        gap: 1.5,
+                        py: 1.75,
+                        px: 2,
+                        borderRadius: 2,
+                        transition: (t) =>
+                          t.transitions.create("background-color", {
+                            duration: t.transitions.duration.shorter,
+                          }),
                         "&:hover": {
-                          bgcolor: theme.palette.action.hover,
+                          bgcolor: "action.hover",
                         },
                         "&:hover .delete-btn": {
                           opacity: 1,
                         },
                       }}
                     >
-                      <Checkbox
-                        size="medium"
-                        checked={todo.isCompleted}
-                        onChange={() => handleToggle(todo.id)}
+                      {/* Custom outlined checkbox via SVG */}
+                      <Box
+                        onClick={() => handleToggle(todo.id)}
                         sx={{
-                          color: alpha(theme.palette.secondary.main, 0.4),
-                          "&.Mui-checked": {
-                            color: theme.palette.success.main,
-                          },
+                          width: 22,
+                          height: 22,
+                          flexShrink: 0,
+                          cursor: "pointer",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
                         }}
-                      />
+                      >
+                        <svg
+                          width="22"
+                          height="22"
+                          viewBox="0 0 24 24"
+                          fill={todo.isCompleted ? theme.palette.success.main : "none"}
+                          stroke={
+                            todo.isCompleted
+                              ? theme.palette.success.main
+                              : alpha(theme.palette.secondary.main, 0.4)
+                          }
+                          strokeWidth="2"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        >
+                          <rect x="3" y="3" width="18" height="18" rx="4" ry="4" />
+                          {todo.isCompleted && (
+                            <polyline points="8 12 11 15 16 9" />
+                          )}
+                        </svg>
+                      </Box>
+
                       <Typography
                         variant="body1"
                         sx={{
                           flex: 1,
-                          textDecoration: todo.isCompleted ? "line-through" : "none",
+                          textDecoration: todo.isCompleted
+                            ? "line-through"
+                            : "none",
                           color: todo.isCompleted
-                            ? theme.palette.text.disabled
-                            : theme.palette.text.primary,
+                            ? "text.disabled"
+                            : "text.primary",
                           fontSize: "0.9375rem",
                           lineHeight: 1.5,
                         }}
                       >
                         {todo.text}
                       </Typography>
+
                       <Tooltip title="Hapus" arrow>
                         <IconButton
                           size="small"
@@ -367,15 +437,17 @@ const Todo = ({ open, onClose }) => {
                           className="delete-btn"
                           sx={{
                             opacity: 0,
-                            transition: theme.transitions.create(["opacity", "background-color"], {
-                              duration: theme.transitions.duration.shorter,
-                            }),
-                            color: theme.palette.text.secondary,
+                            transition: (t) =>
+                              t.transitions.create(
+                                ["opacity", "background-color"],
+                                { duration: t.transitions.duration.shorter }
+                              ),
+                            color: "text.secondary",
                             p: 0.75,
-                            borderRadius: `${theme.shape.borderRadius}px`,
+                            borderRadius: 2,
                             "&:hover": {
                               bgcolor: alpha(theme.palette.error.main, 0.08),
-                              color: theme.palette.error.main,
+                              color: "error.main",
                             },
                           }}
                         >
@@ -389,26 +461,27 @@ const Todo = ({ open, onClose }) => {
             </Stack>
           )}
 
+          {/* CLEAR COMPLETED */}
           {completedTodos.length > 0 && (
             <Box
               sx={{
-                mt: theme.spacing(3),
-                pt: theme.spacing(2.5),
+                mt: 3,
+                pt: 2.5,
                 borderTop: `1px solid ${theme.palette.divider}`,
                 textAlign: "center",
                 flexShrink: 0,
               }}
             >
               <Button
-                size="medium"
                 onClick={handleClearCompleted}
                 sx={{
-                  fontWeight: theme.typography.fontWeightMedium,
+                  fontWeight: 600,
                   textTransform: "none",
                   fontSize: "0.875rem",
-                  color: theme.palette.error.main,
-                  px: theme.spacing(3),
-                  py: theme.spacing(1),
+                  color: "error.main",
+                  px: 3,
+                  py: 1.25,
+                  borderRadius: 2,
                   "&:hover": {
                     bgcolor: alpha(theme.palette.error.main, 0.06),
                   },

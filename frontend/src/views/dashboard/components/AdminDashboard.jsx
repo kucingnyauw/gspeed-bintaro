@@ -3,6 +3,7 @@ import PropTypes from "prop-types";
 import {
   Box,
   Card,
+  Chip,
   Divider,
   IconButton,
   Skeleton,
@@ -21,15 +22,13 @@ import {
   TrendingUp,
   Users,
   AlertCircle,
+  Car,
+  
 } from "lucide-react";
 
 import { formatDate, formatToIdr } from "@shared/utils";
 import { BarChart, SummaryCard } from "@components";
 
-/**
- * Komponen SVG untuk menampilkan ilustrasi stok kosong.
- * @returns {JSX.Element} Ilustrasi SVG stok
- */
 const EmptyStockSVG = () => (
   <Box
     component="svg"
@@ -73,14 +72,6 @@ const EmptyStockSVG = () => (
   </Box>
 );
 
-/**
- * Komponen untuk menampilkan pesan ketika data kosong.
- * @param {Object} props - Properti komponen
- * @param {string} props.title - Judul pesan
- * @param {string} props.description - Deskripsi pesan
- * @param {React.ReactNode} props.children - Konten ilustrasi atau elemen tambahan
- * @returns {JSX.Element} Tampilan status kosong
- */
 const EmptyState = ({ title, description, children }) => (
   <Stack
     sx={{
@@ -110,44 +101,9 @@ EmptyState.propTypes = {
   children: PropTypes.node.isRequired,
 };
 
-/**
- * Dashboard Admin - Menampilkan ringkasan bisnis, stok menipis, dan metrik utama untuk administrator.
- * @param {Object} props - Properti komponen
- * @param {Object} [props.data] - Data dashboard admin
- * @param {Object} [props.data.activeShift] - Informasi shift yang sedang aktif
- * @param {string} props.data.activeShift.cashier - Nama kasir yang bertugas
- * @param {number} props.data.activeShift.orderCount - Jumlah pesanan dalam shift
- * @param {string} props.data.activeShift.openedAt - Waktu shift dibuka
- * @param {number} props.data.activeShift.startingCash - Saldo awal shift
- * @param {Object} [props.data.inventory] - Data inventaris
- * @param {number} props.data.inventory.activeProducts - Jumlah produk aktif
- * @param {number} props.data.inventory.lowStockCount - Jumlah produk stok menipis
- * @param {number} props.data.inventory.totalProducts - Total produk
- * @param {Array<{name: string, stock: number}>} [props.data.inventory.lowStockProducts] - Daftar produk dengan stok menipis
- * @param {Object} [props.data.pending] - Data pesanan tertunda
- * @param {number} props.data.pending.orders - Jumlah pesanan tertunda
- * @param {Object} [props.data.thisMonth] - Statistik bulan ini
- * @param {number} props.data.thisMonth.orders - Jumlah pesanan bulan ini
- * @param {number} props.data.thisMonth.revenue - Pendapatan bulan ini
- * @param {Object} [props.data.today] - Statistik hari ini
- * @param {number} props.data.today.averageOrderValue - Rata-rata nilai pesanan
- * @param {number} props.data.today.orders - Jumlah pesanan hari ini
- * @param {number} props.data.today.revenue - Pendapatan hari ini
- * @param {Object} [props.data.customers] - Data pelanggan
- * @param {number} props.data.customers.newThisMonth - Pelanggan baru bulan ini
- * @param {number} props.data.customers.activeThisMonth - Pelanggan aktif bulan ini
- * @param {boolean} [props.isLoading] - Status loading data
- * @param {Function} [props.refetch] - Fungsi untuk memuat ulang data
- * @returns {JSX.Element} Komponen dashboard admin
- */
 const AdminDashboard = ({ data, isLoading, refetch }) => {
   const theme = useTheme();
 
-  /**
-   * Data untuk BarChart stok menipis.
-   * Memfilter produk dengan stok valid (>= 0) dan memformat untuk ditampilkan dalam grafik batang horizontal.
-   * @type {{ datasets: Array<{ backgroundColor: string[], data: number[], label: string, borderRadius: number, borderSkipped: boolean }>, labels: string[] }}
-   */
   const lowStockData = useMemo(() => {
     if (!data?.inventory?.lowStockProducts?.length)
       return { datasets: [], labels: [] };
@@ -170,6 +126,14 @@ const AdminDashboard = ({ data, isLoading, refetch }) => {
       labels: validProducts.map((p) => p.name),
     };
   }, [data, theme]);
+
+  const hasData = useMemo(() => {
+    return (
+      (data?.today?.orders > 0) ||
+      (data?.thisMonth?.orders > 0) ||
+      (data?.customers?.totalCustomers > 0)
+    );
+  }, [data]);
 
   if (isLoading) {
     return (
@@ -239,7 +203,7 @@ const AdminDashboard = ({ data, isLoading, refetch }) => {
             />
           </Card>
           <Stack sx={{ gap: 5 }}>
-            {[1, 2, 3].map((i) => (
+            {[1, 2, 3, 4].map((i) => (
               <Card
                 key={i}
                 sx={{
@@ -375,6 +339,52 @@ const AdminDashboard = ({ data, isLoading, refetch }) => {
         />
       </Box>
 
+      {/* Second Row - Additional Metrics */}
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: {
+            xs: "1fr",
+            sm: "1fr 1fr",
+            lg: "repeat(4, 1fr)",
+          },
+          gap: 5,
+        }}
+      >
+        <SummaryCard
+          color="secondary"
+          icon={Users}
+          subtitle="Total pelanggan terdaftar"
+          title="Total Pelanggan"
+          value={data?.customers?.totalCustomers || 0}
+          index={4}
+        />
+        <SummaryCard
+          color="secondary"
+          icon={Users}
+          subtitle="Pelanggan baru bulan ini"
+          title="Pelanggan Baru"
+          value={data?.customers?.newThisMonth || 0}
+          index={5}
+        />
+        <SummaryCard
+          color="secondary"
+          icon={Car}
+          subtitle="Total kendaraan terdaftar"
+          title="Total Kendaraan"
+          value={data?.customers?.totalVehicles || 0}
+          index={6}
+        />
+        <SummaryCard
+          color="secondary"
+          icon={Package}
+          subtitle={`${data?.inventory?.activeProducts || 0} produk tersedia`}
+          title="Total Produk"
+          value={data?.inventory?.totalProducts || 0}
+          index={7}
+        />
+      </Box>
+
       {/* Asymmetric Bottom */}
       <Box
         sx={{
@@ -383,6 +393,7 @@ const AdminDashboard = ({ data, isLoading, refetch }) => {
           gap: 5,
         }}
       >
+        {/* Low Stock Section */}
         <Card
           sx={{
             border: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
@@ -394,7 +405,7 @@ const AdminDashboard = ({ data, isLoading, refetch }) => {
         >
           <Box sx={{ p: 3, pb: 2 }}>
             <Typography variant="h6" sx={{ fontWeight: 600 }}>
-              Stok Menipis
+              Stok Menipis & Habis
             </Typography>
             <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
               {data?.inventory?.lowStockCount || 0} item butuh restock
@@ -423,30 +434,31 @@ const AdminDashboard = ({ data, isLoading, refetch }) => {
           </Box>
         </Card>
 
+        {/* Right Stack - Inventory Stats */}
         <Stack sx={{ gap: 5 }}>
           <SummaryCard
             color="secondary"
-            icon={Users}
-            subtitle={`${data?.customers?.newThisMonth || 0} pelanggan baru`}
-            title="Pelanggan Aktif"
-            value={data?.customers?.activeThisMonth || 0}
-            index={4}
-          />
-          <SummaryCard
-            color="secondary"
-            icon={Package}
-            subtitle={`${data?.inventory?.activeProducts || 0} produk tersedia`}
-            title="Total Produk"
-            value={data?.inventory?.totalProducts || 0}
-            index={5}
+            icon={AlertCircle}
+            subtitle="Stok habis"
+            title="Stok Habis"
+            value={data?.inventory?.outOfStockCount || 0}
+            index={8}
           />
           <SummaryCard
             color="secondary"
             icon={AlertCircle}
             subtitle="Stok hampir habis"
-            title="Butuh Restock"
+            title="Stok Menipis"
             value={data?.inventory?.lowStockCount || 0}
-            index={6}
+            index={9}
+          />
+          <SummaryCard
+            color="secondary"
+            icon={DollarSign}
+            subtitle="Total nilai stok"
+            title="Nilai Stok"
+            value={formatToIdr(data?.inventory?.totalStockValue || 0)}
+            index={10}
           />
         </Stack>
       </Box>
@@ -465,13 +477,17 @@ AdminDashboard.propTypes = {
     inventory: PropTypes.shape({
       activeProducts: PropTypes.number,
       lowStockCount: PropTypes.number,
+      outOfStockCount: PropTypes.number,
       totalProducts: PropTypes.number,
+      totalStockValue: PropTypes.number,
       lowStockProducts: PropTypes.array,
     }),
     pending: PropTypes.shape({ orders: PropTypes.number }),
     thisMonth: PropTypes.shape({
       orders: PropTypes.number,
       revenue: PropTypes.number,
+      newCustomers: PropTypes.number,
+      activeCustomers: PropTypes.number,
     }),
     today: PropTypes.shape({
       averageOrderValue: PropTypes.number,
@@ -479,8 +495,10 @@ AdminDashboard.propTypes = {
       revenue: PropTypes.number,
     }),
     customers: PropTypes.shape({
+      totalCustomers: PropTypes.number,
       newThisMonth: PropTypes.number,
       activeThisMonth: PropTypes.number,
+      totalVehicles: PropTypes.number,
     }),
   }),
   isLoading: PropTypes.bool,
