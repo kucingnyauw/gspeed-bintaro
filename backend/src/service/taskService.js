@@ -30,22 +30,22 @@ class TaskService {
   }
 
   /**
-   * Invalidasi cache order history
-   * @param {string} orderNumber
+   * Invalidasi cache order history di namespace order
+   * @param {string} orderNumber - Nomor pesanan
    * @returns {Promise<void>}
    * @private
    */
   async #invalidateOrderHistoryCache(orderNumber) {
-    if (orderNumber) {
-      await this.cache.invalidate(`history:${orderNumber}`);
-    }
+    if (!orderNumber) return;
+    const orderCacheManager = new CacheManager("order");
+    await orderCacheManager.delete(`history:${orderNumber}`);
   }
 
   /**
    * Mendapatkan nilai setting dari database
-   * @param {string} key
-   * @param {*} defaultValue
-   * @returns {Promise<*>}
+   * @param {string} key - Key setting
+   * @param {*} defaultValue - Nilai default jika tidak ditemukan
+   * @returns {Promise<*>} Nilai setting
    * @private
    */
   async #getSetting(key, defaultValue) {
@@ -54,9 +54,12 @@ class TaskService {
   }
 
   /**
-   * Format detail kendaraan
-   * @param {Object} vehicle
-   * @returns {string}
+   * Format detail kendaraan untuk notifikasi
+   * @param {Object} vehicle - Data kendaraan
+   * @param {string} vehicle.plateNumber - Nomor plat
+   * @param {string} [vehicle.brand] - Merek
+   * @param {string} [vehicle.model] - Model
+   * @returns {string} Info kendaraan terformat
    * @private
    */
   #formatVehicleInfo(vehicle) {
@@ -68,8 +71,8 @@ class TaskService {
 
   /**
    * Format daftar service untuk notifikasi
-   * @param {Array} services
-   * @returns {string}
+   * @param {string[]} services - Array nama service
+   * @returns {string} Daftar service terformat
    * @private
    */
   #formatServiceList(services) {
@@ -80,8 +83,8 @@ class TaskService {
   /**
    * Generate note untuk order status history menggunakan AI
    * @param {string} action - assign | unassign | start | complete
-   * @param {Object} context
-   * @returns {Promise<string>}
+   * @param {Object} [context={}] - Konteks untuk note
+   * @returns {Promise<string>} Note yang digenerate
    * @private
    */
   async #generateTaskNote(action, context = {}) {
@@ -164,9 +167,9 @@ Contoh: "Semua service selesai dikerjakan oleh Andi. Durasi pengerjaan 45 menit.
 
   /**
    * Fallback note jika AI gagal
-   * @param {string} action
-   * @param {Object} context
-   * @returns {string}
+   * @param {string} action - assign | unassign | start | complete
+   * @param {Object} context - Konteks note
+   * @returns {string} Note fallback
    * @private
    */
   #getFallbackTaskNote(action, context) {
@@ -189,8 +192,10 @@ Contoh: "Semua service selesai dikerjakan oleh Andi. Durasi pengerjaan 45 menit.
 
   /**
    * Mendapatkan order item service yang belum di-assign
-   * @param {string} orderId
-   * @returns {Promise<Array>}
+   * @param {string} orderId - ID pesanan
+   * @returns {Promise<Array>} Item service unassigned
+   * @throws {ApiError} 404 - Pesanan tidak ditemukan
+   * @throws {ApiError} 400 - Tidak ada item service / semua sudah di-assign
    * @private
    */
   async #getUnassignedServiceItems(orderId) {
@@ -216,7 +221,9 @@ Contoh: "Semua service selesai dikerjakan oleh Andi. Durasi pengerjaan 45 menit.
 
   /**
    * Validasi kapasitas mekanik
-   * @param {string} mechanicId
+   * @param {string} mechanicId - ID mekanik
+   * @returns {Promise<void>}
+   * @throws {ApiError} 400 - Mekanik sudah mencapai batas maksimal tugas
    * @private
    */
   async #validateMechanicCapacity(mechanicId) {
@@ -230,8 +237,8 @@ Contoh: "Semua service selesai dikerjakan oleh Andi. Durasi pengerjaan 45 menit.
 
   /**
    * Cek ketersediaan mekanik
-   * @param {string} mechanicId
-   * @returns {Promise<boolean>}
+   * @param {string} mechanicId - ID mekanik
+   * @returns {Promise<boolean>} True jika mekanik tersedia
    * @private
    */
   async #isMechanicAvailable(mechanicId) {
@@ -242,9 +249,9 @@ Contoh: "Semua service selesai dikerjakan oleh Andi. Durasi pengerjaan 45 menit.
 
   /**
    * Mendapatkan assignment aktif untuk order & mekanik
-   * @param {string} orderId
-   * @param {string} mechanicId
-   * @returns {Promise<Array>}
+   * @param {string} orderId - ID pesanan
+   * @param {string} mechanicId - ID mekanik
+   * @returns {Promise<Array>} Daftar assignment aktif
    * @private
    */
   async #getActiveAssignments(orderId, mechanicId) {
@@ -266,10 +273,11 @@ Contoh: "Semua service selesai dikerjakan oleh Andi. Durasi pengerjaan 45 menit.
 
   /**
    * Mengirim notifikasi
-   * @param {string} userId
-   * @param {string} title
-   * @param {string} message
-   * @param {string} [type="INFO"]
+   * @param {string} userId - ID user penerima
+   * @param {string} title - Judul notifikasi
+   * @param {string} message - Pesan notifikasi
+   * @param {string} [type="INFO"] - Tipe notifikasi
+   * @returns {Promise<void>}
    * @private
    */
   async #sendNotification(userId, title, message, type = "INFO") {
@@ -285,9 +293,9 @@ Contoh: "Semua service selesai dikerjakan oleh Andi. Durasi pengerjaan 45 menit.
   }
 
   /**
-   * Generate signed URL untuk produk
-   * @param {Object} product
-   * @returns {Promise<Object>}
+   * Generate signed URL untuk gambar produk
+   * @param {Object} product - Data produk
+   * @returns {Promise<Object>} Produk dengan signed URL
    * @private
    */
   async #addSignedUrlToProduct(product) {
@@ -302,9 +310,23 @@ Contoh: "Semua service selesai dikerjakan oleh Andi. Durasi pengerjaan 45 menit.
 
   /**
    * Assign mekanik ke semua item service unassigned dalam order
-   * @param {string} orderId
-   * @param {string} mechanicId
-   * @returns {Promise<Array>}
+   *
+   * Flow:
+   * 1. Validasi mekanik (role, ketersediaan, kapasitas)
+   * 2. Validasi order (harus QUEUED)
+   * 3. Ambil item service unassigned
+   * 4. Assign mekanik ke setiap item
+   * 5. Catat history + notifikasi + invalidasi cache
+   *
+   * @param {string} orderId - ID pesanan
+   * @param {string} mechanicId - ID mekanik
+   * @returns {Promise<Array>} Daftar assignment yang dibuat
+   *
+   * @throws {ApiError} 400 - Bukan mekanik / tidak tersedia / kapasitas penuh / bukan QUEUED
+   * @throws {ApiError} 404 - Pesanan tidak ditemukan
+   *
+   * @example
+   * const assignments = await taskService.assignMechanicToOrder("order-id", "mechanic-id");
    */
   async assignMechanicToOrder(orderId, mechanicId) {
     const mechanic = await this.userRepo.findById(mechanicId);
@@ -344,6 +366,7 @@ Contoh: "Semua service selesai dikerjakan oleh Andi. Durasi pengerjaan 45 menit.
     await prisma.orderStatusHistory.create({
       data: { orderId, status: "QUEUED", changedById: mechanicId, note },
     });
+
     await this.#invalidateOrderHistoryCache(order.orderNumber);
 
     const msg = [
@@ -372,10 +395,22 @@ Contoh: "Semua service selesai dikerjakan oleh Andi. Durasi pengerjaan 45 menit.
 
   /**
    * Unassign semua mekanik dari order
-   * @param {string} orderId
-   * @param {string} [userId]
+   *
+   * Flow:
+   * 1. Validasi order (tidak boleh COMPLETED/CLOSED/CANCELLED/DRAFT)
+   * 2. Unassign semua mekanik dari item service
+   * 3. Catat history + notifikasi + invalidasi cache
+   *
+   * @param {string} orderId - ID pesanan
+   * @param {string} [userId] - ID user yang melakukan unassign
+   * @returns {Promise<void>}
+   *
+   * @throws {ApiError} 404 - Pesanan tidak ditemukan
+   * @throws {ApiError} 400 - Pesanan sudah selesai / belum dibayar / tidak ada mekanik
+   *
+   * @example
+   * await taskService.unassignMechanicFromOrder("order-id", "user-id");
    */
-
   async unassignMechanicFromOrder(orderId, userId) {
     const order = await this.orderRepo.findById(orderId);
     if (!order)
@@ -423,9 +458,6 @@ Contoh: "Semua service selesai dikerjakan oleh Andi. Durasi pengerjaan 45 menit.
 
     await this.#invalidateOrderHistoryCache(order.orderNumber);
 
-    const orderCacheManager = new CacheManager("order");
-    await orderCacheManager.delete(`history:${order.orderNumber}`);
-
     for (const mId of mechanicIds) {
       await this.#sendNotification(
         mId,
@@ -444,9 +476,13 @@ Contoh: "Semua service selesai dikerjakan oleh Andi. Durasi pengerjaan 45 menit.
   }
 
   /**
-   * Get task by ID
-   * @param {string} assignmentId
-   * @returns {Promise<Object>}
+   * Dapatkan task berdasarkan ID assignment
+   * @param {string} assignmentId - ID assignment
+   * @returns {Promise<Object>} Data assignment
+   * @throws {ApiError} 404 - Task tidak ditemukan
+   *
+   * @example
+   * const task = await taskService.getTaskById("assignment-id");
    */
   async getTaskById(assignmentId) {
     const a = await this.taskRepo.findById(assignmentId);
@@ -457,9 +493,13 @@ Contoh: "Semua service selesai dikerjakan oleh Andi. Durasi pengerjaan 45 menit.
   }
 
   /**
-   * Get tasks by order ID (grouped)
-   * @param {string} orderId
-   * @returns {Promise<Object>}
+   * Dapatkan tasks berdasarkan order ID (grouped by service item)
+   * @param {string} orderId - ID pesanan
+   * @returns {Promise<Object>} Data order dengan services dan assignments
+   * @throws {ApiError} 404 - Pesanan tidak ditemukan
+   *
+   * @example
+   * const tasks = await taskService.getTasksByOrderId("order-id");
    */
   async getTasksByOrderId(orderId) {
     const order = await this.orderRepo.findById(orderId);
@@ -543,18 +583,24 @@ Contoh: "Semua service selesai dikerjakan oleh Andi. Durasi pengerjaan 45 menit.
   }
 
   /**
-   * Get all tasks
-   * @param {Object} [query={}]
-   * @returns {Promise<{data: Array, metadata: Object}>}
+   * Dapatkan semua tasks dengan filter dan paginasi
+   * @param {Object} [query={}] - Parameter query
+   * @returns {Promise<{data: Array, metadata: Object}>} Daftar tasks
+   *
+   * @example
+   * const { data, metadata } = await taskService.getTasks({ page: 1, limit: 10 });
    */
   async getTasks(query = {}) {
     return this.taskRepo.findMany(query);
   }
 
   /**
-   * Get tasks by mechanic (grouped)
-   * @param {string} mechanicId
-   * @returns {Promise<Array>}
+   * Dapatkan tasks berdasarkan mekanik (grouped by order)
+   * @param {string} mechanicId - ID mekanik
+   * @returns {Promise<Array>} Daftar order dengan services
+   *
+   * @example
+   * const tasks = await taskService.getTasksByMechanic("mechanic-id");
    */
   async getTasksByMechanic(mechanicId) {
     const assignments = await this.taskRepo.findByMechanicId(mechanicId);
@@ -583,19 +629,36 @@ Contoh: "Semua service selesai dikerjakan oleh Andi. Durasi pengerjaan 45 menit.
   }
 
   /**
-   * Get unassigned tasks
-   * @param {Object} [query={}]
-   * @returns {Promise<{data: Array, metadata: Object}>}
+   * Dapatkan tasks yang belum di-assign
+   * @param {Object} [query={}] - Parameter query
+   * @returns {Promise<{data: Array, metadata: Object}>} Daftar tasks unassigned
+   *
+   * @example
+   * const { data } = await taskService.getUnassignedTasks({ page: 1 });
    */
   async getUnassignedTasks(query = {}) {
     return this.taskRepo.findUnassignedServiceTasks(query);
   }
 
   /**
-   * Start order
-   * @param {string} orderId
-   * @param {string} mechanicId
-   * @returns {Promise<Array>}
+   * Mulai pengerjaan order (QUEUED -> IN_PROGRESS)
+   *
+   * Flow:
+   * 1. Validasi order (harus QUEUED)
+   * 2. Ambil assignment pending mekanik
+   * 3. Start semua task pending
+   * 4. Update order status + history + notifikasi + invalidasi cache
+   *
+   * @param {string} orderId - ID pesanan
+   * @param {string} mechanicId - ID mekanik
+   * @returns {Promise<Array>} Daftar task yang dimulai
+   *
+   * @throws {ApiError} 404 - Pesanan tidak ditemukan
+   * @throws {ApiError} 400 - Bukan QUEUED / tidak ada task aktif
+   * @throws {ApiError} 409 - Semua task sudah dimulai
+   *
+   * @example
+   * const started = await taskService.startOrder("order-id", "mechanic-id");
    */
   async startOrder(orderId, mechanicId) {
     const order = await this.orderRepo.findById(orderId);
@@ -672,10 +735,24 @@ Contoh: "Semua service selesai dikerjakan oleh Andi. Durasi pengerjaan 45 menit.
   }
 
   /**
-   * Complete order
-   * @param {string} orderId
-   * @param {string} mechanicId
-   * @returns {Promise<Array>}
+   * Selesaikan pengerjaan order (IN_PROGRESS -> COMPLETED)
+   *
+   * Flow:
+   * 1. Validasi order (harus IN_PROGRESS)
+   * 2. Ambil assignment aktif mekanik
+   * 3. Complete semua task pending
+   * 4. Update order status + history + notifikasi + invalidasi cache
+   *
+   * @param {string} orderId - ID pesanan
+   * @param {string} mechanicId - ID mekanik
+   * @returns {Promise<Array>} Daftar task yang diselesaikan
+   *
+   * @throws {ApiError} 404 - Pesanan tidak ditemukan
+   * @throws {ApiError} 400 - Bukan IN_PROGRESS / tidak ada task aktif
+   * @throws {ApiError} 409 - Semua task sudah selesai
+   *
+   * @example
+   * const completed = await taskService.completeOrder("order-id", "mechanic-id");
    */
   async completeOrder(orderId, mechanicId) {
     const order = await this.orderRepo.findById(orderId);
@@ -758,9 +835,12 @@ Contoh: "Semua service selesai dikerjakan oleh Andi. Durasi pengerjaan 45 menit.
   }
 
   /**
-   * Get available mechanics
-   * @param {Object} [query={}]
-   * @returns {Promise<{data: Array, metadata: Object}>}
+   * Dapatkan daftar mekanik yang tersedia
+   * @param {Object} [query={}] - Parameter query
+   * @returns {Promise<{data: Array, metadata: Object}>} Daftar mekanik dengan status ketersediaan
+   *
+   * @example
+   * const { data } = await taskService.getAvailableMechanics({ page: 1 });
    */
   async getAvailableMechanics(query = {}) {
     const result = await this.taskRepo.getAvailableMechanics(query);
@@ -772,9 +852,13 @@ Contoh: "Semua service selesai dikerjakan oleh Andi. Durasi pengerjaan 45 menit.
   }
 
   /**
-   * Get mechanic availability status
-   * @param {string} mechanicId
-   * @returns {Promise<Object>}
+   * Cek status ketersediaan mekanik
+   * @param {string} mechanicId - ID mekanik
+   * @returns {Promise<Object>} Status ketersediaan (isAvailable, activeTaskCount, maxTasks, remainingCapacity)
+   * @throws {ApiError} 400 - Bukan mekanik
+   *
+   * @example
+   * const status = await taskService.getMechanicAvailabilityStatus("mechanic-id");
    */
   async getMechanicAvailabilityStatus(mechanicId) {
     const m = await this.userRepo.findById(mechanicId);
@@ -791,18 +875,28 @@ Contoh: "Semua service selesai dikerjakan oleh Andi. Durasi pengerjaan 45 menit.
   }
 
   /**
-   * Check if mechanic assigned to order item
-   * @param {string} orderItemId
-   * @returns {Promise<boolean>}
+   * Cek apakah order item sudah memiliki mekanik
+   * @param {string} orderItemId - ID order item
+   * @returns {Promise<boolean>} True jika sudah ada mekanik
+   *
+   * @example
+   * const hasMechanic = await taskService.hasMechanicAssigned("order-item-id");
    */
   async hasMechanicAssigned(orderItemId) {
     return this.taskRepo.hasMechanicAssigned(orderItemId);
   }
 
   /**
-   * Bulk assign mechanics
-   * @param {Array<{orderId: string, mechanicId: string}>} assignments
-   * @returns {Promise<{summary: Object, details: Object}>}
+   * Bulk assign mekanik ke multiple orders
+   * @param {Array<{orderId: string, mechanicId: string}>} assignments - Array penugasan
+   * @returns {Promise<{summary: Object, details: Object}>} Ringkasan dan detail assign
+   * @throws {ApiError} 400 - Tidak ada data penugasan / tidak ada yang valid
+   *
+   * @example
+   * const result = await taskService.bulkAssignMechanics([
+   *   { orderId: "order-1", mechanicId: "mech-1" },
+   *   { orderId: "order-2", mechanicId: "mech-2" },
+   * ]);
    */
   async bulkAssignMechanics(assignments) {
     if (!assignments?.length)
@@ -873,8 +967,14 @@ Contoh: "Semua service selesai dikerjakan oleh Andi. Durasi pengerjaan 45 menit.
 
   /**
    * Bulk start orders
-   * @param {Array<{orderId: string, mechanicId: string}>} orders
-   * @returns {Promise<{summary: Object, details: Object}>}
+   * @param {Array<{orderId: string, mechanicId: string}>} orders - Array order yang akan dimulai
+   * @returns {Promise<{summary: Object, details: Object}>} Ringkasan dan detail start
+   * @throws {ApiError} 400 - Tidak ada order
+   *
+   * @example
+   * const result = await taskService.bulkStartOrders([
+   *   { orderId: "order-1", mechanicId: "mech-1" },
+   * ]);
    */
   async bulkStartOrders(orders) {
     if (!orders?.length)
@@ -900,8 +1000,14 @@ Contoh: "Semua service selesai dikerjakan oleh Andi. Durasi pengerjaan 45 menit.
 
   /**
    * Bulk complete orders
-   * @param {Array<{orderId: string, mechanicId: string}>} orders
-   * @returns {Promise<{summary: Object, details: Object}>}
+   * @param {Array<{orderId: string, mechanicId: string}>} orders - Array order yang akan diselesaikan
+   * @returns {Promise<{summary: Object, details: Object}>} Ringkasan dan detail complete
+   * @throws {ApiError} 400 - Tidak ada order
+   *
+   * @example
+   * const result = await taskService.bulkCompleteOrders([
+   *   { orderId: "order-1", mechanicId: "mech-1" },
+   * ]);
    */
   async bulkCompleteOrders(orders) {
     if (!orders?.length)
@@ -926,20 +1032,26 @@ Contoh: "Semua service selesai dikerjakan oleh Andi. Durasi pengerjaan 45 menit.
   }
 
   /**
-   * Get my tasks (mechanic)
-   * @param {string} mechanicId
-   * @param {Object} [query={}]
-   * @returns {Promise<{data: Array, metadata: Object}>}
+   * Dapatkan task saya (untuk mekanik yang sedang login)
+   * @param {string} mechanicId - ID mekanik
+   * @param {Object} [query={}] - Parameter query
+   * @returns {Promise<{data: Array, metadata: Object}>} Daftar task mekanik
+   *
+   * @example
+   * const { data } = await taskService.getMyTasks("mechanic-id", { page: 1 });
    */
   async getMyTasks(mechanicId, query = {}) {
     return this.taskRepo.findMyTasks(mechanicId, query);
   }
 
   /**
-   * Get my task history
-   * @param {string} mechanicId
-   * @param {Object} [query={}]
-   * @returns {Promise<{data: Array, metadata: Object}>}
+   * Dapatkan riwayat task saya
+   * @param {string} mechanicId - ID mekanik
+   * @param {Object} [query={}] - Parameter query
+   * @returns {Promise<{data: Array, metadata: Object}>} Riwayat task mekanik
+   *
+   * @example
+   * const { data } = await taskService.getMyTaskHistory("mechanic-id", { page: 1 });
    */
   async getMyTaskHistory(mechanicId, query = {}) {
     return this.taskRepo.findHistoryByMechanic(mechanicId, query);
