@@ -529,7 +529,7 @@ const AppTable = memo(
               <Typography
                 color="text.secondary"
                 variant="body1"
-                fontWeight={500}
+                fontWeight={600}
               >
                 {emptyStateMessage}
               </Typography>

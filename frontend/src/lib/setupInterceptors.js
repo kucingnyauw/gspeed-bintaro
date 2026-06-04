@@ -11,10 +11,8 @@ import { logger } from "@lib/logger.js";
  * @param {import("@reduxjs/toolkit").EnhancedStore} params.store - Redux store
  */
 export function setupInterceptors({ store }) {
-  /**
-   * Request Interceptor
-   * Menambahkan Authorization header dari Supabase session
-   */
+  let isRedirecting = false;
+
   Client.interceptors.request.use(
     async (config) => {
       try {
@@ -68,10 +66,6 @@ export function setupInterceptors({ store }) {
     }
   );
 
-  /**
-   * Response Interceptor
-   * Menangani error response, unauthorized, dan network issues
-   */
   Client.interceptors.response.use(
     (response) => {
       logger.debug(
@@ -93,7 +87,7 @@ export function setupInterceptors({ store }) {
 
       if (response?.data) {
         statusCode = response.status;
-        errorCode = response.data.code || errorCode;
+        errorCode = response.data.code || response.data.errorCode || errorCode;
         message = response.data.message || message;
         details = response.data.details || null;
 
@@ -123,50 +117,45 @@ export function setupInterceptors({ store }) {
         logger.error("🌐 Network error:", config?.url);
       }
 
-      /**
-       * Handle 401 Unauthorized - Session expired atau invalid
-       * Redirect ke login jika bukan di halaman login
-       */
-      if (statusCode === 401 && !window.location.pathname.includes("/login")) {
-        logger.warn("🔒 Unauthorized - Redirecting to login");
+      if (statusCode === 401 && !isRedirecting) {
+        const currentPath = window.location.pathname;
 
-        try {
-          const { data, error: sessionError } =
-            await supabase.auth.getSession();
+        if (currentPath.includes("/login") || currentPath === "/login") {
+          logger.debug("🔒 Already on login page, skipping redirect");
+        } else {
+          isRedirecting = true;
+          logger.warn("🔒 Unauthorized - Redirecting to login");
 
-          if (sessionError) {
-            logger.error(
-              "❌ Session error, signing out:",
-              sessionError.message
-            );
+          try {
             await supabase.auth.signOut();
-            window.location.replace("/login");
-            return Promise.reject({
-              success: false,
-              statusCode: 401,
-              code: "SESSION_EXPIRED",
-              message:
-                "Sesi Anda telah berakhir. Silakan masuk kembali untuk melanjutkan.",
-              details: null,
-            });
-          }
 
-          const session = data?.session;
+            const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+            if (projectId) {
+              localStorage.removeItem(`sb-${projectId}-auth-token`);
+            }
 
-          if (!session?.access_token) {
-            logger.warn("⚠️ No access token, redirecting to login");
-            await supabase.auth.signOut();
-            window.location.replace("/login");
+            sessionStorage.setItem("redirectAfterLogin", currentPath);
+
+            setTimeout(() => {
+              window.location.href = "/login";
+            }, 100);
+          } catch (err) {
+            logger.error("❌ Error handling 401:", err.message);
+            isRedirecting = false;
+            window.location.href = "/login";
           }
-        } catch (err) {
-          logger.error("❌ Error handling 401:", err.message);
-          window.location.replace("/login");
         }
+
+        return Promise.reject({
+          success: false,
+          statusCode: 401,
+          code: "SESSION_EXPIRED",
+          message:
+            "Sesi Anda telah berakhir. Silakan masuk kembali untuk melanjutkan.",
+          details: null,
+        });
       }
 
-      /**
-       * Tampilkan notifikasi error hanya untuk koneksi/network issues
-       */
       if (
         errorCode === "NO_INTERNET_CONNECTION" ||
         errorCode === "REQUEST_TIMEOUT"
