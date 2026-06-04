@@ -2,12 +2,27 @@ import prisma from "#app/database.js";
 
 class ReportRepository {
   /**
+   * Mendapatkan PPH rate dari settings
+   * @returns {Promise<number>} PPH rate dalam persen (default 0.5)
+   * @private
+   */
+  async #getPPHRate() {
+    const setting = await prisma.setting.findUnique({
+      where: { key: "pph_rate" },
+      select: { value: true },
+    });
+    return setting ? parseFloat(setting.value) : 0.5;
+  }
+
+  /**
    * Mendapatkan data penjualan agregat dalam rentang waktu tertentu
    * @param {Date} startDate - Tanggal mulai
    * @param {Date} endDate - Tanggal akhir
-   * @returns {Promise<{totalOrders: number, totalSales: number, totalSubtotal: number, totalTax: number, averageOrderValue: number}>}
+   * @returns {Promise<{totalOrders: number, totalSales: number, totalSubtotal: number, totalTax: number, totalPPH: number, pphRate: number, averageOrderValue: number}>}
    */
   async getSalesData(startDate, endDate) {
+    const pphRate = await this.#getPPHRate();
+
     const aggregations = await prisma.order.aggregate({
       _sum: { subtotal: true, tax: true, total: true },
       _count: { id: true },
@@ -20,11 +35,16 @@ class ReportRepository {
       },
     });
 
+    const totalSubtotal = Number(aggregations._sum.subtotal || 0);
+    const totalPPH = Math.round((totalSubtotal * pphRate) / 100);
+
     return {
       totalOrders: aggregations._count.id || 0,
       totalSales: Number(aggregations._sum.total || 0),
-      totalSubtotal: Number(aggregations._sum.subtotal || 0),
+      totalSubtotal: totalSubtotal,
       totalTax: Number(aggregations._sum.tax || 0),
+      totalPPH: totalPPH,
+      pphRate: pphRate,
       averageOrderValue: Math.round(Number(aggregations._avg.total || 0)),
     };
   }
@@ -33,9 +53,11 @@ class ReportRepository {
    * Mendapatkan ringkasan penjualan harian untuk chart dan export
    * @param {Date} startDate - Tanggal mulai
    * @param {Date} endDate - Tanggal akhir
-   * @returns {Promise<Array<{date: string, orderCount: number, totalSales: number, totalSubtotal: number, totalTax: number, averageOrderValue: number}>>}
+   * @returns {Promise<Array<{date: string, orderCount: number, totalSales: number, totalSubtotal: number, totalTax: number, totalPPH: number, averageOrderValue: number}>>}
    */
   async getDailySalesSummary(startDate, endDate) {
+    const pphRate = await this.#getPPHRate();
+
     const query = `
       SELECT 
         DATE(o."createdAt") as date,
@@ -63,6 +85,7 @@ class ReportRepository {
       totalSales: Number(item.totalSales),
       totalSubtotal: Number(item.totalSubtotal),
       totalTax: Number(item.totalTax),
+      totalPPH: Math.round((Number(item.totalSubtotal) * pphRate) / 100),
       averageOrderValue: Math.round(Number(item.averageOrderValue)),
     }));
   }
@@ -112,9 +135,11 @@ class ReportRepository {
    * Mendapatkan data laba rugi
    * @param {Date} startDate - Tanggal mulai
    * @param {Date} endDate - Tanggal akhir
-   * @returns {Promise<{grossRevenue: number, totalCogs: number, grossProfit: number, grossMargin: number, totalOperatingExpenses: number, netProfit: number, netMargin: number}>}
+   * @returns {Promise<{grossRevenue: number, totalCogs: number, grossProfit: number, grossMargin: number, totalOperatingExpenses: number, netProfit: number, netMargin: number, totalPPH: number, pphRate: number, netProfitAfterPPH: number, netMarginAfterPPH: number}>}
    */
   async getProfitLossData(startDate, endDate) {
+    const pphRate = await this.#getPPHRate();
+
     const query = `
       WITH expense_total AS (
         SELECT COALESCE(SUM("amount"), 0)::bigint as "totalExpenses"
@@ -149,14 +174,26 @@ class ReportRepository {
 
     const [result] = await prisma.$queryRawUnsafe(query, startDate, endDate);
 
+    const grossRevenue = Number(result.grossRevenue);
+    const netProfit = Number(result.netProfit);
+    const totalPPH = Math.round((grossRevenue * pphRate) / 100);
+    const netProfitAfterPPH = netProfit - totalPPH;
+
     return {
-      grossRevenue: Number(result.grossRevenue),
+      grossRevenue: grossRevenue,
       totalCogs: Number(result.totalCogs),
       grossProfit: Number(result.grossProfit),
       grossMargin: Math.round(Number(result.grossMargin) * 100) / 100,
       totalOperatingExpenses: Number(result.totalOperatingExpenses),
-      netProfit: Number(result.netProfit),
+      netProfit: netProfit,
       netMargin: Math.round(Number(result.netMargin) * 100) / 100,
+      totalPPH: totalPPH,
+      pphRate: pphRate,
+      netProfitAfterPPH: netProfitAfterPPH,
+      netMarginAfterPPH:
+        grossRevenue > 0
+          ? Math.round((netProfitAfterPPH / grossRevenue) * 100 * 100) / 100
+          : 0,
     };
   }
 
@@ -164,9 +201,11 @@ class ReportRepository {
    * Mendapatkan data laba rugi harian untuk chart dan export
    * @param {Date} startDate - Tanggal mulai
    * @param {Date} endDate - Tanggal akhir
-   * @returns {Promise<Array<{date: string, grossRevenue: number, totalCogs: number, grossProfit: number, totalOperatingExpenses: number, netProfit: number}>>}
+   * @returns {Promise<Array<{date: string, grossRevenue: number, totalCogs: number, grossProfit: number, totalOperatingExpenses: number, netProfit: number, totalPPH: number, netProfitAfterPPH: number}>>}
    */
   async getDailyProfitLossSummary(startDate, endDate) {
+    const pphRate = await this.#getPPHRate();
+
     const query = `
       WITH daily_expenses AS (
         SELECT DATE("date") as date, COALESCE(SUM("amount"), 0)::bigint as "expenses"
@@ -203,14 +242,23 @@ class ReportRepository {
 
     const rawData = await prisma.$queryRawUnsafe(query, startDate, endDate);
 
-    return rawData.map((item) => ({
-      date: item.date,
-      grossRevenue: Number(item.grossRevenue),
-      totalCogs: Number(item.totalCogs),
-      grossProfit: Number(item.grossProfit),
-      totalOperatingExpenses: Number(item.totalOperatingExpenses),
-      netProfit: Number(item.netProfit),
-    }));
+    return rawData.map((item) => {
+      const netProfit = Number(item.netProfit);
+      const grossRevenue = Number(item.grossRevenue);
+      const totalPPH = Math.round((grossRevenue * pphRate) / 100);
+      const netProfitAfterPPH = netProfit - totalPPH;
+
+      return {
+        date: item.date,
+        grossRevenue: grossRevenue,
+        totalCogs: Number(item.totalCogs),
+        grossProfit: Number(item.grossProfit),
+        totalOperatingExpenses: Number(item.totalOperatingExpenses),
+        netProfit: netProfit,
+        totalPPH: totalPPH,
+        netProfitAfterPPH: netProfitAfterPPH,
+      };
+    });
   }
 
   /**

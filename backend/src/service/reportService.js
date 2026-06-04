@@ -5,6 +5,10 @@ import prisma from "#app/database.js";
 import logger from "#app/logger.js";
 
 class ReportService {
+  /**
+   * Inisialisasi ReportService
+   * @constructor
+   */
   constructor() {
     this.reportRepo = new ReportRepository();
   }
@@ -91,11 +95,11 @@ class ReportService {
   }
 
   /**
-   * Mendapatkan ringkasan penjualan berdasarkan periode
+   * Mendapatkan ringkasan penjualan berdasarkan periode (termasuk PPh UMKM)
    * @param {string} [period='monthly'] - 'daily' | 'weekly' | 'monthly' | 'yearly'
    * @param {Object} [options={}]
    * @param {Date|string} [options.referenceDate] - Tanggal referensi
-   * @returns {Promise<Object>} Ringkasan penjualan
+   * @returns {Promise<Object>} Ringkasan penjualan dengan totalPPH, pphRate
    * @throws {ApiError} 400 - Periode tidak valid
    */
   async getSalesSummary(period = "monthly", options = {}) {
@@ -114,16 +118,24 @@ class ReportService {
       period,
       dateRange: { startDate, endDate },
       labels,
-      summary: salesData,
+      summary: {
+        totalOrders: salesData.totalOrders,
+        totalSales: salesData.totalSales,
+        totalSubtotal: salesData.totalSubtotal,
+        totalTax: salesData.totalTax,
+        totalPPH: salesData.totalPPH,           // ✅ PPh UMKM dari repository
+        pphRate: salesData.pphRate,             // ✅ Rate PPh dari settings
+        averageOrderValue: salesData.averageOrderValue,
+      },
       breakdown: period === "daily" ? hourlySales : dailySales,
     };
   }
 
   /**
-   * Mendapatkan laporan laba rugi berdasarkan periode
+   * Mendapatkan laporan laba rugi berdasarkan periode (termasuk PPh UMKM)
    * @param {string} [period='monthly'] - 'daily' | 'weekly' | 'monthly' | 'yearly'
    * @param {Object} [options={}]
-   * @returns {Promise<Object>} Laporan laba rugi
+   * @returns {Promise<Object>} Laporan laba rugi dengan netProfitAfterPPH, netMarginAfterPPH
    * @throws {ApiError} 400 - Periode tidak valid
    */
   async getProfitLossReport(period = "monthly", options = {}) {
@@ -139,7 +151,19 @@ class ReportService {
       period,
       dateRange: { startDate, endDate },
       labels,
-      summary: profitLossData,
+      summary: {
+        grossRevenue: profitLossData.grossRevenue,
+        totalCogs: profitLossData.totalCogs,
+        grossProfit: profitLossData.grossProfit,
+        grossMargin: profitLossData.grossMargin,
+        totalOperatingExpenses: profitLossData.totalOperatingExpenses,
+        netProfit: profitLossData.netProfit,
+        netMargin: profitLossData.netMargin,
+        totalPPH: profitLossData.totalPPH,                // ✅ PPh UMKM
+        pphRate: profitLossData.pphRate,                  // ✅ Rate PPh
+        netProfitAfterPPH: profitLossData.netProfitAfterPPH,  // ✅ Laba setelah PPh
+        netMarginAfterPPH: profitLossData.netMarginAfterPPH,  // ✅ Margin setelah PPh
+      },
       breakdown: dailyProfitLoss,
     };
   }
@@ -169,7 +193,7 @@ class ReportService {
    * @param {Object} [options={}]
    * @param {number} [options.page=1] - Halaman
    * @param {number} [options.limit=10] - Jumlah per halaman
-   * @returns {Promise<Object>} Laporan inventori
+   * @returns {Promise<Object>} Laporan inventori dengan signed URLs
    */
   async getInventoryReport(options = {}) {
     logger.info("Mengambil laporan inventori", options);
@@ -197,7 +221,7 @@ class ReportService {
    * @param {number} [options.page=1] - Halaman
    * @param {number} [options.limit=10] - Jumlah per halaman
    * @param {Date|string} [options.referenceDate]
-   * @returns {Promise<Object>} Laporan produk terlaris
+   * @returns {Promise<Object>} Laporan produk terlaris dengan signed image URLs
    * @throws {ApiError} 400 - Periode tidak valid
    */
   async getTopProductsReport(period = "monthly", options = {}) {
@@ -304,7 +328,7 @@ class ReportService {
   }
 
   /**
-   * Dashboard untuk Admin
+   * Dashboard untuk Admin (termasuk PPN & PPh UMKM)
    * @returns {Promise<Object>}
    * @private
    */
@@ -351,11 +375,17 @@ class ReportService {
         date: startOfDay,
         orders: todaySales.totalOrders,
         revenue: todaySales.totalSales,
+        ppn: todaySales.totalTax,           // ✅ PPN
+        pph: todaySales.totalPPH,           // ✅ PPh UMKM
+        pphRate: todaySales.pphRate,        // ✅ Rate PPh
         averageOrderValue: todaySales.averageOrderValue,
       },
       thisMonth: {
         orders: monthSales.totalOrders,
         revenue: monthSales.totalSales,
+        ppn: monthSales.totalTax,           // ✅ PPN
+        pph: monthSales.totalPPH,           // ✅ PPh UMKM
+        pphRate: monthSales.pphRate,        // ✅ Rate PPh
         newCustomers: customerSummary.newCustomers,
         activeCustomers: customerSummary.activeCustomers,
       },

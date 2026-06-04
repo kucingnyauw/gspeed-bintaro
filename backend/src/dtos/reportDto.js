@@ -25,6 +25,13 @@ class BaseDto {
 class SalesDataDto extends BaseDto {
   /**
    * @param {Object} data - Data agregat penjualan
+   * @param {number} [data.totalOrders=0]
+   * @param {number} [data.totalSales=0]
+   * @param {number} [data.totalSubtotal=0]
+   * @param {number} [data.totalTax=0]
+   * @param {number} [data.totalPPH=0] - PPh UMKM (0.5% dari omzet)
+   * @param {number} [data.pphRate=0.5] - Rate PPh dalam persen
+   * @param {number} [data.averageOrderValue=0]
    */
   constructor(data) {
     super();
@@ -32,6 +39,8 @@ class SalesDataDto extends BaseDto {
     this.totalSales = data.totalSales || 0;
     this.totalSubtotal = data.totalSubtotal || 0;
     this.totalTax = data.totalTax || 0;
+    this.totalPPH = data.totalPPH || 0;
+    this.pphRate = data.pphRate || 0.5;
     this.averageOrderValue = data.averageOrderValue || 0;
   }
 }
@@ -44,6 +53,13 @@ class SalesDataDto extends BaseDto {
 class DailySalesDto extends BaseDto {
   /**
    * @param {Object} data - Data penjualan harian
+   * @param {string} data.date
+   * @param {number} [data.orderCount=0]
+   * @param {number} [data.totalSales=0]
+   * @param {number} [data.totalSubtotal=0]
+   * @param {number} [data.totalTax=0]
+   * @param {number} [data.totalPPH=0] - PPh UMKM harian
+   * @param {number} [data.averageOrderValue=0]
    */
   constructor(data) {
     super();
@@ -52,6 +68,7 @@ class DailySalesDto extends BaseDto {
     this.totalSales = data.totalSales || 0;
     this.totalSubtotal = data.totalSubtotal || 0;
     this.totalTax = data.totalTax || 0;
+    this.totalPPH = data.totalPPH || 0;
     this.averageOrderValue = data.averageOrderValue || 0;
   }
 }
@@ -64,6 +81,10 @@ class DailySalesDto extends BaseDto {
 class HourlySalesDto extends BaseDto {
   /**
    * @param {Object} data - Data penjualan per jam
+   * @param {string} data.hour
+   * @param {number} [data.orderCount=0]
+   * @param {number} [data.totalSales=0]
+   * @param {number} [data.averageOrderValue=0]
    */
   constructor(data) {
     super();
@@ -82,6 +103,17 @@ class HourlySalesDto extends BaseDto {
 class ProfitLossDto extends BaseDto {
   /**
    * @param {Object} data - Data laba rugi
+   * @param {number} [data.grossRevenue=0]
+   * @param {number} [data.totalCogs=0]
+   * @param {number} [data.grossProfit=0]
+   * @param {number} [data.grossMargin=0]
+   * @param {number} [data.totalOperatingExpenses=0]
+   * @param {number} [data.netProfit=0]
+   * @param {number} [data.netMargin=0]
+   * @param {number} [data.totalPPH=0] - PPh UMKM
+   * @param {number} [data.pphRate=0.5] - Rate PPh dalam persen
+   * @param {number} [data.netProfitAfterPPH=0] - Laba bersih setelah PPh
+   * @param {number} [data.netMarginAfterPPH=0] - Margin bersih setelah PPh
    */
   constructor(data) {
     super();
@@ -92,6 +124,10 @@ class ProfitLossDto extends BaseDto {
     this.totalOperatingExpenses = data.totalOperatingExpenses || 0;
     this.netProfit = data.netProfit || 0;
     this.netMargin = data.netMargin || 0;
+    this.totalPPH = data.totalPPH || 0;
+    this.pphRate = data.pphRate || 0.5;
+    this.netProfitAfterPPH = data.netProfitAfterPPH || 0;
+    this.netMarginAfterPPH = data.netMarginAfterPPH || 0;
   }
 }
 
@@ -103,6 +139,14 @@ class ProfitLossDto extends BaseDto {
 class DailyProfitLossDto extends BaseDto {
   /**
    * @param {Object} data - Data laba rugi harian
+   * @param {string} data.date
+   * @param {number} [data.grossRevenue=0]
+   * @param {number} [data.totalCogs=0]
+   * @param {number} [data.grossProfit=0]
+   * @param {number} [data.totalOperatingExpenses=0]
+   * @param {number} [data.netProfit=0]
+   * @param {number} [data.totalPPH=0] - PPh UMKM harian
+   * @param {number} [data.netProfitAfterPPH=0] - Laba bersih setelah PPh
    */
   constructor(data) {
     super();
@@ -112,6 +156,8 @@ class DailyProfitLossDto extends BaseDto {
     this.grossProfit = data.grossProfit || 0;
     this.totalOperatingExpenses = data.totalOperatingExpenses || 0;
     this.netProfit = data.netProfit || 0;
+    this.totalPPH = data.totalPPH || 0;
+    this.netProfitAfterPPH = data.netProfitAfterPPH || 0;
   }
 }
 
@@ -299,6 +345,22 @@ class MechanicPerformanceDto extends BaseDto {
 class DashboardSummaryDto extends BaseDto {
   /**
    * @param {Object} data - Data dashboard
+   * @param {Object} [data.today]
+   * @param {Date} data.today.date
+   * @param {number} [data.today.orders=0]
+   * @param {number} [data.today.revenue=0]
+   * @param {number} [data.today.ppn=0] - PPN hari ini
+   * @param {number} [data.today.pph=0] - PPh UMKM hari ini
+   * @param {number} [data.today.pphRate=0.5] - Rate PPh
+   * @param {number} [data.today.averageOrderValue=0]
+   * @param {Object} [data.thisMonth]
+   * @param {number} [data.thisMonth.orders=0]
+   * @param {number} [data.thisMonth.revenue=0]
+   * @param {number} [data.thisMonth.ppn=0] - PPN bulan ini
+   * @param {number} [data.thisMonth.pph=0] - PPh UMKM bulan ini
+   * @param {number} [data.thisMonth.pphRate=0.5] - Rate PPh
+   * @param {number} [data.thisMonth.newCustomers=0]
+   * @param {number} [data.thisMonth.activeCustomers=0]
    */
   constructor(data) {
     super();
@@ -307,6 +369,9 @@ class DashboardSummaryDto extends BaseDto {
           date: data.today.date,
           orders: data.today.orders || 0,
           revenue: data.today.revenue || 0,
+          ppn: data.today.ppn || 0,
+          pph: data.today.pph || 0,
+          pphRate: data.today.pphRate || 0.5,
           averageOrderValue: data.today.averageOrderValue || 0,
         }
       : null;
@@ -315,6 +380,9 @@ class DashboardSummaryDto extends BaseDto {
       ? {
           orders: data.thisMonth.orders || 0,
           revenue: data.thisMonth.revenue || 0,
+          ppn: data.thisMonth.ppn || 0,
+          pph: data.thisMonth.pph || 0,
+          pphRate: data.thisMonth.pphRate || 0.5,
           newCustomers: data.thisMonth.newCustomers || 0,
           activeCustomers: data.thisMonth.activeCustomers || 0,
         }

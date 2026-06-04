@@ -56,8 +56,11 @@ class OrderService {
    * @returns {Promise<number>}
    * @private
    */
+
   async #getTaxRate() {
-    return Number(await this.#getSetting("tax_rate", 11));
+    const enabled = await this.#getSetting("enable_ppn", "true");
+    if (enabled !== "true") return 0;
+    return Number(await this.#getSetting("ppn_rate", 11));
   }
 
   /**
@@ -322,7 +325,7 @@ Contoh format yang baik:
     let orderNumber;
     let exists = true;
     while (exists) {
-      orderNumber =  CodeGenerator.orderNumber();
+      orderNumber = CodeGenerator.orderNumber();
       exists = await this.orderRepo.isOrderNumberExists(orderNumber);
     }
     return orderNumber;

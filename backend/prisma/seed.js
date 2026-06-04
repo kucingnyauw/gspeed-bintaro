@@ -24,107 +24,252 @@ function generateSku(type, index) {
 }
 
 // ============================================================
-// DATA MASTER (DENGAN DESKRIPSI)
+// DATA MASTER - DIPERBANYAK VARIAN (120 Sparepart + 60 Service = 180 Produk)
 // ============================================================
 const sparepartData = [
-  { name: "Kampas Rem Depan Vespa Sprint", description: "Kampas rem depan original untuk Vespa Sprint 150. Material semi-metallic memberikan daya cengkeram optimal dan tahan panas. Cocok untuk penggunaan harian maupun touring jarak jauh." },
-  { name: "Kampas Rem Belakang Vespa Primavera", description: "Kampas rem belakang berkualitas tinggi untuk Vespa Primavera. Teknologi ceramic composite memastikan pengereman halus tanpa bunyi. Lifetime lebih panjang dibanding kampas standar." },
-  { name: "Kampas Rem Depan Racing Malossi", description: "Kampas rem racing Malossi untuk performa maksimal. Material sintered metal memberikan grip superior pada kecepatan tinggi. Direkomendasikan untuk penggunaan racing dan harian sporty." },
-  { name: "Oli Mesin Motul 2T", description: "Oli mesin 2-tak Motul 510 Technosynthese. Formula ester synthetic memberikan pelumasan optimal, mengurangi asap, dan membersihkan mesin. Cocok untuk Vespa PX, Sprint, dan model 2T lainnya." },
-  { name: "Oli Mesin Motul 4T", description: "Oli mesin 4-tak Motul 7100 full synthetic. Memberikan perlindungan maksimal pada mesin Vespa matic. Mengurangi gesekan, menjaga kebersihan mesin, dan memperpanjang umur mesin." },
-  { name: "Oli Mesin Castrol Power 1", description: "Oli mesin Castrol Power 1 10W-40 semi-synthetic. Teknologi Power Release Formula memberikan akselerasi lebih responsif. Cocok untuk Vespa GTS, Primavera, dan Sprint 4T." },
-  { name: "Oli Gardan Vespa Matic", description: "Oli gardan khusus Vespa matic SAE 80W-90. Melindungi gear transmisi dari keausan, mengurangi suara kasar, dan memastikan perpindahan gigi halus. Ganti setiap 8.000 km." },
-  { name: "Busi NGK Racing Vespa", description: "Busi NGK Iridium IX Racing untuk Vespa. Elektroda iridium ultra-tipis memberikan percikan api lebih kuat dan efisien. Akselerasi lebih responsif dan konsumsi bahan bakar lebih irit." },
-  { name: "Busi Denso Iridium Racing", description: "Busi Denso Iridium Power dengan teknologi 0.4mm center electrode. Memberikan pembakaran sempurna, start mudah di pagi hari, dan performa mesin optimal di semua RPM." },
-  { name: "Busi NGK Platinum Vespa", description: "Busi NGK G-Power Platinum untuk Vespa harian. Elektroda platinum memberikan umur pakai 2x lebih lama dibanding busi standar. Performa stabil dan harga terjangkau." },
-  { name: "Filter Udara Malossi Racing", description: "Filter udara racing Malossi Red Sponge. Material sponge berpori besar meningkatkan airflow ke mesin. Washable dan reusable, cocok untuk setup racing dan harian kencang." },
-  { name: "Filter Udara Standar Vespa", description: "Filter udara original Vespa berkualitas OEM. Menyaring debu dan kotoran dengan efisiensi tinggi. Menjaga performa mesin tetap optimal dan konsumsi BBM irit." },
-  { name: "Filter Oli Vespa Matic", description: "Filter oli Vespa matic original. Menyaring partikel dan kotoran dari oli mesin untuk melindungi komponen mesin. Ganti setiap 5.000 km atau bersamaan dengan ganti oli." },
-  { name: "Filter Bensin Vespa", description: "Filter bensin Vespa dengan mesh stainless steel. Menyaring kotoran dan air dari bahan bakar sebelum masuk karburator/injektor. Mencegah tersumbatnya sistem bahan bakar." },
-  { name: "Rantai Keteng Vespa PX", description: "Rantai keteng Vespa PX 150 original DID Japan. Material hardened steel menjamin ketahanan dan presisi timing mesin. Ganti setiap 20.000 km untuk performa optimal." },
-  { name: "Rantai Keteng Vespa Sprint", description: "Rantai keteng Vespa Sprint 150. Kualitas OEM dengan ketahanan tinggi terhadap stretching. Memastikan timing valve akurat untuk performa mesin maksimal." },
-  { name: "Gear Set Rasio 4.0 Racing", description: "Gear set rasio 4.0 racing untuk Vespa. Memberikan akselerasi lebih cepat dengan top speed optimal. Material forged steel tahan beban tinggi. Cocok untuk harian sporty." },
-  { name: "Gear Set Rasio 3.8 Standar", description: "Gear set rasio 3.8 standar Vespa. Rasio original untuk keseimbangan akselerasi dan top speed. Nyaman untuk riding harian dalam kota dengan konsumsi BBM efisien." },
-  { name: "Gear Set Rasio 4.2 Drag", description: "Gear set rasio 4.2 untuk drag race. Akselerasi brutal di lintasan pendek. Material chromoly steel super kuat. Khusus racing, tidak disarankan untuk harian." },
-  { name: "Ban Luar Pirelli Angel Scooter 110/70", description: "Ban Pirelli Angel Scooter 110/70-12. Pattern multi-compound memberikan grip optimal di kondisi basah maupun kering. Mileage panjang cocok untuk daily commute." },
-  { name: "Ban Luar Michelin City Grip 120/70", description: "Ban Michelin City Grip 120/70-12. Teknologi silica compound memberikan cengkeraman superior di jalan basah. Pattern anti-aquaplaning untuk keamanan maksimal." },
-  { name: "Ban Luar Metzeler Sportec 130/70", description: "Ban Metzeler Sportec Street 130/70-12. Ban sport touring dengan grip racing. Compound dual memberikan mileage baik di tengah dan grip maksimal di sisi ban." },
-  { name: "Ban Dalam Vespa 10 Inch", description: "Ban dalam Vespa ukuran 10 inch. Karet butyl berkualitas tinggi tahan bocor halus. Cocok untuk Vespa klasik dengan velg 10 inch. Pentil lurus standar." },
-  { name: "Ban Dalam Vespa 12 Inch", description: "Ban dalam Vespa ukuran 12 inch. Material karet elastis premium dengan ketebalan merata. Tahan tekanan tinggi dan perubahan suhu. Pentil bengkok untuk velg racing." },
-  { name: "Aki Kering MotoBatt 12V", description: "Aki kering MotoBatt MBTZ10S 12V maintenance free. Teknologi AGM (Absorbent Glass Mat) tahan getaran dan posisi tidur. Start mudah, umur pakai 3x lebih lama." },
-  { name: "Aki Kering Yuasa YTZ7S", description: "Aki kering Yuasa YTZ7S original Japan. Factory activated, siap pakai tanpa isi air aki. Cranking power besar untuk start mesin cepat. Tahan getaran dan kebocoran." },
-  { name: "Aki Kering GS Astra", description: "Aki kering GS Astra MF 12V 6Ah. Maintenance free dengan teknologi calcium-calcium. Harga terjangkau kualitas terjamin. Garansi resmi 6 bulan." },
-  { name: "Lampu Depan LED Proyektor Vespa", description: "Lampu depan LED proyektor untuk Vespa GTS/Sprint. Teknologi projector lens memberikan cahaya fokus dan terang. Cut-off jelas, tidak menyilaukan pengendara lain." },
-  { name: "Lampu Belakang LED Vespa GTS", description: "Lampu belakang LED custom Vespa GTS. LED chip 5050 super terang dengan 3 mode: running, rem, dan sein. Plug and play tanpa potong kabel." },
-  { name: "Lampu Sein LED Sequential", description: "Lampu sein LED sequential flowing. Efek bergerak mengalir seperti mobil premium. LED amber super terang, waterproof, dan tahan getaran. Universal fit untuk Vespa." },
-  { name: "Kampas Kopling Malossi Fly Clutch", description: "Kampas kopling racing Malossi Fly Clutch. Material kevlar-carbon memberikan grip maksimal tanpa slip. Tahan panas tinggi untuk pemakaian racing dan touring." },
-  { name: "Kampas Kopling Racing Polini", description: "Kampas kopling Polini Speed Clutch. Material sintered metal untuk transfer tenaga maksimal. Engagement point presisi, cocok untuk setup mesin racing high performance." },
-  { name: "Shockbreaker Depan Bitubo Vespa GTS", description: "Shockbreaker depan Bitubo untuk Vespa GTS 300. Fully adjustable preload, compression, dan rebound. Tabung gas eksternal untuk stabilitas redaman maksimal." },
-  { name: "Shockbreaker Belakang Ohlins Vespa", description: "Shockbreaker belakang Ohlins HO 142 untuk Vespa. Kualitas premium Swedia dengan adjustable preload dan rebound. Handling superior di tikungan dan jalan bergelombang." },
-  { name: "Shockbreaker Depan YSS Racing", description: "Shockbreaker depan YSS Racing Series. Tabung gas dengan adjustable preload. Piston 30mm memberikan redaman progresif. Upgrade signifikan dari shockbreaker standar." },
-  { name: "Bearing Roda Depan SKF Premium", description: "Bearing roda depan SKF Explorer Series. Seal 2RSH melindungi dari air dan debu. Putaran halus dan umur pakai panjang. Made in Italy kualitas terjamin." },
-  { name: "Bearing Roda Belakang NTN Japan", description: "Bearing roda belakang NTN original Japan. Precision grade ABEC-3 untuk putaran presisi tinggi. Seal contact rubber tahan air dan kotoran." },
-  { name: "Bearing Steering Koyo", description: "Bearing steering Koyo tapered roller. Mengurangi berat setang dan meningkatkan stabilitas kemudi. Kualitas OEM untuk berbagai model Vespa." },
-  { name: "Kabel Gas Domino Racing", description: "Kabel gas Domino Racing Quick Action. Kabel stainless steel anti-karat dengan housing teflon liner. Tarikan gas lebih ringan dan responsif. Universal Vespa." },
-  { name: "Kabel Rem Depan Vespa Original", description: "Kabel rem depan Vespa original Piaggio. Panjang presisi sesuai model. Housing PVC tahan cuaca dan inner cable galvanis anti-karat." },
-  { name: "Kabel Kopling Vespa PX", description: "Kabel kopling Vespa PX 150 original. Inner cable 2.5mm kuat dengan housing spiral steel. Tarikan kopling halus dan tidak mudah putus." },
-  { name: "Piston Kit Polini 200cc Racing", description: "Piston kit Polini 200cc forged racing. Diameter 68mm dengan ring racing. Material aluminium forged T6 ringan dan tahan panas. Meningkatkan kompresi dan tenaga." },
-  { name: "Piston Kit Malossi 175cc", description: "Piston kit Malossi 175cc cast performance. Diameter 64mm dengan coating anti-friction. Piston pin 15mm dengan circlip racing. Cocok untuk bore up harian." },
-  { name: "Piston Kit Standar 150cc", description: "Piston kit standar Vespa 150cc OEM quality. Diameter 62mm dengan ring 3 lapis. Material cast aluminium dengan coating graphite. Ideal untuk rebuild mesin standar." },
-  { name: "Spion Oval Chrome Vespa", description: "Spion oval chrome Vespa classic. Kaca cembung wide angle untuk pandangan lebih luas. Stem adjustable dengan joint ball. Finishing chrome mengkilap tahan karat." },
-  { name: "Spion Lipat Racing CNC", description: "Spion lipat racing CNC aluminium. Desain aerodinamis dengan bracket 360° adjustable. Kaca blue tint anti-glare. Lipat praktis untuk parkir di tempat sempit." },
-  { name: "Spion Bar End MotoGadget", description: "Spion bar end MotoGadget Glassless. Kaca Hindsight technology tanpa frame. Pemasangan di ujung stang untuk tampilan minimalis racing. Buatan Jerman." },
-  { name: "Knalpot Racing Akrapovic Vespa", description: "Knalpot Akrapovic Racing Line titanium untuk Vespa. Suara deep bass khas Akra. Bobot ringan 60% lebih ringan dari standar. Power increase +3.5 HP." },
-  { name: "Knalpot Racing Yoshimura Vespa", description: "Knalpot Yoshimura Tri-Oval stainless steel. Teknologi TRI-Oval untuk flow gas buang optimal. Suara racing khas Yoshimura. Include dB killer untuk harian." },
-  { name: "Knalpot Racing Leo Vince", description: "Knalpot Leo Vince GP Corsa. Desain MotoGP style dengan carbon end cap. Suara agresif dengan performa meningkat. E-approved legal untuk jalan raya." },
-  { name: "CDI Racing BRT Powermax", description: "CDI racing BRT Powermax dual band. Teknologi dual curve untuk akselerasi bawah dan top speed atas. Limiter 12.000 RPM. Plug and play tanpa ubahan kabel." },
-  { name: "CDI Racing Rextor Adjustable", description: "CDI racing Rextor Programmable. Adjustable timing curve 0-60 derajat. 5 preset map untuk berbagai kebutuhan. Monitor RPM realtime via LED indikator." },
-  { name: "CDI Standar Vespa Original", description: "CDI standar Vespa original Piaggio. Timing fixed sesuai spesifikasi pabrik. Kualitas OEM terjamin untuk penggunaan harian. Cocok untuk motor standar." },
-  { name: "Paking Mesin Set Vespa PX", description: "Paking mesin set Vespa PX 150 lengkap. Termasuk paking head, blok, crankcase, dan intake. Material asbestos-free tahan panas tinggi. Set 12 pcs." },
-  { name: "Paking Mesin Set Vespa Sprint", description: "Paking mesin set Vespa Sprint 150. Kualitas OEM dengan presisi laser cut. Material graphite composite tahan kompresi tinggi. Set lengkap 10 pcs." },
-  { name: "Seal Mesin Vespa 2T Full Set", description: "Seal mesin full set Vespa 2-tak. Termasuk seal crank, seal gigi transmisi, dan seal kopling. Material nitrile rubber tahan oli dan panas. Set 8 pcs." },
-  { name: "Roller CVT Malossi 12gr", description: "Roller CVT Malossi 12 gram. Material special plastic dengan inti kuningan. Tahan aus dan tidak mudah penyok. Mempengaruhi karakter akselerasi dan top speed." },
-  { name: "Roller CVT Polini 10gr", description: "Roller CVT Polini 10 gram. Bobot ringan untuk akselerasi lebih cepat. Material composite low friction. Cocok untuk setup racing dan harian responsif." },
-  { name: "Roller CVT Dr Pulley 11gr", description: "Roller CVT Dr Pulley Sliding 11 gram. Desain unik dengan sliding surface. Mengurangi gesekan pada ramp plate. Akselerasi halus tanpa hentakan." },
-  { name: "Belt CVT Vespa Matic Racing", description: "Belt CVT racing reinforced untuk Vespa matic. Material aramid fiber dengan lebar 24mm. Tahan panas dan tidak mudah mulur. Meningkatkan transfer tenaga ke roda." },
+  // REM & KAMPAS (8 varian)
+  { name: "Kampas Rem Depan Vespa Sprint", description: "Kampas rem depan original untuk Vespa Sprint 150. Material semi-metallic." },
+  { name: "Kampas Rem Belakang Vespa Primavera", description: "Kampas rem belakang berkualitas tinggi untuk Vespa Primavera." },
+  { name: "Kampas Rem Depan Racing Malossi", description: "Kampas rem racing Malossi untuk performa maksimal." },
+  { name: "Kampas Rem Belakang Racing Malossi", description: "Kampas rem belakang racing Malossi. Material sintered metal." },
+  { name: "Kampas Rem Depan Brembo Vespa", description: "Kampas rem depan Brembo SA series. Kualitas premium Italia." },
+  { name: "Kampas Rem Belakang Brembo Vespa", description: "Kampas rem belakang Brembo. Performa pengereman superior." },
+  { name: "Kampas Rem Depan EBC Racing", description: "Kampas rem depan EBC Double-H sintered. Untuk racing dan touring." },
+  { name: "Kampas Rem Belakang EBC Racing", description: "Kampas rem belakang EBC. Ketahanan panas tinggi." },
+
+  // OLI MESIN (12 varian)
+  { name: "Oli Mesin Motul 2T", description: "Oli mesin 2-tak Motul 510 Technosynthese. Formula ester synthetic." },
+  { name: "Oli Mesin Motul 4T", description: "Oli mesin 4-tak Motul 7100 full synthetic 10W-40." },
+  { name: "Oli Mesin Motul 300V Racing", description: "Oli racing Motul 300V 15W-50. Ester core technology." },
+  { name: "Oli Mesin Castrol Power 1", description: "Oli mesin Castrol Power 1 10W-40 semi-synthetic." },
+  { name: "Oli Mesin Castrol Edge", description: "Oli mesin Castrol Edge 5W-40 full synthetic. Titanium FST." },
+  { name: "Oli Mesin Shell Advance Ultra", description: "Oli Shell Advance Ultra 10W-40. PurePlus technology." },
+  { name: "Oli Mesin Shell Advance AX7", description: "Oli Shell Advance AX7 10W-40 semi-synthetic." },
+  { name: "Oli Mesin Repsol Moto", description: "Oli Repsol Moto 4T 10W-40 full synthetic." },
+  { name: "Oli Mesin Repsol Racing", description: "Oli Repsol Racing 4T 10W-50. Untuk performa tinggi." },
+  { name: "Oli Mesin Liqui Moly", description: "Oli Liqui Moly 4T 10W-40. Teknologi MoS2 anti-friction." },
+  { name: "Oli Mesin Yamalube", description: "Oli Yamalube 4T 10W-40 semi-synthetic. Kualitas OEM." },
+  { name: "Oli Mesin AHM MPX2", description: "Oli AHM MPX2 10W-30. Untuk motor matic harian." },
+
+  // OLI GARDAN & TRANSMISI (5 varian)
+  { name: "Oli Gardan Vespa Matic", description: "Oli gardan khusus Vespa matic SAE 80W-90." },
+  { name: "Oli Gardan Motul", description: "Oli gardan Motul 80W-90 mineral. Pelumasan optimal." },
+  { name: "Oli Gardan Castrol", description: "Oli gardan Castrol 80W-90. Anti-wear protection." },
+  { name: "Oli Transmisi Vespa PX", description: "Oli transmisi Vespa PX SAE 30. Untuk gear box." },
+  { name: "Oli Transmisi Racing", description: "Oli transmisi racing 75W-140 full synthetic." },
+
+  // BUSI (8 varian)
+  { name: "Busi NGK Racing Vespa", description: "Busi NGK Iridium IX Racing CR8EIX-9." },
+  { name: "Busi NGK Platinum Vespa", description: "Busi NGK G-Power Platinum CR8EGP." },
+  { name: "Busi NGK Standar Vespa", description: "Busi NGK standar CR8E. Kualitas OEM." },
+  { name: "Busi Denso Iridium Racing", description: "Busi Denso Iridium Power IU24. 0.4mm electrode." },
+  { name: "Busi Denso Platinum", description: "Busi Denso Platinum PK20PR-P8. Durabilitas tinggi." },
+  { name: "Busi Denso Standar", description: "Busi Denso standar U24ESR-N. Kualitas OEM." },
+  { name: "Busi Champion Racing", description: "Busi Champion Iridium 9401. Performa racing." },
+  { name: "Busi Splitfire Racing", description: "Busi Splitfire Triple Platinum. Multi-spark." },
+
+  // FILTER (10 varian)
+  { name: "Filter Udara Malossi Racing", description: "Filter udara racing Malossi Red Sponge. Washable." },
+  { name: "Filter Udara Standar Vespa", description: "Filter udara original Vespa kualitas OEM." },
+  { name: "Filter Udara K&N Racing", description: "Filter udara K&N high flow. Reusable lifetime." },
+  { name: "Filter Udara BMC Racing", description: "Filter udara BMC race. Cotton gauze material." },
+  { name: "Filter Udara DNA Racing", description: "Filter udara DNA high performance. Made in Italy." },
+  { name: "Filter Oli Vespa Matic", description: "Filter oli Vespa matic original." },
+  { name: "Filter Oli Racing Malossi", description: "Filter oli racing Malossi. High flow rate." },
+  { name: "Filter Bensin Vespa", description: "Filter bensin Vespa mesh stainless steel." },
+  { name: "Filter Bensin Racing", description: "Filter bensin racing high flow. 40 micron." },
+  { name: "Filter CVT Vespa Matic", description: "Filter CVT Vespa matic. Mencegah debu masuk." },
+
+  // RANTAI & GEAR (8 varian)
+  { name: "Rantai Keteng Vespa PX", description: "Rantai keteng Vespa PX 150 original DID Japan." },
+  { name: "Rantai Keteng Vespa Sprint", description: "Rantai keteng Vespa Sprint 150 OEM quality." },
+  { name: "Rantai Keteng Racing DID", description: "Rantai keteng racing DID gold series." },
+  { name: "Rantai Keteng Racing RK", description: "Rantai keteng racing RK Takasago Japan." },
+  { name: "Gear Set Rasio 3.8 Standar", description: "Gear set rasio 3.8 standar Vespa. OEM quality." },
+  { name: "Gear Set Rasio 4.0 Racing", description: "Gear set rasio 4.0 racing. Akselerasi cepat." },
+  { name: "Gear Set Rasio 4.2 Drag", description: "Gear set rasio 4.2 untuk drag race." },
+  { name: "Gear Set Rasio 3.5 Touring", description: "Gear set rasio 3.5 untuk top speed maksimal." },
+
+  // BAN LUAR (10 varian)
+  { name: "Ban Pirelli Angel Scooter 110/70", description: "Ban Pirelli Angel Scooter 110/70-12. Multi-compound." },
+  { name: "Ban Pirelli Angel Scooter 120/70", description: "Ban Pirelli Angel Scooter 120/70-12. Pattern bi-compound." },
+  { name: "Ban Pirelli Diablo Rosso 130/70", description: "Ban Pirelli Diablo Rosso Scooter 130/70-12. Sport." },
+  { name: "Ban Michelin City Grip 120/70", description: "Ban Michelin City Grip 120/70-12. Silica compound." },
+  { name: "Ban Michelin City Grip 130/70", description: "Ban Michelin City Grip 130/70-12. Anti-aquaplaning." },
+  { name: "Ban Michelin Pilot Street 110/70", description: "Ban Michelin Pilot Street 110/70-12. Commuting." },
+  { name: "Ban Metzeler Sportec 130/70", description: "Ban Metzeler Sportec Street 130/70-12. Sport touring." },
+  { name: "Ban Metzeler Feelfree 120/70", description: "Ban Metzeler Feelfree 120/70-12. Wet grip optimal." },
+  { name: "Ban Maxxis Diamond 110/70", description: "Ban Maxxis Diamond 110/70-12. Budget friendly." },
+  { name: "Ban IRC Eagle Grip 120/70", description: "Ban IRC Eagle Grip 120/70-12. Durabilitas tinggi." },
+
+  // BAN DALAM (4 varian)
+  { name: "Ban Dalam Vespa 10 Inch", description: "Ban dalam Vespa 10 inch. Karet butyl." },
+  { name: "Ban Dalam Vespa 12 Inch", description: "Ban dalam Vespa 12 inch. Karet premium." },
+  { name: "Ban Dalam Racing 10 Inch", description: "Ban dalam racing 10 inch. Lebih tebal anti bocor." },
+  { name: "Ban Dalam Racing 12 Inch", description: "Ban dalam racing 12 inch. Material heavy duty." },
+
+  // AKI (6 varian)
+  { name: "Aki Kering MotoBatt 12V", description: "Aki kering MotoBatt MBTZ10S. AGM technology." },
+  { name: "Aki Kering Yuasa YTZ7S", description: "Aki kering Yuasa YTZ7S original Japan." },
+  { name: "Aki Kering Yuasa YTZ10S", description: "Aki kering Yuasa YTZ10S. Cranking power besar." },
+  { name: "Aki Kering GS Astra", description: "Aki kering GS Astra MF 12V 6Ah." },
+  { name: "Aki Basah Yuasa", description: "Aki basah Yuasa YB9B. Untuk Vespa klasik." },
+  { name: "Aki Lithium Racing", description: "Aki lithium Shido LTZ10S. Bobot ringan." },
+
+  // LAMPU (8 varian)
+  { name: "Lampu Depan LED Proyektor Vespa", description: "Lampu depan LED proyektor. Cut-off jelas." },
+  { name: "Lampu Depan LED Bi-LED", description: "Lampu depan Bi-LED projector. High-low beam." },
+  { name: "Lampu Belakang LED Vespa GTS", description: "Lampu belakang LED custom Vespa GTS." },
+  { name: "Lampu Belakang LED Smoked", description: "Lampu belakang LED smoked lens. Tampilan gelap." },
+  { name: "Lampu Sein LED Sequential", description: "Lampu sein LED sequential flowing." },
+  { name: "Lampu Sein LED Smoke", description: "Lampu sein LED smoked universal Vespa." },
+  { name: "Lampu DRL LED Strip", description: "Lampu DRL LED strip flexible. Daytime running light." },
+  { name: "Lampu Kabut LED", description: "Lampu kabut LED mini proyektor. Tahan air." },
+
+  // KOPLING (6 varian)
+  { name: "Kampas Kopling Malossi Fly", description: "Kampas kopling racing Malossi Fly Clutch." },
+  { name: "Kampas Kopling Polini Speed", description: "Kampas kopling Polini Speed Clutch." },
+  { name: "Kampas Kopling Standar Vespa", description: "Kampas kopling standar Vespa OEM." },
+  { name: "Kampas Kopling Racing Kevlar", description: "Kampas kopling kevlar racing. Tahan panas." },
+  { name: "Per CVT Racing Malossi", description: "Per CVT racing Malossi kuning. 1500 RPM." },
+  { name: "Per CVT Racing Polini", description: "Per CVT racing Polini biru. 2000 RPM." },
+
+  // SHOCKBREAKER (8 varian)
+  { name: "Shockbreaker Depan Bitubo Vespa", description: "Shockbreaker depan Bitubo fully adjustable." },
+  { name: "Shockbreaker Belakang Ohlins Vespa", description: "Shockbreaker belakang Ohlins HO 142." },
+  { name: "Shockbreaker Depan YSS Racing", description: "Shockbreaker depan YSS Racing Series. Gas." },
+  { name: "Shockbreaker Belakang YSS Racing", description: "Shockbreaker belakang YSS G-Series. Adjustable." },
+  { name: "Shockbreaker Depan KYB", description: "Shockbreaker depan KYB Excel-G. OEM replacement." },
+  { name: "Shockbreaker Belakang KYB", description: "Shockbreaker belakang KYB Gas-A-Just." },
+  { name: "Shockbreaker Depan Racing KTC", description: "Shockbreaker depan KTC Racing. Preload adjustable." },
+  { name: "Shockbreaker Belakang Racing KTC", description: "Shockbreaker belakang KTC Racing. Tabung gas." },
+
+  // BEARING (6 varian)
+  { name: "Bearing Roda Depan SKF", description: "Bearing roda depan SKF Explorer Series." },
+  { name: "Bearing Roda Belakang NTN", description: "Bearing roda belakang NTN original Japan." },
+  { name: "Bearing Steering Koyo", description: "Bearing steering Koyo tapered roller." },
+  { name: "Bearing Roda Depan NSK", description: "Bearing roda depan NSK Japan. Precision grade." },
+  { name: "Bearing Roda Belakang FAG", description: "Bearing roda belakang FAG Germany." },
+  { name: "Bearing CVT Vespa", description: "Bearing CVT Vespa matic. Needle bearing." },
+
+  // KABEL (5 varian)
+  { name: "Kabel Gas Domino Racing", description: "Kabel gas Domino Racing Quick Action." },
+  { name: "Kabel Rem Depan Vespa Original", description: "Kabel rem depan Vespa original Piaggio." },
+  { name: "Kabel Kopling Vespa PX", description: "Kabel kopling Vespa PX 150 original." },
+  { name: "Kabel Spedometer Vespa", description: "Kabel spedometer Vespa original." },
+  { name: "Kabel Choke Vespa 2T", description: "Kabel choke Vespa 2-tak. Kualitas OEM." },
+
+  // PISTON (6 varian)
+  { name: "Piston Kit Polini 200cc", description: "Piston kit Polini 200cc forged racing." },
+  { name: "Piston Kit Malossi 175cc", description: "Piston kit Malossi 175cc cast performance." },
+  { name: "Piston Kit Standar 150cc", description: "Piston kit standar Vespa 150cc OEM." },
+  { name: "Piston Kit 62mm Racing", description: "Piston kit 62mm racing. Forged aluminium." },
+  { name: "Piston Kit 63mm Touring", description: "Piston kit 63mm touring. Cast piston." },
+  { name: "Piston Kit 65mm Drag", description: "Piston kit 65mm drag race. High compression." },
+
+  // SPION (4 varian)
+  { name: "Spion Oval Chrome Vespa", description: "Spion oval chrome Vespa classic. Wide angle." },
+  { name: "Spion Lipat Racing CNC", description: "Spion lipat racing CNC aluminium." },
+  { name: "Spion Bar End MotoGadget", description: "Spion bar end MotoGadget Glassless." },
+  { name: "Spion Universal Black", description: "Spion universal black. Adjustable joint." },
+
+  // KNALPOT (6 varian)
+  { name: "Knalpot Akrapovic Racing", description: "Knalpot Akrapovic Racing Line titanium." },
+  { name: "Knalpot Yoshimura Tri-Oval", description: "Knalpot Yoshimura Tri-Oval stainless." },
+  { name: "Knalpot Leo Vince GP", description: "Knalpot Leo Vince GP Corsa. Carbon end cap." },
+  { name: "Knalpot R9 Racing", description: "Knalpot R9 Racing Generation 5. Stainless." },
+  { name: "Knalpot SC Project", description: "Knalpot SC Project CR-T. MotoGP style." },
+  { name: "Knalpot Arrow Racing", description: "Knalpot Arrow Pro-Race. Titanium." },
+
+  // CDI (4 varian)
+  { name: "CDI Racing BRT Powermax", description: "CDI racing BRT Powermax dual band." },
+  { name: "CDI Racing Rextor Programmable", description: "CDI racing Rextor adjustable. 5 maps." },
+  { name: "CDI Standar Vespa", description: "CDI standar Vespa original Piaggio." },
+  { name: "CDI Racing TDR", description: "CDI racing TDR. Limiter 14.000 RPM." },
+
+  // PAKING & SEAL (4 varian)
+  { name: "Paking Mesin Set Vespa PX", description: "Paking mesin set Vespa PX 150 lengkap." },
+  { name: "Paking Mesin Set Vespa Sprint", description: "Paking mesin set Vespa Sprint 150." },
+  { name: "Seal Mesin Vespa 2T Set", description: "Seal mesin full set Vespa 2-tak." },
+  { name: "Seal Mesin Vespa 4T Set", description: "Seal mesin full set Vespa 4-tak." },
+
+  // ROLLER & BELT CVT (6 varian)
+  { name: "Roller CVT Malossi 10gr", description: "Roller CVT Malossi 10 gram. Akselerasi cepat." },
+  { name: "Roller CVT Malossi 12gr", description: "Roller CVT Malossi 12 gram. Balanced." },
+  { name: "Roller CVT Polini 9gr", description: "Roller CVT Polini 9 gram. Racing." },
+  { name: "Roller CVT Dr Pulley 11gr", description: "Roller CVT Dr Pulley Sliding 11 gram." },
+  { name: "Belt CVT Vespa Racing", description: "Belt CVT racing reinforced. Aramid fiber." },
+  { name: "Belt CVT Vespa Standar", description: "Belt CVT standar Vespa. Kualitas OEM." },
 ];
 
 const serviceData = [
-  { name: "Service Ringan Vespa Matic", description: "Service ringan meliputi ganti oli mesin, pembersihan filter udara, pengecekan CVT, pengecekan rem, dan pengecekan kelistrikan. Estimasi pengerjaan 1-2 jam." },
-  { name: "Service Ringan Vespa 2-Tak", description: "Service ringan Vespa 2-tak meliputi ganti oli samping, pembersihan karburator, setel platina/ignition timing, pembersihan busi, dan pengecekan kompresi. Estimasi 1-2 jam." },
-  { name: "Service Ringan Vespa 4-Tak", description: "Service ringan Vespa 4-tak meliputi ganti oli mesin, pembersihan throttle body, pengecekan valve clearance, dan pengecekan sistem injeksi. Estimasi 1-2 jam." },
-  { name: "Tune Up Mesin 2-Tak", description: "Tune up menyeluruh mesin 2-tak meliputi setel karburator, setel timing pengapian, pembersihan exhaust port, dan pengecekan reed valve. Meningkatkan performa dan efisiensi." },
-  { name: "Tune Up Mesin 4-Tak", description: "Tune up mesin 4-tak meliputi penyetelan valve clearance, pembersihan injector/throttle body, reset ECU, dan pengecekan sensor. Performa mesin kembali optimal." },
-  { name: "Tune Up Racing Performance", description: "Tune up racing meliputi dyno test, setting karburator/injeksi untuk performa maksimal, penyesuaian timing pengapian, dan fine tuning AFR. Termasuk printout dyno chart." },
-  { name: "Ganti Oli Mesin & Gardan", description: "Paket ganti oli mesin dan gardan lengkap. Termasuk oli mesin full synthetic 1.2L dan oli gardan 250ml. Pengecekan filter oli dan pembersihan magnet drain plug." },
-  { name: "Ganti Oli Mesin Sintetik", description: "Ganti oli mesin dengan oli full synthetic premium. Pilihan Motul 7100 atau Castrol Power 1. Termasuk jasa ganti dan pengecekan kebocoran. Cocok untuk Vespa matic dan sport." },
-  { name: "Ganti Oli Mesin Racing", description: "Ganti oli racing special untuk setup mesin high performance. Oli Motul 300V dengan ester core technology. Memberikan perlindungan maksimal pada RPM tinggi." },
-  { name: "Cuci Motor Detailing Premium", description: "Cuci motor detailing premium meliputi foam wash, pembersihan detail dengan kuas, poles body, coating wax, pembersihan mesin, dan semir ban. Motor seperti baru keluar dealer." },
-  { name: "Cuci Motor Biasa", description: "Cuci motor standar meliputi semprot air, foam wash, bilas, keringkan, dan semir ban. Pengerjaan cepat 15-20 menit. Bersih bebas debu dan lumpur." },
-  { name: "Cuci Motor + Poles Body", description: "Cuci motor + poles body untuk menghilangkan swirl marks dan baret halus. Menggunakan dual action polisher dan compound premium. Hasil glossy seperti kaca." },
-  { name: "Balancing & Spooring Roda", description: "Balancing dan spooring roda depan-belakang. Menggunakan mesin balancing digital. Menghilangkan getaran di setang dan meningkatkan stabilitas handling." },
-  { name: "Overhaul Mesin 2-Tak Full", description: "Overhaul total mesin 2-tak meliputi turun mesin, ganti piston kit, boring silinder, ganti semua seal dan bearing, serta penyetelan ulang. Mesin kembali seperti baru." },
-  { name: "Overhaul Mesin 4-Tak Full", description: "Overhaul total mesin 4-tak meliputi turun mesin, ganti ring piston, skir klep, ganti seal klep, ganti tensioner rantai keteng, dan ganti gasket full set." },
-  { name: "Overhaul Mesin Racing", description: "Overhaul spesifikasi racing meliputi bore up, porting polish, ganti piston forged, camshaft racing, dan pengaturan ulang ECU/karburator. Output tenaga maksimal." },
-  { name: "Tambal Ban Tubeless", description: "Tambal ban tubeless dengan metode mushroom plug dari dalam. Lebih aman dan permanen dibanding tambal tusuk dari luar. Termasuk balancing roda." },
-  { name: "Tambal Ban Biasa", description: "Tambal ban biasa (tube type) dengan patch dingin. Proses lem dan patch rubber. Cocok untuk ban dalam Vespa klasik. Pengerjaan cepat 15 menit." },
-  { name: "Ganti Ban Baru + Balancing", description: "Paket ganti ban baru termasuk balancing dan pemasangan. Tersedia berbagai merek: Pirelli, Michelin, Metzeler. Termasuk pentil baru dan pembuangan ban bekas." },
-  { name: "Service CVT & Pulley", description: "Service CVT dan pulley meliputi pembersihan total, ganti roller, pengecekan belt, pembersihan torque driver, dan pelumasan moving part. Tarikan kembali responsif." },
-  { name: "Service Karburator Vespa", description: "Service karburator meliputi pembongkaran, pembersihan ultrasonic, ganti main jet/pilot jet sesuai kebutuhan, setel AFR, dan sinkronisasi. Mesin lebih halus dan irit." },
-  { name: "Service Injeksi Vespa Matic", description: "Service sistem injeksi meliputi pembersihan injector dengan ultrasonic cleaner, pembersihan throttle body, reset TPS, dan pengecekan fuel pump. Tarikan lebih responsif." },
-  { name: "Ganti Kampas Rem Depan & Belakang", description: "Paket ganti kampas rem depan dan belakang. Termasuk pembersihan kaliper, piston, dan sliding pin. Pilihan kampas standar atau racing sesuai kebutuhan." },
-  { name: "Bore Up Mesin 175cc", description: "Bore up mesin 150cc ke 175cc menggunakan piston kit Malossi. Termasuk boring silinder, porting intake/exhaust, dan penyetelan ulang. Estimasi kenaikan 3-4 HP." },
-  { name: "Bore Up Mesin 200cc Racing", description: "Bore up ekstrem ke 200cc menggunakan piston Polini forged. Termasuk boring dan honing presisi CNC, porting polish full, dan dyno tuning. Output hingga 20+ HP." },
-  { name: "Setting Karburator Racing", description: "Setting karburator racing meliputi penggantian jet sesuai setup mesin, setel ketinggian pelampung, setel jarum skep, dan fine tuning AFR menggunakan wideband O2 sensor." },
-  { name: "Setting ECU Racing Vespa", description: "Setting ECU racing menggunakan software Rexxer Pro. Remapping fuel map, ignition timing, rev limiter, dan speed limiter. Termasuk dyno test before-after." },
-  { name: "Pemasangan Knalpot Racing", description: "Jasa pemasangan knalpot racing aftermarket. Termasuk penyesuaian bracket, pemasangan gasket baru, dan pengecekan kebocoran. Tersedia juga jasa setting ulang." },
-  { name: "Pemasangan CDI Racing", description: "Pemasangan CDI racing plug and play. Termasuk penyetelan timing dasar dan pengecekan kelistrikan. Bisa request setting timing sesuai karakter mesin." },
-  { name: "Overhaul Suspensi Depan", description: "Overhaul suspensi depan meliputi ganti seal, ganti oli, pembersihan tabung, dan pengecekan bushing. Handling kembali mantap tanpa bocor." },
-  { name: "Ganti Seal Shockbreaker", description: "Ganti seal shockbreaker depan-belakang. Termasuk pembersihan tabung, ganti oli, dan pengecekan shaft. Satu set untuk shockbreaker depan atau belakang." },
-  { name: "Setting Suspensi Racing", description: "Setting suspensi untuk racing meliputi penyesuaian preload, rebound, dan compression damping. Menggunakan tools khusus untuk pengukuran sag dan stroke." },
-  { name: "Pengecatan Body Vespa", description: "Jasa pengecatan body Vespa full set. Mulai dari pengamplasan, epoxy primer, cat warna pilihan, clear coat, dan compounding. Hasil showroom quality dengan garansi." },
-  { name: "Pemasangan Aksesoris Racing", description: "Jasa pemasangan berbagai aksesoris racing: rearset, clip-on handlebar, windshield, belly pan, dll. Pengerjaan rapi dan presisi sesuai standar racing." },
-  { name: "Modifikasi Custom Vespa", description: "Jasa modifikasi custom Vespa sesuai permintaan. Dari classic resto, cafe racer, scrambler, hingga modern custom. Konsultasi gratis dan pengerjaan detail." },
+  // SERVICE RINGAN (8 varian)
+  { name: "Service Ringan Vespa Matic", description: "Ganti oli, bersihkan filter udara, cek CVT, cek rem, cek kelistrikan. 1-2 jam." },
+  { name: "Service Ringan Vespa 2-Tak", description: "Ganti oli samping, bersihkan karburator, setel platina, bersihkan busi, cek kompresi." },
+  { name: "Service Ringan Vespa 4-Tak", description: "Ganti oli, bersihkan throttle body, cek valve clearance, cek sistem injeksi." },
+  { name: "Service Ringan Motor Matic Lain", description: "Service ringan untuk motor matic non-Vespa." },
+  { name: "Service Ringan Motor Bebek", description: "Service ringan motor bebek 4-tak." },
+  { name: "Service Ringan Motor Sport", description: "Service ringan motor sport 150cc-250cc." },
+  { name: "Service Express 30 Menit", description: "Service express: ganti oli + cek cepat. 30 menit selesai." },
+  { name: "Service Malam", description: "Service malam hari (diatas jam 8 malam). Extra charge 25%." },
+
+  // TUNE UP (6 varian)
+  { name: "Tune Up Mesin 2-Tak", description: "Setel karburator, timing, bersihkan exhaust port, cek reed valve." },
+  { name: "Tune Up Mesin 4-Tak", description: "Setel valve clearance, bersihkan injector, reset ECU, cek sensor." },
+  { name: "Tune Up Racing Performance", description: "Dyno test, setting karburator/injeksi, timing adjustment, AFR tuning." },
+  { name: "Tune Up Irit BBM", description: "Setting mesin untuk efisiensi BBM maksimal. Target irit 10-15%." },
+  { name: "Tune Up Touring", description: "Setting mesin untuk touring jarak jauh. Fokus reliability dan kenyamanan." },
+  { name: "Dyno Test Only", description: "Tes dyno saja tanpa tuning. Printout grafik HP dan torsi." },
+
+  // GANTI OLI (5 varian)
+  { name: "Ganti Oli Mesin & Gardan", description: "Paket ganti oli mesin + gardan. Oli full synthetic." },
+  { name: "Ganti Oli Mesin Sintetik", description: "Ganti oli full synthetic premium. Motul/Castrol/Shell." },
+  { name: "Ganti Oli Mesin Racing", description: "Ganti oli racing Motul 300V. Untuk mesin high performance." },
+  { name: "Ganti Oli Mesin Mineral", description: "Ganti oli mineral standar. Budget friendly." },
+  { name: "Ganti Oli Gardan Only", description: "Ganti oli gardan saja. SAE 80W-90." },
+
+  // CUCI MOTOR (6 varian)
+  { name: "Cuci Motor Detailing Premium", description: "Foam wash, kuas detail, poles body, coating wax, bersihkan mesin, semir ban." },
+  { name: "Cuci Motor Biasa", description: "Semprot air, foam wash, bilas, keringkan, semir ban. 15-20 menit." },
+  { name: "Cuci Motor + Poles Body", description: "Cuci + poles body. Hilangkan swirl marks dan baret halus." },
+  { name: "Cuci Mesin Motor", description: "Pembersihan mesin dengan chemical khusus. Bebas oli dan kotoran." },
+  { name: "Cuci Rantai & Gear", description: "Pembersihan rantai dan gear set. Termasuk pelumasan ulang." },
+  { name: "Coating Nano Ceramic", description: "Coating nano ceramic 9H. Proteksi cat 2 tahun. Include detailing." },
+
+  // OVERHAUL (6 varian)
+  { name: "Overhaul Mesin 2-Tak Full", description: "Turun mesin, ganti piston, boring, ganti seal & bearing, setel ulang." },
+  { name: "Overhaul Mesin 4-Tak Full", description: "Turun mesin, ganti ring piston, skir klep, ganti seal klep, gasket set." },
+  { name: "Overhaul Mesin Racing", description: "Bore up, porting polish, piston forged, camshaft racing, ECU tuning." },
+  { name: "Overhaul Suspensi Depan", description: "Ganti seal, ganti oli, bersihkan tabung, cek bushing." },
+  { name: "Overhaul CVT Full", description: "Bongkar total CVT, ganti belt, roller, per, bersihkan torque driver." },
+  { name: "Overhaul Karburator", description: "Bongkar, bersihkan ultrasonic, ganti jet, setel AFR." },
+
+  // BAN (5 varian)
+  { name: "Tambal Ban Tubeless", description: "Tambal ban tubeless metode mushroom plug dari dalam. Aman & permanen." },
+  { name: "Tambal Ban Biasa", description: "Tambal ban tube type dengan patch dingin. 15 menit." },
+  { name: "Ganti Ban Baru + Balancing", description: "Paket ganti ban baru + balancing. Pilihan Pirelli/Michelin/Metzeler." },
+  { name: "Balancing & Spooring Roda", description: "Balancing digital + spooring. Hilangkan getaran setang." },
+  { name: "Ganti Ban Dalam Only", description: "Ganti ban dalam saja. Karet butyl premium." },
+
+  // MODIFIKASI & UPGRADE (8 varian)
+  { name: "Bore Up Mesin 175cc", description: "Bore up 150cc ke 175cc. Piston kit Malossi." },
+  { name: "Bore Up Mesin 200cc Racing", description: "Bore up ekstrem ke 200cc. Piston Polini forged. CNC." },
+  { name: "Setting Karburator Racing", description: "Ganti jet, setel pelampung, jarum skep, fine tuning AFR wideband." },
+  { name: "Setting ECU Racing", description: "Remapping ECU Rexxer Pro. Fuel map, ignition, rev limiter." },
+  { name: "Pemasangan Knalpot Racing", description: "Jasa pemasangan knalpot aftermarket. Include setting ulang." },
+  { name: "Pemasangan CDI Racing", description: "Pemasangan CDI racing plug and play. Include timing setting." },
+  { name: "Pengecatan Body Vespa", description: "Cat full set. Epoxy primer, cat warna, clear coat, compounding." },
+  { name: "Modifikasi Custom Vespa", description: "Jasa modifikasi custom: classic, cafe racer, scrambler, modern." },
+
+  // SERVIS KHUSUS (8 varian)
+  { name: "Service CVT & Pulley", description: "Bersihkan total CVT, ganti roller, cek belt, pelumasan moving part." },
+  { name: "Service Karburator Vespa", description: "Bongkar, bersihkan ultrasonic, ganti jet, setel AFR, sinkronisasi." },
+  { name: "Service Injeksi Vespa", description: "Bersihkan injector ultrasonic, throttle body, reset TPS, cek fuel pump." },
+  { name: "Ganti Kampas Rem Full", description: "Ganti kampas rem depan-belakang + bersihkan kaliper." },
+  { name: "Service AC Motor", description: "Service AC motor. Isi freon, bersihkan kondensor, cek kompresor." },
+  { name: "Service Speedometer", description: "Perbaikan speedometer digital/analog. Ganti gear, kabel, atau sensor." },
+  { name: "Service Kelistrikan", description: "Troubleshooting kelistrikan: kabel, sekring, relay, saklar." },
+  { name: "Service Starter Motor", description: "Service dinamo starter. Ganti brush, bersihkan komutator." },
 ];
 
 const defaultSettings = [
@@ -132,6 +277,10 @@ const defaultSettings = [
   { key: "mechanic_max_tasks", value: "5" },
   { key: "shift_min_starting_cash", value: "1000000" },
   { key: "stock_low_threshold", value: "5" },
+  { key: "enable_ppn", value: "true" },
+  { key: "enable_pph", value: "true" },
+  { key: "pph_rate", value: "0.5" },
+  { key: "ppn_rate", value: "11" },
 ];
 
 // 26 Users: 2 Admin, 5 Kasir, 19 Mekanik
@@ -165,31 +314,21 @@ const userData = [
 ];
 
 const vespaModels = [
-  "Sprint 150",
-  "Primavera 150",
-  "GTS Super 300",
-  "GTS Super Sport 300",
-  "GTS Super Tech 300",
-  "PX 150",
-  "S 125",
-  "LX 125",
-  "Vespa 946",
-  "Sprint S 150",
-  "Primavera S 150",
-  "Elettrica",
+  "Sprint 150", "Primavera 150", "GTS Super 300", "GTS Super Sport 300",
+  "GTS Super Tech 300", "PX 150", "S 125", "LX 125", "Vespa 946",
+  "Sprint S 150", "Primavera S 150", "Elettrica",
 ];
 
 const expenseTitles = [
-  "Beli ATK Kantor",
-  "Beli Kopi & Snack Tim",
-  "Bensin Test Ride Motor",
-  "Biaya Kebersihan Bengkel",
-  "Parkir Harian",
-  "Peralatan Kebersihan",
-  "Air Mineral Galon",
-  "Sarung Tangan Mekanik",
-  "Lap Microfiber",
-  "Cairan Pembersih Rantai",
+  "Beli ATK Kantor", "Beli Kopi & Snack Tim", "Bensin Test Ride Motor",
+  "Biaya Kebersihan Bengkel", "Parkir Harian", "Peralatan Kebersihan",
+  "Air Mineral Galon", "Sarung Tangan Mekanik", "Lap Microfiber",
+  "Cairan Pembersih Rantai", "Listrik Bulanan", "Internet Bulanan",
+  "Peralatan Bengkel", "Seragam Mekanik", "Promosi & Iklan",
+  "Beli Oli & Cairan", "Sewa Alat Diagnostik", "Kalibrasi Tools",
+  "Perbaikan Kompresor", "Safety Equipment", "Iuran Kebersihan",
+  "Langganan Software", "Biaya Training Mekanik", "Bensin Generator",
+  "Maintenance AC", "Pest Control", "Biaya Sertifikasi",
 ];
 
 // ============================================================
@@ -197,7 +336,6 @@ const expenseTitles = [
 // ============================================================
 async function cleanDatabase() {
   console.log("🧹 Membersihkan database...\n");
-
   await prisma.notification.deleteMany();
   await prisma.orderStatusHistory.deleteMany();
   await prisma.mechanicAssignment.deleteMany();
@@ -214,22 +352,20 @@ async function cleanDatabase() {
   await prisma.setting.deleteMany();
   await prisma.file.deleteMany();
   await prisma.user.deleteMany();
-
   console.log("✅ Database berhasil dibersihkan\n");
 }
 
 // ============================================================
-// SEEDING
+// SEEDING - 6 BULAN (Jan 2026 - Jun 2026) ~200 order/bulan
 // ============================================================
 async function seed() {
   await cleanDatabase();
-  console.log("🌱 Mulai seeding database (PRODUCTION VOLUME - MAX 7000 DATA)...\n");
+  console.log("🌱 Mulai seeding database (180 PRODUK - ~200 ORDER/BULAN - JAN-JUN 2026)...\n");
 
   // ============================================================
   // STEP 1: Settings & Users (26 users)
   // ============================================================
   console.log("⚙️  [1/6] Membuat Settings & Users...");
-
   for (const setting of defaultSettings) {
     await prisma.setting.create({ data: setting });
   }
@@ -242,16 +378,14 @@ async function seed() {
   const admins = createdUsers.filter((u) => u.role === "ADMIN");
   const cashiers = createdUsers.filter((u) => u.role === "CASHIER");
   const mechanics = createdUsers.filter((u) => u.role === "MECHANIC");
-
   console.log(`   ✅ ${createdUsers.length} users created (${admins.length} Admin, ${cashiers.length} Kasir, ${mechanics.length} Mekanik)\n`);
 
   // ============================================================
-  // STEP 2: Customers & Vehicles (80 customers)
+  // STEP 2: Customers & Vehicles (200 customers)
   // ============================================================
-  console.log("👥 [2/6] Membuat 80 Customers & Vehicles...");
-
+  console.log("👥 [2/6] Membuat 200 Customers & Vehicles...");
   const dbCustomers = [];
-  for (let i = 0; i < 80; i++) {
+  for (let i = 0; i < 200; i++) {
     const customer = await prisma.customer.create({
       data: {
         name: faker.person.fullName(),
@@ -272,11 +406,10 @@ async function seed() {
       });
     }
   }
-
-  console.log(`   ✅ ${dbCustomers.length} customers created (~${Math.floor(dbCustomers.length * 2)} vehicles)\n`);
+  console.log(`   ✅ ${dbCustomers.length} customers created (~${dbCustomers.length * 2} vehicles)\n`);
 
   // ============================================================
-  // STEP 3: Products & Initial Stock (DENGAN DESKRIPSI)
+  // STEP 3: Products & Initial Stock (180 produk: 120 sparepart + 60 service)
   // ============================================================
   console.log(`🏍️  [3/6] Membuat Products & Initial Stock (${sparepartData.length + serviceData.length} products)...`);
 
@@ -284,9 +417,10 @@ async function seed() {
   const services = [];
 
   for (let i = 0; i < sparepartData.length; i++) {
-    const price = faker.number.int({ min: 15000, max: 1000000 });
-    const cost = Math.floor(price * 0.6);
-    const initialStock = faker.number.int({ min: 50, max: 150 });
+    const price = faker.number.int({ min: 15000, max: 1500000 });
+    const cost = Math.floor(price * 0.55);
+    // Stok awal besar agar tidak habis (200-500 unit)
+    const initialStock = faker.number.int({ min: 200, max: 500 });
 
     const p = await prisma.product.create({
       data: {
@@ -294,39 +428,22 @@ async function seed() {
         sku: generateSku("SPAREPART", i),
         type: "SPAREPART",
         description: sparepartData[i].description,
-        price,
-        cost,
-        stock: initialStock,
-        isActive: true,
+        price, cost, stock: initialStock, isActive: true,
       },
     });
     spareparts.push(p);
 
     await prisma.productPriceHistory.create({
-      data: {
-        productId: p.id,
-        price: p.price,
-        cost: p.cost,
-        effectiveFrom: new Date("2026-01-01"),
-      },
+      data: { productId: p.id, price: p.price, cost: p.cost, effectiveFrom: new Date("2026-01-01") },
     });
-
     await prisma.stockMovement.create({
-      data: {
-        productId: p.id,
-        type: "IN",
-        sourceType: "PURCHASE",
-        quantity: initialStock,
-        recordedById: admins[0].id,
-        note: "Stok awal",
-        createdAt: new Date("2026-01-01"),
-      },
+      data: { productId: p.id, type: "IN", sourceType: "PURCHASE", quantity: initialStock, recordedById: admins[0].id, note: "Stok awal 2026", createdAt: new Date("2026-01-01") },
     });
   }
 
   for (let i = 0; i < serviceData.length; i++) {
-    const price = faker.number.int({ min: 50000, max: 1000000 });
-    const cost = Math.floor(price * 0.4);
+    const price = faker.number.int({ min: 50000, max: 2000000 });
+    const cost = Math.floor(price * 0.35);
 
     const p = await prisma.product.create({
       data: {
@@ -334,460 +451,412 @@ async function seed() {
         sku: generateSku("SERVICE", i),
         type: "SERVICE",
         description: serviceData[i].description,
-        price,
-        cost,
-        stock: 0,
-        isActive: true,
+        price, cost, stock: 0, isActive: true,
       },
     });
     services.push(p);
 
     await prisma.productPriceHistory.create({
-      data: {
-        productId: p.id,
-        price: p.price,
-        cost: p.cost,
-        effectiveFrom: new Date("2026-01-01"),
-      },
+      data: { productId: p.id, price: p.price, cost: p.cost, effectiveFrom: new Date("2026-01-01") },
     });
   }
-
-  console.log(`   ✅ ${spareparts.length} spareparts & ${services.length} services created (dengan deskripsi)\n`);
+  console.log(`   ✅ ${spareparts.length} spareparts & ${services.length} services created\n`);
 
   // ============================================================
-  // STEP 4: Shifts & Expenses (3 bulan: Jan-Mar 2026)
+  // STEP 4: Shifts & Expenses (Jan 2026 - Jun 2026 = 6 bulan)
   // ============================================================
-  console.log("🕐 [4/6] Membuat Shifts & Expenses (Jan - Mar 2026)...");
+  console.log("🕐 [4/6] Membuat Shifts & Expenses (Jan 2026 - Jun 2026)...\n");
 
   const shifts = [];
   const startDate = new Date("2026-01-01");
-  const endDate = new Date("2026-03-31");
+  const endDate = new Date("2026-06-30");
 
   for (let d = new Date(startDate); d <= endDate; d.setDate(d.getDate() + 1)) {
     if (d.getDay() === 0) continue; // Minggu libur
 
     const cashier = faker.helpers.arrayElement(cashiers);
-
     const openedAt = new Date(d);
     openedAt.setHours(8, 0, 0, 0);
-
     const closedAt = new Date(d);
     closedAt.setHours(20, 0, 0, 0);
 
-    const cashSales = faker.number.int({ min: 800000, max: 8000000 });
+    const cashSales = faker.number.int({ min: 500000, max: 6000000 });
     const endingCash = 1000000 + cashSales;
 
     const shift = await prisma.shift.create({
       data: {
-        cashierId: cashier.id,
-        status: "CLOSED",
-        startingCash: 1000000,
-        endingCash: endingCash,
-        expectedCash: endingCash,
-        cashSales: cashSales,
-        cashIn: 0,
-        cashOut: 0,
-        discrepancy: 0,
-        openedAt,
-        closedAt: closedAt,
+        cashierId: cashier.id, status: "CLOSED", startingCash: 1000000,
+        endingCash, expectedCash: endingCash, cashSales, cashIn: 0, cashOut: 0, discrepancy: 0,
+        openedAt, closedAt,
       },
     });
     shifts.push(shift);
 
-    const numExpenses = faker.number.int({ min: 1, max: 3 });
+    // Expense 0-3 per shift
+    const numExpenses = faker.number.int({ min: 0, max: 3 });
     for (let e = 0; e < numExpenses; e++) {
       await prisma.expense.create({
         data: {
           title: faker.helpers.arrayElement(expenseTitles),
-          amount: faker.number.int({ min: 15000, max: 300000 }),
+          amount: faker.number.int({ min: 15000, max: 500000 }),
           category: faker.helpers.arrayElement(["SUPPLIES", "MAINTENANCE", "UTILITIES", "RENT", "OTHER"]),
-          shiftId: shift.id,
-          recordedById: shift.cashierId,
-          date: openedAt,
+          shiftId: shift.id, recordedById: shift.cashierId, date: openedAt,
         },
       });
     }
   }
-
   console.log(`   ✅ ${shifts.length} shifts created (ALL CLOSED)\n`);
 
   // ============================================================
-  // STEP 5: Orders
+  // STEP 5: Orders (~200 order per bulan, 6 bulan = ~1200 orders)
   // ============================================================
-  console.log("📋 [5/6] Membuat Orders dengan STRICT BUSINESS LOGIC...\n");
-  console.log("   ⚠️  1 ORDER = 1 MEKANIK (tidak campur) | Order Number anti-duplicate\n");
+  console.log("📋 [5/6] Membuat Orders (~200/bulan)...\n");
 
   let orderCount = 0;
   let globalOrderCounter = 0;
 
   const mechanicDailyTasks = {};
-  mechanics.forEach((m) => {
-    mechanicDailyTasks[m.id] = {};
-  });
+  mechanics.forEach((m) => { mechanicDailyTasks[m.id] = {}; });
 
+  // Stock tracker: simpan stok real-time, pastikan tidak < 0
   const stockTracker = {};
-  spareparts.forEach((sp) => {
-    stockTracker[sp.id] = sp.stock;
-  });
+  spareparts.forEach((sp) => { stockTracker[sp.id] = sp.stock; });
 
+  // Restock periodik: setiap bulan restock produk yang stoknya menipis
+  const months = ["2026-01", "2026-02", "2026-03", "2026-04", "2026-05", "2026-06"];
+
+  // Group shifts by month
+  const shiftsByMonth = {};
   for (const shift of shifts) {
-    const shiftDay = shift.openedAt.toISOString().split("T")[0];
+    const monthKey = `${shift.openedAt.getFullYear()}-${String(shift.openedAt.getMonth() + 1).padStart(2, "0")}`;
+    if (!shiftsByMonth[monthKey]) shiftsByMonth[monthKey] = [];
+    shiftsByMonth[monthKey].push(shift);
+  }
 
-    mechanics.forEach((m) => {
-      if (!mechanicDailyTasks[m.id][shiftDay]) {
-        mechanicDailyTasks[m.id][shiftDay] = 0;
-      }
-    });
+  for (const monthKey of months) {
+    const monthShifts = shiftsByMonth[monthKey] || [];
+    if (monthShifts.length === 0) continue;
 
-    const totalOrders = faker.number.int({ min: 8, max: 15 });
+    // RESTOCK AWAL BULAN: restock produk yang stoknya < 50
+    console.log(`   📦 Restock awal bulan ${monthKey}...`);
+    const [year, month] = monthKey.split("-").map(Number);
+    const restockDate = new Date(year, month - 1, 1, 8, 0, 0);
 
-    const draftCount = Math.max(0, Math.floor(totalOrders * 0.05));
-    const queuedCount = Math.max(0, Math.floor(totalOrders * 0.10));
-    const inProgressCount = Math.max(0, Math.floor(totalOrders * 0.15));
-    const completedCount = Math.max(0, Math.floor(totalOrders * 0.20));
-    const closedCount = Math.max(0, Math.floor(totalOrders * 0.45));
-    const cancelledCount = Math.max(0, totalOrders - draftCount - queuedCount - inProgressCount - completedCount - closedCount);
+    for (const sp of spareparts) {
+      const currentStock = stockTracker[sp.id];
+      if (currentStock < 50) {
+        const restockQty = faker.number.int({ min: 100, max: 300 });
+        stockTracker[sp.id] = currentStock + restockQty;
 
-    const orderStatuses = [
-      ...Array(draftCount).fill("DRAFT"),
-      ...Array(queuedCount).fill("QUEUED"),
-      ...Array(inProgressCount).fill("IN_PROGRESS"),
-      ...Array(completedCount).fill("COMPLETED"),
-      ...Array(closedCount).fill("CLOSED"),
-      ...Array(cancelledCount).fill("CANCELLED"),
-    ];
-
-    for (let i = orderStatuses.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [orderStatuses[i], orderStatuses[j]] = [orderStatuses[j], orderStatuses[i]];
-    }
-
-    for (const status of orderStatuses) {
-      globalOrderCounter++;
-
-      const customer = faker.helpers.arrayElement(dbCustomers);
-      const vehicles = await prisma.vehicle.findMany({
-        where: { customerId: customer.id },
-      });
-
-      if (vehicles.length === 0) continue;
-
-      const vehicle = faker.helpers.arrayElement(vehicles);
-
-      let assignedMechanicId = null;
-
-      if (!["DRAFT", "CANCELLED"].includes(status)) {
-        const availableMechanics = mechanics.filter(
-          (m) => (mechanicDailyTasks[m.id][shiftDay] || 0) < 5
-        );
-
-        if (availableMechanics.length > 0) {
-          assignedMechanicId = faker.helpers.arrayElement(availableMechanics).id;
-          mechanicDailyTasks[assignedMechanicId][shiftDay] = (mechanicDailyTasks[assignedMechanicId][shiftDay] || 0) + 1;
-        }
-      }
-
-      let subtotal = 0;
-      const selectedItems = [];
-      const numItems = faker.number.int({ min: 1, max: 5 });
-
-      for (let j = 0; j < numItems; j++) {
-        const isService = faker.datatype.boolean({ probability: 0.4 });
-        const product = faker.helpers.arrayElement(isService ? services : spareparts);
-        const qty = isService ? 1 : faker.number.int({ min: 1, max: 3 });
-        const itemSubtotal = product.price * qty;
-        subtotal += itemSubtotal;
-
-        selectedItems.push({
-          product,
-          qty,
-          subtotal: itemSubtotal,
-          isService,
+        await prisma.product.update({
+          where: { id: sp.id },
+          data: { stock: { increment: restockQty } },
         });
-      }
 
-      const tax = Math.round(subtotal * 0.11);
-      const total = subtotal + tax;
-
-      const baseDate = new Date(shift.openedAt);
-      baseDate.setMinutes(baseDate.getMinutes() + faker.number.int({ min: 10, max: 500 }));
-
-      let diagnosedAt = null;
-      let startedAt = null;
-      let completedAt = null;
-      let closedAt = null;
-      let deletedAt = null;
-      let paymentMethod = null;
-      let paymentStatus = "PENDING";
-      let amountPaid = 0;
-      let changeAmount = 0;
-      let paidAt = null;
-
-      switch (status) {
-        case "DRAFT":
-          break;
-
-        case "QUEUED":
-          diagnosedAt = new Date(baseDate);
-          paymentMethod = faker.helpers.arrayElement(["CASH", "QRIS"]);
-          break;
-
-        case "IN_PROGRESS":
-          diagnosedAt = new Date(baseDate);
-          startedAt = new Date(baseDate.getTime() + 15 * 60000);
-          paymentMethod = faker.helpers.arrayElement(["CASH", "QRIS"]);
-          break;
-
-        case "COMPLETED":
-          diagnosedAt = new Date(baseDate);
-          startedAt = new Date(baseDate.getTime() + 15 * 60000);
-          completedAt = new Date(baseDate.getTime() + faker.number.int({ min: 30, max: 150 }) * 60000);
-          paymentMethod = faker.helpers.arrayElement(["CASH", "QRIS"]);
-          paymentStatus = "PAID";
-          paidAt = completedAt;
-          amountPaid = paymentMethod === "CASH" ? total + faker.number.int({ min: 0, max: 200000 }) : total;
-          changeAmount = paymentMethod === "CASH" ? amountPaid - total : 0;
-          break;
-
-        case "CLOSED":
-          diagnosedAt = new Date(baseDate);
-          startedAt = new Date(baseDate.getTime() + 15 * 60000);
-          completedAt = new Date(baseDate.getTime() + faker.number.int({ min: 30, max: 150 }) * 60000);
-          closedAt = new Date(baseDate.getTime() + faker.number.int({ min: 60, max: 200 }) * 60000);
-          paymentMethod = faker.helpers.arrayElement(["CASH", "QRIS"]);
-          paymentStatus = "PAID";
-          paidAt = closedAt;
-          amountPaid = paymentMethod === "CASH" ? total + faker.number.int({ min: 0, max: 200000 }) : total;
-          changeAmount = paymentMethod === "CASH" ? amountPaid - total : 0;
-          break;
-
-        case "CANCELLED":
-          deletedAt = new Date(baseDate.getTime() + 10 * 60000);
-          break;
-      }
-
-      const orderNumber = generateOrderNumber(baseDate, globalOrderCounter);
-
-      const order = await prisma.order.create({
-        data: {
-          orderNumber,
-          status: status,
-          subtotal,
-          tax,
-          total,
-          diagnosedAt,
-          startedAt,
-          completedAt,
-          closedAt,
-          deletedAt,
-          cashierId: shift.cashierId,
-          shiftId: shift.id,
-          customerId: customer.id,
-          vehicleId: vehicle.id,
-          createdAt: baseDate,
-          updatedAt: closedAt || completedAt || startedAt || diagnosedAt || baseDate,
-        },
-      });
-      orderCount++;
-
-      for (const item of selectedItems) {
-        const orderItem = await prisma.orderItem.create({
+        await prisma.stockMovement.create({
           data: {
-            orderId: order.id,
-            productId: item.product.id,
-            productNameSnapshot: item.product.name,
-            quantity: item.qty,
-            unitPrice: item.product.price,
-            unitCostSnapshot: item.product.cost,
-            subtotal: item.subtotal,
+            productId: sp.id,
+            type: "IN",
+            sourceType: "PURCHASE",
+            quantity: restockQty,
+            recordedById: admins[0].id,
+            note: `Restock bulanan ${monthKey}`,
+            createdAt: restockDate,
           },
         });
+      }
+    }
 
-        if (item.isService && assignedMechanicId && !["DRAFT", "CANCELLED"].includes(status)) {
-          await prisma.mechanicAssignment.create({
+    // Tambah variasi: ADJUSTMENT acak untuk beberapa produk (stock opname)
+    const adjustmentProducts = faker.helpers.arrayElements(spareparts, faker.number.int({ min: 3, max: 8 }));
+    for (const sp of adjustmentProducts) {
+      const adjQty = faker.number.int({ min: -5, max: 10 });
+      if (adjQty !== 0) {
+        stockTracker[sp.id] = Math.max(0, stockTracker[sp.id] + adjQty);
+
+        await prisma.product.update({
+          where: { id: sp.id },
+          data: { stock: { increment: adjQty } },
+        });
+
+        await prisma.stockMovement.create({
+          data: {
+            productId: sp.id,
+            type: "ADJUSTMENT",
+            sourceType: "ADJUSTMENT",
+            quantity: Math.abs(adjQty),
+            recordedById: admins[0].id,
+            note: adjQty > 0 ? "Stock opname: kelebihan" : "Stock opname: kekurangan",
+            createdAt: new Date(restockDate.getTime() + 3600000),
+          },
+        });
+      }
+    }
+
+    // Target ~200 order per bulan
+    const targetOrders = faker.number.int({ min: 190, max: 210 });
+    let ordersThisMonth = 0;
+
+    const shuffledShifts = faker.helpers.shuffle([...monthShifts]);
+
+    for (const shift of shuffledShifts) {
+      if (ordersThisMonth >= targetOrders) break;
+
+      const shiftDay = shift.openedAt.toISOString().split("T")[0];
+
+      mechanics.forEach((m) => {
+        if (!mechanicDailyTasks[m.id][shiftDay]) mechanicDailyTasks[m.id][shiftDay] = 0;
+      });
+
+      // Maksimal 8 order per shift
+      const maxOrdersThisShift = Math.min(8, targetOrders - ordersThisMonth);
+      const totalOrders = faker.number.int({ min: 3, max: maxOrdersThisShift });
+      if (totalOrders <= 0) continue;
+
+      // Distribusi status
+      const draftCount = Math.max(0, Math.floor(totalOrders * 0.03));
+      const queuedCount = Math.max(0, Math.floor(totalOrders * 0.08));
+      const inProgressCount = Math.max(0, Math.floor(totalOrders * 0.12));
+      const completedCount = Math.max(0, Math.floor(totalOrders * 0.22));
+      const closedCount = Math.max(0, Math.floor(totalOrders * 0.50));
+      const cancelledCount = Math.max(0, totalOrders - draftCount - queuedCount - inProgressCount - completedCount - closedCount);
+
+      const orderStatuses = [
+        ...Array(draftCount).fill("DRAFT"),
+        ...Array(queuedCount).fill("QUEUED"),
+        ...Array(inProgressCount).fill("IN_PROGRESS"),
+        ...Array(completedCount).fill("COMPLETED"),
+        ...Array(closedCount).fill("CLOSED"),
+        ...Array(cancelledCount).fill("CANCELLED"),
+      ];
+
+      for (let i = orderStatuses.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [orderStatuses[i], orderStatuses[j]] = [orderStatuses[j], orderStatuses[i]];
+      }
+
+      for (const status of orderStatuses) {
+        globalOrderCounter++;
+        ordersThisMonth++;
+
+        const customer = faker.helpers.arrayElement(dbCustomers);
+        const vehicles = await prisma.vehicle.findMany({ where: { customerId: customer.id } });
+        if (vehicles.length === 0) continue;
+        const vehicle = faker.helpers.arrayElement(vehicles);
+
+        let assignedMechanicId = null;
+        if (!["DRAFT", "CANCELLED"].includes(status)) {
+          const availableMechanics = mechanics.filter((m) => (mechanicDailyTasks[m.id][shiftDay] || 0) < 5);
+          if (availableMechanics.length > 0) {
+            assignedMechanicId = faker.helpers.arrayElement(availableMechanics).id;
+            mechanicDailyTasks[assignedMechanicId][shiftDay] = (mechanicDailyTasks[assignedMechanicId][shiftDay] || 0) + 1;
+          }
+        }
+
+        let subtotal = 0;
+        const selectedItems = [];
+        const numItems = faker.number.int({ min: 1, max: 4 });
+
+        for (let j = 0; j < numItems; j++) {
+          const isService = faker.datatype.boolean({ probability: 0.35 });
+          const product = faker.helpers.arrayElement(isService ? services : spareparts);
+          const qty = isService ? 1 : faker.number.int({ min: 1, max: 3 });
+          const itemSubtotal = product.price * qty;
+          subtotal += itemSubtotal;
+          selectedItems.push({ product, qty, subtotal: itemSubtotal, isService });
+        }
+
+        const tax = Math.round(subtotal * 0.11);
+        const total = subtotal + tax;
+
+        const baseDate = new Date(shift.openedAt);
+        baseDate.setMinutes(baseDate.getMinutes() + faker.number.int({ min: 10, max: 600 }));
+
+        let diagnosedAt = null, startedAt = null, completedAt = null, closedAt = null, deletedAt = null;
+        let paymentMethod = null, paymentStatus = "PENDING", amountPaid = 0, changeAmount = 0, paidAt = null;
+
+        switch (status) {
+          case "DRAFT": break;
+          case "QUEUED":
+            diagnosedAt = new Date(baseDate);
+            paymentMethod = faker.helpers.arrayElement(["CASH", "QRIS"]);
+            break;
+          case "IN_PROGRESS":
+            diagnosedAt = new Date(baseDate);
+            startedAt = new Date(baseDate.getTime() + 15 * 60000);
+            paymentMethod = faker.helpers.arrayElement(["CASH", "QRIS"]);
+            break;
+          case "COMPLETED":
+            diagnosedAt = new Date(baseDate);
+            startedAt = new Date(baseDate.getTime() + 15 * 60000);
+            completedAt = new Date(baseDate.getTime() + faker.number.int({ min: 30, max: 150 }) * 60000);
+            paymentMethod = faker.helpers.arrayElement(["CASH", "QRIS"]);
+            paymentStatus = "PAID"; paidAt = completedAt;
+            amountPaid = paymentMethod === "CASH" ? total + faker.number.int({ min: 0, max: 200000 }) : total;
+            changeAmount = paymentMethod === "CASH" ? amountPaid - total : 0;
+            break;
+          case "CLOSED":
+            diagnosedAt = new Date(baseDate);
+            startedAt = new Date(baseDate.getTime() + 15 * 60000);
+            completedAt = new Date(baseDate.getTime() + faker.number.int({ min: 30, max: 150 }) * 60000);
+            closedAt = new Date(baseDate.getTime() + faker.number.int({ min: 60, max: 200 }) * 60000);
+            paymentMethod = faker.helpers.arrayElement(["CASH", "QRIS"]);
+            paymentStatus = "PAID"; paidAt = closedAt;
+            amountPaid = paymentMethod === "CASH" ? total + faker.number.int({ min: 0, max: 200000 }) : total;
+            changeAmount = paymentMethod === "CASH" ? amountPaid - total : 0;
+            break;
+          case "CANCELLED":
+            deletedAt = new Date(baseDate.getTime() + 10 * 60000);
+            break;
+        }
+
+        const orderNumber = generateOrderNumber(baseDate, globalOrderCounter);
+        const order = await prisma.order.create({
+          data: {
+            orderNumber, status, subtotal, tax, total,
+            diagnosedAt, startedAt, completedAt, closedAt, deletedAt,
+            cashierId: shift.cashierId, shiftId: shift.id,
+            customerId: customer.id, vehicleId: vehicle.id,
+            createdAt: baseDate,
+            updatedAt: closedAt || completedAt || startedAt || diagnosedAt || baseDate,
+          },
+        });
+        orderCount++;
+
+        for (const item of selectedItems) {
+          const orderItem = await prisma.orderItem.create({
             data: {
-              orderItemId: orderItem.id,
-              mechanicId: assignedMechanicId,
-              startAt: ["QUEUED"].includes(status) ? null : startedAt,
-              endAt: ["QUEUED", "IN_PROGRESS"].includes(status) ? null : completedAt,
+              orderId: order.id, productId: item.product.id,
+              productNameSnapshot: item.product.name, quantity: item.qty,
+              unitPrice: item.product.price, unitCostSnapshot: item.product.cost,
+              subtotal: item.subtotal,
             },
+          });
+
+          if (item.isService && assignedMechanicId && !["DRAFT", "CANCELLED"].includes(status)) {
+            await prisma.mechanicAssignment.create({
+              data: {
+                orderItemId: orderItem.id, mechanicId: assignedMechanicId,
+                startAt: ["QUEUED"].includes(status) ? null : startedAt,
+                endAt: ["QUEUED", "IN_PROGRESS"].includes(status) ? null : completedAt,
+              },
+            });
+          }
+
+          // STOCK OUT: hanya jika sparepart dan status pengerjaan sudah mulai
+          // PASTIKAN STOK CUKUP SEBELUM MENGURANGI
+          if (item.product.type === "SPAREPART" && ["IN_PROGRESS", "COMPLETED", "CLOSED"].includes(status)) {
+            if (stockTracker[item.product.id] >= item.qty) {
+              await prisma.stockMovement.create({
+                data: {
+                  productId: item.product.id, type: "OUT", sourceType: "SALE",
+                  quantity: item.qty, orderItemId: orderItem.id,
+                  recordedById: shift.cashierId, createdAt: startedAt || diagnosedAt,
+                },
+              });
+              await prisma.product.update({ where: { id: item.product.id }, data: { stock: { decrement: item.qty } } });
+              stockTracker[item.product.id] -= item.qty;
+            } else {
+              // Jika stok tidak cukup, skip pengurangan (stok tetap tidak berubah, tidak minus)
+              // Log peringatan di note
+              await prisma.stockMovement.create({
+                data: {
+                  productId: item.product.id, type: "OUT", sourceType: "SALE",
+                  quantity: 0, orderItemId: orderItem.id,
+                  recordedById: shift.cashierId,
+                  note: `PERINGATAN: Stok tidak mencukupi untuk ${item.product.name}. Order tetap diproses.`,
+                  createdAt: startedAt || diagnosedAt,
+                },
+              });
+            }
+          }
+        }
+
+        if (!["DRAFT", "CANCELLED"].includes(status)) {
+          await prisma.payment.create({
+            data: { orderId: order.id, method: paymentMethod, amountPaid, change: changeAmount, status: paymentStatus, paidAt },
           });
         }
 
-        if (item.product.type === "SPAREPART" && ["IN_PROGRESS", "COMPLETED", "CLOSED"].includes(status)) {
-          if (stockTracker[item.product.id] >= item.qty) {
-            await prisma.stockMovement.create({
-              data: {
-                productId: item.product.id,
-                type: "OUT",
-                sourceType: "SALE",
-                quantity: item.qty,
-                orderItemId: orderItem.id,
-                recordedById: shift.cashierId,
-                createdAt: startedAt || diagnosedAt,
-              },
-            });
+        // Status flow history
+        const statusFlow = [];
+        statusFlow.push({ status: "DRAFT", note: "Pesanan dibuat", changedById: shift.cashierId, createdAt: baseDate });
 
-            await prisma.product.update({
-              where: { id: item.product.id },
-              data: { stock: { decrement: item.qty } },
-            });
-            stockTracker[item.product.id] -= item.qty;
-          }
+        if (["QUEUED", "IN_PROGRESS", "COMPLETED", "CLOSED"].includes(status)) {
+          statusFlow.push({ status: "QUEUED", note: "Masuk antrian pengerjaan", changedById: shift.cashierId, createdAt: diagnosedAt || new Date(baseDate.getTime() + 5 * 60000) });
         }
-      }
+        if (["IN_PROGRESS", "COMPLETED", "CLOSED"].includes(status)) {
+          statusFlow.push({ status: "IN_PROGRESS", note: `Mekanik ${mechanics.find((m) => m.id === assignedMechanicId)?.fullName || "Unknown"} mulai pengerjaan`, changedById: assignedMechanicId || shift.cashierId, createdAt: startedAt || new Date(baseDate.getTime() + 20 * 60000) });
+        }
+        if (["COMPLETED", "CLOSED"].includes(status)) {
+          statusFlow.push({ status: "COMPLETED", note: "Pengerjaan selesai, menunggu pembayaran", changedById: assignedMechanicId || shift.cashierId, createdAt: completedAt || new Date(baseDate.getTime() + 60 * 60000) });
+        }
+        if (status === "CLOSED") {
+          statusFlow.push({ status: "CLOSED", note: "Pembayaran lunas, motor diambil pelanggan", changedById: shift.cashierId, createdAt: closedAt || new Date(baseDate.getTime() + 90 * 60000) });
+        }
+        if (status === "CANCELLED") {
+          statusFlow.push({ status: "CANCELLED", note: "Pesanan dibatalkan", changedById: shift.cashierId, createdAt: deletedAt || new Date(baseDate.getTime() + 10 * 60000) });
+        }
 
-      if (!["DRAFT", "CANCELLED"].includes(status)) {
-        await prisma.payment.create({
-          data: {
-            orderId: order.id,
-            method: paymentMethod,
-            amountPaid: amountPaid,
-            change: changeAmount,
-            status: paymentStatus,
-            paidAt: paidAt,
-          },
-        });
-      }
-
-      const statusFlow = [];
-
-      statusFlow.push({
-        status: "DRAFT",
-        note: "Pesanan dibuat",
-        changedById: shift.cashierId,
-        createdAt: baseDate,
-      });
-
-      if (["QUEUED", "IN_PROGRESS", "COMPLETED", "CLOSED"].includes(status)) {
-        statusFlow.push({
-          status: "QUEUED",
-          note: "Masuk antrian pengerjaan",
-          changedById: shift.cashierId,
-          createdAt: diagnosedAt || new Date(baseDate.getTime() + 5 * 60000),
-        });
-      }
-
-      if (["IN_PROGRESS", "COMPLETED", "CLOSED"].includes(status)) {
-        statusFlow.push({
-          status: "IN_PROGRESS",
-          note: `Mekanik ${mechanics.find(m => m.id === assignedMechanicId)?.fullName || "Unknown"} mulai pengerjaan`,
-          changedById: assignedMechanicId || shift.cashierId,
-          createdAt: startedAt || new Date(baseDate.getTime() + 20 * 60000),
-        });
-      }
-
-      if (["COMPLETED", "CLOSED"].includes(status)) {
-        statusFlow.push({
-          status: "COMPLETED",
-          note: "Pengerjaan selesai, menunggu pembayaran",
-          changedById: assignedMechanicId || shift.cashierId,
-          createdAt: completedAt || new Date(baseDate.getTime() + 60 * 60000),
-        });
-      }
-
-      if (status === "CLOSED") {
-        statusFlow.push({
-          status: "CLOSED",
-          note: "Pembayaran lunas, motor diambil pelanggan",
-          changedById: shift.cashierId,
-          createdAt: closedAt || new Date(baseDate.getTime() + 90 * 60000),
-        });
-      }
-
-      if (status === "CANCELLED") {
-        statusFlow.push({
-          status: "CANCELLED",
-          note: "Pesanan dibatalkan",
-          changedById: shift.cashierId,
-          createdAt: deletedAt || new Date(baseDate.getTime() + 10 * 60000),
-        });
-      }
-
-      for (const flow of statusFlow) {
-        await prisma.orderStatusHistory.create({
-          data: {
-            orderId: order.id,
-            status: flow.status,
-            note: flow.note,
-            changedById: flow.changedById,
-            createdAt: flow.createdAt,
-          },
-        });
+        for (const flow of statusFlow) {
+          await prisma.orderStatusHistory.create({
+            data: { orderId: order.id, status: flow.status, note: flow.note, changedById: flow.changedById, createdAt: flow.createdAt },
+          });
+        }
       }
     }
   }
-
-  console.log(`   ✅ ${orderCount} orders created (1 order = 1 mekanik)\n`);
+  console.log(`   ✅ ${orderCount} orders created\n`);
 
   // ============================================================
   // STEP 6: Notifications
   // ============================================================
   console.log("🔔 [6/6] Membuat Notifications...");
-
   await prisma.notification.create({
-    data: {
-      title: "Seeding Selesai",
-      message: `Database berhasil di-seed.\n\nUsers: ${createdUsers.length}\nCustomers: ${dbCustomers.length}\nOrders: ${orderCount}\nShifts: ${shifts.length}\nProducts: ${spareparts.length + services.length}`,
-      type: "SUCCESS",
-      userId: admins[0].id,
-    },
+    data: { title: "Seeding Selesai", message: `Database berhasil di-seed.\n\nProduk: ${spareparts.length + services.length}\nUsers: ${createdUsers.length}\nCustomers: ${dbCustomers.length}\nOrders: ${orderCount}\nShifts: ${shifts.length}`, type: "SUCCESS", userId: admins[0].id },
   });
-
   for (const user of createdUsers) {
     if (user.role === "ADMIN") continue;
     await prisma.notification.create({
-      data: {
-        title: "Selamat Bekerja",
-        message: `Halo ${user.fullName}, sistem siap digunakan dengan data production.`,
-        type: "INFO",
-        userId: user.id,
-      },
+      data: { title: "Selamat Bekerja", message: `Halo ${user.fullName}, sistem siap digunakan dengan data production.`, type: "INFO", userId: user.id },
     });
   }
-
   console.log(`   ✅ ${createdUsers.length} notifications created\n`);
 
   // ============================================================
   // TOTAL ESTIMASI
   // ============================================================
   const totalEstimasi =
-    defaultSettings.length +                              // settings (4)
-    createdUsers.length +                                 // users (26)
-    dbCustomers.length +                                  // customers (80)
-    Math.floor(dbCustomers.length * 2) +                  // vehicles (~160)
-    (spareparts.length + services.length) +               // products (95)
-    (spareparts.length + services.length) +               // productPriceHistory (95)
-    spareparts.length +                                   // stockMovement awal (60)
-    shifts.length +                                       // shifts (~78)
-    Math.floor(shifts.length * 2) +                       // expenses (~156)
-    orderCount +                                          // orders (~900)
-    Math.floor(orderCount * 3) +                          // orderItems (~2700)
-    Math.floor(orderCount * 0.4) +                        // mechanicAssignments (~360)
-    Math.floor(orderCount * 0.9) +                        // payments (~810)
-    Math.floor(orderCount * 3.5) +                        // orderStatusHistory (~3150)
-    createdUsers.length;                                  // notifications (26)
+    defaultSettings.length + createdUsers.length + dbCustomers.length +
+    dbCustomers.length * 2 + (spareparts.length + services.length) +
+    (spareparts.length + services.length) + spareparts.length + shifts.length +
+    Math.floor(shifts.length * 1.5) + orderCount + Math.floor(orderCount * 2.5) +
+    Math.floor(orderCount * 0.4) + Math.floor(orderCount * 0.9) +
+    Math.floor(orderCount * 3.5) + createdUsers.length +
+    spareparts.length * 7; // Restock + adjustment bulanan
 
   console.log("==================================================");
   console.log("✅ SEEDING BERHASIL");
   console.log("==================================================");
   console.log(`⚙️  Settings       : ${defaultSettings.length}`);
-  console.log(`👥 Users          : ${createdUsers.length} (${admins.length} Admin, ${cashiers.length} Kasir, ${mechanics.length} Mekanik)`);
+  console.log(`👥 Users          : ${createdUsers.length}`);
   console.log(`👤 Customers      : ${dbCustomers.length}`);
-  console.log(`🚗 Vehicles       : ~${Math.floor(dbCustomers.length * 2)}`);
-  console.log(`🏍️  Products       : ${spareparts.length + services.length} (${spareparts.length} Spareparts, ${services.length} Services)`);
-  console.log(`📝 Deskripsi      : ✅ Semua produk memiliki deskripsi`);
-  console.log(`🕐 Shifts         : ${shifts.length} (ALL CLOSED)`);
-  console.log(`💰 Expenses       : ~${Math.floor(shifts.length * 2)}`);
+  console.log(`🚗 Vehicles       : ~${dbCustomers.length * 2}`);
+  console.log(`🏍️  Spareparts     : ${spareparts.length}`);
+  console.log(`🔧 Services       : ${services.length}`);
+  console.log(`🕐 Shifts         : ${shifts.length}`);
+  console.log(`💰 Expenses       : ~${Math.floor(shifts.length * 1.5)}`);
   console.log(`📋 Orders         : ${orderCount}`);
-  console.log(`📦 OrderItems     : ~${Math.floor(orderCount * 3)}`);
+  console.log(`📦 OrderItems     : ~${Math.floor(orderCount * 2.5)}`);
   console.log(`🔧 Assignments    : ~${Math.floor(orderCount * 0.4)}`);
   console.log(`💳 Payments       : ~${Math.floor(orderCount * 0.9)}`);
   console.log(`📜 Status History : ~${Math.floor(orderCount * 3.5)}`);
+  console.log(`📊 Stock Movements: ~${spareparts.length * 7 + Math.floor(orderCount * 1.5)}`);
   console.log(`🔔 Notifications  : ${createdUsers.length}`);
   console.log(`--------------------------------------------------`);
   console.log(`📊 TOTAL ESTIMASI : ~${totalEstimasi} data`);
-  console.log(`🔧 Mekanik/Order  : 1 Mekanik per Order (tidak campur)`);
+  console.log(`📅 Periode        : Jan 2026 - Jun 2026 (6 bulan)`);
+  console.log(`📊 Rata-rata      : ~${Math.round(orderCount / 6)} order/bulan`);
   console.log("==================================================");
 }
 

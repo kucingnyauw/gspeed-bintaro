@@ -27,6 +27,8 @@ class PaymentService {
     this.orderRepo = new OrderRepository();
     this.userRepo = new UserRepository();
     this.notifRepo = new NotificationRepository();
+    this.cache = new CacheManager("payment");
+    this.orderCache = new CacheManager("order");
   }
 
   /**
@@ -37,8 +39,7 @@ class PaymentService {
    */
   async #invalidateOrderHistoryCache(orderNumber) {
     if (!orderNumber) return;
-    const orderCacheManager = new CacheManager("order");
-    await orderCacheManager.delete(`history:${orderNumber}`);
+    await this.orderCache.invalidate(`history:${orderNumber}`);
   }
 
   /**
@@ -271,10 +272,6 @@ Contoh: "Pembayaran direfund. Pesanan dibatalkan."`,
     }
   }
 
-  // ============================================================
-  // PUBLIC METHODS
-  // ============================================================
-
   /**
    * Buat pembayaran berdasarkan metode
    * @param {Object} payload - Data pembayaran
@@ -283,13 +280,6 @@ Contoh: "Pembayaran direfund. Pesanan dibatalkan."`,
    * @param {number} [payload.amountPaid] - Jumlah dibayar (untuk CASH)
    * @returns {Promise<Object>} Hasil pembayaran
    * @throws {ApiError} 400 - Metode tidak didukung
-   *
-   * @example
-   * const result = await paymentService.createPayment({
-   *   orderId: "order-id-123",
-   *   method: "CASH",
-   *   amountPaid: 500000
-   * });
    */
   async createPayment(payload) {
     const { orderId, method, amountPaid } = payload;
@@ -302,25 +292,12 @@ Contoh: "Pembayaran direfund. Pesanan dibatalkan."`,
 
   /**
    * Proses pembayaran tunai
-   *
-   * Flow:
-   * 1. Validasi order (harus DRAFT)
-   * 2. Validasi belum ada pembayaran
-   * 3. Hitung kembalian
-   * 4. Update status order (QUEUED/COMPLETED)
-   * 5. Catat history + notifikasi
-   * 6. Invalidasi cache history
-   *
    * @param {string} orderId - ID pesanan
    * @param {number} amountPaid - Jumlah uang dibayarkan
    * @returns {Promise<Object>} Data pembayaran beserta order
-   *
    * @throws {ApiError} 404 - Pesanan tidak ditemukan
    * @throws {ApiError} 409 - Pesanan tidak dapat dibayar / sudah ada pembayaran
    * @throws {ApiError} 400 - Pembayaran kurang dari total
-   *
-   * @example
-   * const result = await paymentService.createCashPayment("order-id", 500000);
    */
   async createCashPayment(orderId, amountPaid) {
     const order = await this.orderRepo.findById(orderId);
@@ -459,23 +436,11 @@ Contoh: "Pembayaran direfund. Pesanan dibatalkan."`,
 
   /**
    * Buat pembayaran QRIS via Midtrans
-   *
-   * Flow:
-   * 1. Validasi order (harus DRAFT)
-   * 2. Generate QR Code via Midtrans API
-   * 3. Simpan payment PENDING
-   * 4. Notifikasi + kembalikan QR code URL
-   *
    * @param {string} orderId - ID pesanan
    * @returns {Promise<Object>} Data QRIS (orderId, qrCodeUrl, expiry, dll)
-   *
    * @throws {ApiError} 404 - Pesanan tidak ditemukan
    * @throws {ApiError} 409 - Pesanan tidak dapat dibayar / sudah ada pembayaran
    * @throws {ApiError} 500 - Gagal memproses QRIS di Midtrans
-   *
-   * @example
-   * const result = await paymentService.createQrisPayment("order-id");
-   * console.log(result.qrCodeUrl); // URL QR Code
    */
   async createQrisPayment(orderId) {
     const order = await this.orderRepo.findById(orderId);
@@ -581,9 +546,6 @@ Contoh: "Pembayaran direfund. Pesanan dibatalkan."`,
    * @param {string} paymentId - ID pembayaran
    * @returns {Promise<Object>} Data pembayaran
    * @throws {ApiError} 404 - Pembayaran tidak ditemukan
-   *
-   * @example
-   * const payment = await paymentService.getPaymentById("payment-id");
    */
   async getPaymentById(paymentId) {
     const p = await this.paymentRepo.findById(paymentId);
@@ -599,12 +561,6 @@ Contoh: "Pembayaran direfund. Pesanan dibatalkan."`,
    * @param {string} [query.method] - Filter metode (CASH/QRIS)
    * @param {string} [query.status] - Filter status (PAID/PENDING/REFUNDED)
    * @returns {Promise<{data: Array, metadata: Object}>} Daftar pembayaran
-   *
-   * @example
-   * const { data, metadata } = await paymentService.getPayments({
-   *   method: "CASH",
-   *   status: "PAID"
-   * });
    */
   async getPayments(query = {}) {
     const result = await this.paymentRepo.findMany(query);
@@ -628,9 +584,6 @@ Contoh: "Pembayaran direfund. Pesanan dibatalkan."`,
    * @param {string} orderId - ID pesanan
    * @returns {Promise<Object>} Data pembayaran
    * @throws {ApiError} 404 - Pesanan tidak ditemukan / belum ada pembayaran
-   *
-   * @example
-   * const payment = await paymentService.getPaymentByOrder("order-id");
    */
   async getPaymentByOrder(orderId) {
     const order = await this.orderRepo.findById(orderId);
@@ -649,9 +602,6 @@ Contoh: "Pembayaran direfund. Pesanan dibatalkan."`,
    * @param {string} orderId - ID pesanan
    * @returns {Promise<Object>} Status pembayaran (dari DB atau Midtrans)
    * @throws {ApiError} 404 - Pesanan tidak ditemukan / belum ada pembayaran
-   *
-   * @example
-   * const status = await paymentService.getPaymentStatus("order-id");
    */
   async getPaymentStatus(orderId) {
     const order = await this.orderRepo.findById(orderId);
@@ -750,24 +700,11 @@ Contoh: "Pembayaran direfund. Pesanan dibatalkan."`,
 
   /**
    * Handle webhook notifikasi pembayaran dari Midtrans
-   *
-   * Flow:
-   * 1. Verifikasi signature
-   * 2. Validasi order & payment
-   * 3. Update status sesuai transaction_status
-   * 4. Invalidasi cache + notifikasi + emit socket
-   *
    * @param {Object} payload - Payload webhook Midtrans
    * @returns {Promise<void>}
    * @throws {ApiError} 401 - Signature tidak valid
    * @throws {ApiError} 404 - Pesanan / pembayaran tidak ditemukan
    * @throws {ApiError} 400 - Jumlah tidak sesuai
-   *
-   * @example
-   * app.post("/webhook/midtrans", async (req, res) => {
-   *   await paymentService.handleMidtransWebhook(req.body);
-   *   res.status(200).json({ status: "OK" });
-   * });
    */
   async handleMidtransWebhook(payload) {
     const {
@@ -926,12 +863,6 @@ Contoh: "Pembayaran direfund. Pesanan dibatalkan."`,
 
   /**
    * Refund pembayaran
-   *
-   * Flow:
-   * 1. Validasi payment (harus PAID)
-   * 2. Update payment jadi REFUNDED + order jadi CANCELLED
-   * 3. Invalidasi cache + notifikasi
-   *
    * @param {string} paymentId - ID pembayaran
    * @param {Object} [payload={}] - Data refund
    * @param {string} [payload.reason] - Alasan refund
@@ -939,13 +870,6 @@ Contoh: "Pembayaran direfund. Pesanan dibatalkan."`,
    * @returns {Promise<Object>} Data pembayaran yang sudah direfund
    * @throws {ApiError} 404 - Pembayaran tidak ditemukan
    * @throws {ApiError} 409 - Status bukan PAID
-   *
-   * @example
-   * const refunded = await paymentService.refundPayment(
-   *   "payment-id",
-   *   { reason: "Pesanan dibatalkan" },
-   *   "user-id"
-   * );
    */
   async refundPayment(paymentId, payload = {}, userId) {
     const payment = await this.paymentRepo.findById(paymentId);
@@ -1015,20 +939,10 @@ Contoh: "Pembayaran direfund. Pesanan dibatalkan."`,
 
   /**
    * Bulk refund pembayaran
-   *
    * @param {string[]} paymentIds - Array ID pembayaran
    * @param {string} userId - ID user yang melakukan refund
    * @returns {Promise<{summary: Object, details: Object}>} Ringkasan dan detail refund
-   * @returns {Object} return.summary - Ringkasan (total, valid, skipped, refunded, failed)
-   * @returns {Object} return.details - Detail (refunded, failed, skipped)
    * @throws {ApiError} 400 - Tidak ada pembayaran dipilih / tidak ada yang PAID
-   *
-   * @example
-   * const result = await paymentService.refundPayments(
-   *   ["payment-id-1", "payment-id-2"],
-   *   "user-id"
-   * );
-   * console.log(result.summary.refunded); // 2
    */
   async refundPayments(paymentIds, userId) {
     if (!paymentIds?.length)
