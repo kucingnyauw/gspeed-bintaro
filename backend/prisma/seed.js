@@ -7,14 +7,14 @@ const prisma = new PrismaClient();
 const ADMIN_EMAIL = "rifkyf589@gmail.com";
 
 // ============================================================
-// UTILITY: Code Generator (DIPERBAIKI - ANTI DUPLICATE)
+// UTILITY: Code Generator (ANTI DUPLICATE)
 // ============================================================
 function generateOrderNumber(date, counter) {
   const yyyy = date.getFullYear();
   const mm = String(date.getMonth() + 1).padStart(2, "0");
   const dd = String(date.getDate()).padStart(2, "0");
   const seq = String(counter).padStart(4, "0");
-  const rand = crypto.randomBytes(4).toString("hex").toUpperCase(); // 8 karakter hex
+  const rand = crypto.randomBytes(4).toString("hex").toUpperCase();
   return `ORD-${yyyy}${mm}${dd}-${seq}-${rand}`;
 }
 
@@ -24,107 +24,107 @@ function generateSku(type, index) {
 }
 
 // ============================================================
-// DATA MASTER
+// DATA MASTER (DENGAN DESKRIPSI)
 // ============================================================
-const sparepartNames = [
-  "Kampas Rem Depan Vespa Sprint",
-  "Kampas Rem Belakang Vespa Primavera",
-  "Kampas Rem Depan Racing Malossi",
-  "Oli Mesin Motul 2T",
-  "Oli Mesin Motul 4T",
-  "Oli Mesin Castrol Power 1",
-  "Oli Gardan Vespa Matic",
-  "Busi NGK Racing Vespa",
-  "Busi Denso Iridium Racing",
-  "Busi NGK Platinum Vespa",
-  "Filter Udara Malossi Racing",
-  "Filter Udara Standar Vespa",
-  "Filter Oli Vespa Matic",
-  "Filter Bensin Vespa",
-  "Rantai Keteng Vespa PX",
-  "Rantai Keteng Vespa Sprint",
-  "Gear Set Rasio 4.0 Racing",
-  "Gear Set Rasio 3.8 Standar",
-  "Gear Set Rasio 4.2 Drag",
-  "Ban Luar Pirelli Angel Scooter 110/70",
-  "Ban Luar Michelin City Grip 120/70",
-  "Ban Luar Metzeler Sportec 130/70",
-  "Ban Dalam Vespa 10 Inch",
-  "Ban Dalam Vespa 12 Inch",
-  "Aki Kering MotoBatt 12V",
-  "Aki Kering Yuasa YTZ7S",
-  "Aki Kering GS Astra",
-  "Lampu Depan LED Proyektor Vespa",
-  "Lampu Belakang LED Vespa GTS",
-  "Lampu Sein LED Sequential",
-  "Kampas Kopling Malossi Fly Clutch",
-  "Kampas Kopling Racing Polini",
-  "Shockbreaker Depan Bitubo Vespa GTS",
-  "Shockbreaker Belakang Ohlins Vespa",
-  "Shockbreaker Depan YSS Racing",
-  "Bearing Roda Depan SKF Premium",
-  "Bearing Roda Belakang NTN Japan",
-  "Bearing Steering Koyo",
-  "Kabel Gas Domino Racing",
-  "Kabel Rem Depan Vespa Original",
-  "Kabel Kopling Vespa PX",
-  "Piston Kit Polini 200cc Racing",
-  "Piston Kit Malossi 175cc",
-  "Piston Kit Standar 150cc",
-  "Spion Oval Chrome Vespa",
-  "Spion Lipat Racing CNC",
-  "Spion Bar End MotoGadget",
-  "Knalpot Racing Akrapovic Vespa",
-  "Knalpot Racing Yoshimura Vespa",
-  "Knalpot Racing Leo Vince",
-  "CDI Racing BRT Powermax",
-  "CDI Racing Rextor Adjustable",
-  "CDI Standar Vespa Original",
-  "Paking Mesin Set Vespa PX",
-  "Paking Mesin Set Vespa Sprint",
-  "Seal Mesin Vespa 2T Full Set",
-  "Roller CVT Malossi 12gr",
-  "Roller CVT Polini 10gr",
-  "Roller CVT Dr Pulley 11gr",
-  "Belt CVT Vespa Matic Racing",
+const sparepartData = [
+  { name: "Kampas Rem Depan Vespa Sprint", description: "Kampas rem depan original untuk Vespa Sprint 150. Material semi-metallic memberikan daya cengkeram optimal dan tahan panas. Cocok untuk penggunaan harian maupun touring jarak jauh." },
+  { name: "Kampas Rem Belakang Vespa Primavera", description: "Kampas rem belakang berkualitas tinggi untuk Vespa Primavera. Teknologi ceramic composite memastikan pengereman halus tanpa bunyi. Lifetime lebih panjang dibanding kampas standar." },
+  { name: "Kampas Rem Depan Racing Malossi", description: "Kampas rem racing Malossi untuk performa maksimal. Material sintered metal memberikan grip superior pada kecepatan tinggi. Direkomendasikan untuk penggunaan racing dan harian sporty." },
+  { name: "Oli Mesin Motul 2T", description: "Oli mesin 2-tak Motul 510 Technosynthese. Formula ester synthetic memberikan pelumasan optimal, mengurangi asap, dan membersihkan mesin. Cocok untuk Vespa PX, Sprint, dan model 2T lainnya." },
+  { name: "Oli Mesin Motul 4T", description: "Oli mesin 4-tak Motul 7100 full synthetic. Memberikan perlindungan maksimal pada mesin Vespa matic. Mengurangi gesekan, menjaga kebersihan mesin, dan memperpanjang umur mesin." },
+  { name: "Oli Mesin Castrol Power 1", description: "Oli mesin Castrol Power 1 10W-40 semi-synthetic. Teknologi Power Release Formula memberikan akselerasi lebih responsif. Cocok untuk Vespa GTS, Primavera, dan Sprint 4T." },
+  { name: "Oli Gardan Vespa Matic", description: "Oli gardan khusus Vespa matic SAE 80W-90. Melindungi gear transmisi dari keausan, mengurangi suara kasar, dan memastikan perpindahan gigi halus. Ganti setiap 8.000 km." },
+  { name: "Busi NGK Racing Vespa", description: "Busi NGK Iridium IX Racing untuk Vespa. Elektroda iridium ultra-tipis memberikan percikan api lebih kuat dan efisien. Akselerasi lebih responsif dan konsumsi bahan bakar lebih irit." },
+  { name: "Busi Denso Iridium Racing", description: "Busi Denso Iridium Power dengan teknologi 0.4mm center electrode. Memberikan pembakaran sempurna, start mudah di pagi hari, dan performa mesin optimal di semua RPM." },
+  { name: "Busi NGK Platinum Vespa", description: "Busi NGK G-Power Platinum untuk Vespa harian. Elektroda platinum memberikan umur pakai 2x lebih lama dibanding busi standar. Performa stabil dan harga terjangkau." },
+  { name: "Filter Udara Malossi Racing", description: "Filter udara racing Malossi Red Sponge. Material sponge berpori besar meningkatkan airflow ke mesin. Washable dan reusable, cocok untuk setup racing dan harian kencang." },
+  { name: "Filter Udara Standar Vespa", description: "Filter udara original Vespa berkualitas OEM. Menyaring debu dan kotoran dengan efisiensi tinggi. Menjaga performa mesin tetap optimal dan konsumsi BBM irit." },
+  { name: "Filter Oli Vespa Matic", description: "Filter oli Vespa matic original. Menyaring partikel dan kotoran dari oli mesin untuk melindungi komponen mesin. Ganti setiap 5.000 km atau bersamaan dengan ganti oli." },
+  { name: "Filter Bensin Vespa", description: "Filter bensin Vespa dengan mesh stainless steel. Menyaring kotoran dan air dari bahan bakar sebelum masuk karburator/injektor. Mencegah tersumbatnya sistem bahan bakar." },
+  { name: "Rantai Keteng Vespa PX", description: "Rantai keteng Vespa PX 150 original DID Japan. Material hardened steel menjamin ketahanan dan presisi timing mesin. Ganti setiap 20.000 km untuk performa optimal." },
+  { name: "Rantai Keteng Vespa Sprint", description: "Rantai keteng Vespa Sprint 150. Kualitas OEM dengan ketahanan tinggi terhadap stretching. Memastikan timing valve akurat untuk performa mesin maksimal." },
+  { name: "Gear Set Rasio 4.0 Racing", description: "Gear set rasio 4.0 racing untuk Vespa. Memberikan akselerasi lebih cepat dengan top speed optimal. Material forged steel tahan beban tinggi. Cocok untuk harian sporty." },
+  { name: "Gear Set Rasio 3.8 Standar", description: "Gear set rasio 3.8 standar Vespa. Rasio original untuk keseimbangan akselerasi dan top speed. Nyaman untuk riding harian dalam kota dengan konsumsi BBM efisien." },
+  { name: "Gear Set Rasio 4.2 Drag", description: "Gear set rasio 4.2 untuk drag race. Akselerasi brutal di lintasan pendek. Material chromoly steel super kuat. Khusus racing, tidak disarankan untuk harian." },
+  { name: "Ban Luar Pirelli Angel Scooter 110/70", description: "Ban Pirelli Angel Scooter 110/70-12. Pattern multi-compound memberikan grip optimal di kondisi basah maupun kering. Mileage panjang cocok untuk daily commute." },
+  { name: "Ban Luar Michelin City Grip 120/70", description: "Ban Michelin City Grip 120/70-12. Teknologi silica compound memberikan cengkeraman superior di jalan basah. Pattern anti-aquaplaning untuk keamanan maksimal." },
+  { name: "Ban Luar Metzeler Sportec 130/70", description: "Ban Metzeler Sportec Street 130/70-12. Ban sport touring dengan grip racing. Compound dual memberikan mileage baik di tengah dan grip maksimal di sisi ban." },
+  { name: "Ban Dalam Vespa 10 Inch", description: "Ban dalam Vespa ukuran 10 inch. Karet butyl berkualitas tinggi tahan bocor halus. Cocok untuk Vespa klasik dengan velg 10 inch. Pentil lurus standar." },
+  { name: "Ban Dalam Vespa 12 Inch", description: "Ban dalam Vespa ukuran 12 inch. Material karet elastis premium dengan ketebalan merata. Tahan tekanan tinggi dan perubahan suhu. Pentil bengkok untuk velg racing." },
+  { name: "Aki Kering MotoBatt 12V", description: "Aki kering MotoBatt MBTZ10S 12V maintenance free. Teknologi AGM (Absorbent Glass Mat) tahan getaran dan posisi tidur. Start mudah, umur pakai 3x lebih lama." },
+  { name: "Aki Kering Yuasa YTZ7S", description: "Aki kering Yuasa YTZ7S original Japan. Factory activated, siap pakai tanpa isi air aki. Cranking power besar untuk start mesin cepat. Tahan getaran dan kebocoran." },
+  { name: "Aki Kering GS Astra", description: "Aki kering GS Astra MF 12V 6Ah. Maintenance free dengan teknologi calcium-calcium. Harga terjangkau kualitas terjamin. Garansi resmi 6 bulan." },
+  { name: "Lampu Depan LED Proyektor Vespa", description: "Lampu depan LED proyektor untuk Vespa GTS/Sprint. Teknologi projector lens memberikan cahaya fokus dan terang. Cut-off jelas, tidak menyilaukan pengendara lain." },
+  { name: "Lampu Belakang LED Vespa GTS", description: "Lampu belakang LED custom Vespa GTS. LED chip 5050 super terang dengan 3 mode: running, rem, dan sein. Plug and play tanpa potong kabel." },
+  { name: "Lampu Sein LED Sequential", description: "Lampu sein LED sequential flowing. Efek bergerak mengalir seperti mobil premium. LED amber super terang, waterproof, dan tahan getaran. Universal fit untuk Vespa." },
+  { name: "Kampas Kopling Malossi Fly Clutch", description: "Kampas kopling racing Malossi Fly Clutch. Material kevlar-carbon memberikan grip maksimal tanpa slip. Tahan panas tinggi untuk pemakaian racing dan touring." },
+  { name: "Kampas Kopling Racing Polini", description: "Kampas kopling Polini Speed Clutch. Material sintered metal untuk transfer tenaga maksimal. Engagement point presisi, cocok untuk setup mesin racing high performance." },
+  { name: "Shockbreaker Depan Bitubo Vespa GTS", description: "Shockbreaker depan Bitubo untuk Vespa GTS 300. Fully adjustable preload, compression, dan rebound. Tabung gas eksternal untuk stabilitas redaman maksimal." },
+  { name: "Shockbreaker Belakang Ohlins Vespa", description: "Shockbreaker belakang Ohlins HO 142 untuk Vespa. Kualitas premium Swedia dengan adjustable preload dan rebound. Handling superior di tikungan dan jalan bergelombang." },
+  { name: "Shockbreaker Depan YSS Racing", description: "Shockbreaker depan YSS Racing Series. Tabung gas dengan adjustable preload. Piston 30mm memberikan redaman progresif. Upgrade signifikan dari shockbreaker standar." },
+  { name: "Bearing Roda Depan SKF Premium", description: "Bearing roda depan SKF Explorer Series. Seal 2RSH melindungi dari air dan debu. Putaran halus dan umur pakai panjang. Made in Italy kualitas terjamin." },
+  { name: "Bearing Roda Belakang NTN Japan", description: "Bearing roda belakang NTN original Japan. Precision grade ABEC-3 untuk putaran presisi tinggi. Seal contact rubber tahan air dan kotoran." },
+  { name: "Bearing Steering Koyo", description: "Bearing steering Koyo tapered roller. Mengurangi berat setang dan meningkatkan stabilitas kemudi. Kualitas OEM untuk berbagai model Vespa." },
+  { name: "Kabel Gas Domino Racing", description: "Kabel gas Domino Racing Quick Action. Kabel stainless steel anti-karat dengan housing teflon liner. Tarikan gas lebih ringan dan responsif. Universal Vespa." },
+  { name: "Kabel Rem Depan Vespa Original", description: "Kabel rem depan Vespa original Piaggio. Panjang presisi sesuai model. Housing PVC tahan cuaca dan inner cable galvanis anti-karat." },
+  { name: "Kabel Kopling Vespa PX", description: "Kabel kopling Vespa PX 150 original. Inner cable 2.5mm kuat dengan housing spiral steel. Tarikan kopling halus dan tidak mudah putus." },
+  { name: "Piston Kit Polini 200cc Racing", description: "Piston kit Polini 200cc forged racing. Diameter 68mm dengan ring racing. Material aluminium forged T6 ringan dan tahan panas. Meningkatkan kompresi dan tenaga." },
+  { name: "Piston Kit Malossi 175cc", description: "Piston kit Malossi 175cc cast performance. Diameter 64mm dengan coating anti-friction. Piston pin 15mm dengan circlip racing. Cocok untuk bore up harian." },
+  { name: "Piston Kit Standar 150cc", description: "Piston kit standar Vespa 150cc OEM quality. Diameter 62mm dengan ring 3 lapis. Material cast aluminium dengan coating graphite. Ideal untuk rebuild mesin standar." },
+  { name: "Spion Oval Chrome Vespa", description: "Spion oval chrome Vespa classic. Kaca cembung wide angle untuk pandangan lebih luas. Stem adjustable dengan joint ball. Finishing chrome mengkilap tahan karat." },
+  { name: "Spion Lipat Racing CNC", description: "Spion lipat racing CNC aluminium. Desain aerodinamis dengan bracket 360° adjustable. Kaca blue tint anti-glare. Lipat praktis untuk parkir di tempat sempit." },
+  { name: "Spion Bar End MotoGadget", description: "Spion bar end MotoGadget Glassless. Kaca Hindsight technology tanpa frame. Pemasangan di ujung stang untuk tampilan minimalis racing. Buatan Jerman." },
+  { name: "Knalpot Racing Akrapovic Vespa", description: "Knalpot Akrapovic Racing Line titanium untuk Vespa. Suara deep bass khas Akra. Bobot ringan 60% lebih ringan dari standar. Power increase +3.5 HP." },
+  { name: "Knalpot Racing Yoshimura Vespa", description: "Knalpot Yoshimura Tri-Oval stainless steel. Teknologi TRI-Oval untuk flow gas buang optimal. Suara racing khas Yoshimura. Include dB killer untuk harian." },
+  { name: "Knalpot Racing Leo Vince", description: "Knalpot Leo Vince GP Corsa. Desain MotoGP style dengan carbon end cap. Suara agresif dengan performa meningkat. E-approved legal untuk jalan raya." },
+  { name: "CDI Racing BRT Powermax", description: "CDI racing BRT Powermax dual band. Teknologi dual curve untuk akselerasi bawah dan top speed atas. Limiter 12.000 RPM. Plug and play tanpa ubahan kabel." },
+  { name: "CDI Racing Rextor Adjustable", description: "CDI racing Rextor Programmable. Adjustable timing curve 0-60 derajat. 5 preset map untuk berbagai kebutuhan. Monitor RPM realtime via LED indikator." },
+  { name: "CDI Standar Vespa Original", description: "CDI standar Vespa original Piaggio. Timing fixed sesuai spesifikasi pabrik. Kualitas OEM terjamin untuk penggunaan harian. Cocok untuk motor standar." },
+  { name: "Paking Mesin Set Vespa PX", description: "Paking mesin set Vespa PX 150 lengkap. Termasuk paking head, blok, crankcase, dan intake. Material asbestos-free tahan panas tinggi. Set 12 pcs." },
+  { name: "Paking Mesin Set Vespa Sprint", description: "Paking mesin set Vespa Sprint 150. Kualitas OEM dengan presisi laser cut. Material graphite composite tahan kompresi tinggi. Set lengkap 10 pcs." },
+  { name: "Seal Mesin Vespa 2T Full Set", description: "Seal mesin full set Vespa 2-tak. Termasuk seal crank, seal gigi transmisi, dan seal kopling. Material nitrile rubber tahan oli dan panas. Set 8 pcs." },
+  { name: "Roller CVT Malossi 12gr", description: "Roller CVT Malossi 12 gram. Material special plastic dengan inti kuningan. Tahan aus dan tidak mudah penyok. Mempengaruhi karakter akselerasi dan top speed." },
+  { name: "Roller CVT Polini 10gr", description: "Roller CVT Polini 10 gram. Bobot ringan untuk akselerasi lebih cepat. Material composite low friction. Cocok untuk setup racing dan harian responsif." },
+  { name: "Roller CVT Dr Pulley 11gr", description: "Roller CVT Dr Pulley Sliding 11 gram. Desain unik dengan sliding surface. Mengurangi gesekan pada ramp plate. Akselerasi halus tanpa hentakan." },
+  { name: "Belt CVT Vespa Matic Racing", description: "Belt CVT racing reinforced untuk Vespa matic. Material aramid fiber dengan lebar 24mm. Tahan panas dan tidak mudah mulur. Meningkatkan transfer tenaga ke roda." },
 ];
 
-const serviceNames = [
-  "Service Ringan Vespa Matic",
-  "Service Ringan Vespa 2-Tak",
-  "Service Ringan Vespa 4-Tak",
-  "Tune Up Mesin 2-Tak",
-  "Tune Up Mesin 4-Tak",
-  "Tune Up Racing Performance",
-  "Ganti Oli Mesin & Gardan",
-  "Ganti Oli Mesin Sintetik",
-  "Ganti Oli Mesin Racing",
-  "Cuci Motor Detailing Premium",
-  "Cuci Motor Biasa",
-  "Cuci Motor + Poles Body",
-  "Balancing & Spooring Roda",
-  "Overhaul Mesin 2-Tak Full",
-  "Overhaul Mesin 4-Tak Full",
-  "Overhaul Mesin Racing",
-  "Tambal Ban Tubeless",
-  "Tambal Ban Biasa",
-  "Ganti Ban Baru + Balancing",
-  "Service CVT & Pulley",
-  "Service Karburator Vespa",
-  "Service Injeksi Vespa Matic",
-  "Ganti Kampas Rem Depan & Belakang",
-  "Bore Up Mesin 175cc",
-  "Bore Up Mesin 200cc Racing",
-  "Setting Karburator Racing",
-  "Setting ECU Racing Vespa",
-  "Pemasangan Knalpot Racing",
-  "Pemasangan CDI Racing",
-  "Overhaul Suspensi Depan",
-  "Ganti Seal Shockbreaker",
-  "Setting Suspensi Racing",
-  "Pengecatan Body Vespa",
-  "Pemasangan Aksesoris Racing",
-  "Modifikasi Custom Vespa",
+const serviceData = [
+  { name: "Service Ringan Vespa Matic", description: "Service ringan meliputi ganti oli mesin, pembersihan filter udara, pengecekan CVT, pengecekan rem, dan pengecekan kelistrikan. Estimasi pengerjaan 1-2 jam." },
+  { name: "Service Ringan Vespa 2-Tak", description: "Service ringan Vespa 2-tak meliputi ganti oli samping, pembersihan karburator, setel platina/ignition timing, pembersihan busi, dan pengecekan kompresi. Estimasi 1-2 jam." },
+  { name: "Service Ringan Vespa 4-Tak", description: "Service ringan Vespa 4-tak meliputi ganti oli mesin, pembersihan throttle body, pengecekan valve clearance, dan pengecekan sistem injeksi. Estimasi 1-2 jam." },
+  { name: "Tune Up Mesin 2-Tak", description: "Tune up menyeluruh mesin 2-tak meliputi setel karburator, setel timing pengapian, pembersihan exhaust port, dan pengecekan reed valve. Meningkatkan performa dan efisiensi." },
+  { name: "Tune Up Mesin 4-Tak", description: "Tune up mesin 4-tak meliputi penyetelan valve clearance, pembersihan injector/throttle body, reset ECU, dan pengecekan sensor. Performa mesin kembali optimal." },
+  { name: "Tune Up Racing Performance", description: "Tune up racing meliputi dyno test, setting karburator/injeksi untuk performa maksimal, penyesuaian timing pengapian, dan fine tuning AFR. Termasuk printout dyno chart." },
+  { name: "Ganti Oli Mesin & Gardan", description: "Paket ganti oli mesin dan gardan lengkap. Termasuk oli mesin full synthetic 1.2L dan oli gardan 250ml. Pengecekan filter oli dan pembersihan magnet drain plug." },
+  { name: "Ganti Oli Mesin Sintetik", description: "Ganti oli mesin dengan oli full synthetic premium. Pilihan Motul 7100 atau Castrol Power 1. Termasuk jasa ganti dan pengecekan kebocoran. Cocok untuk Vespa matic dan sport." },
+  { name: "Ganti Oli Mesin Racing", description: "Ganti oli racing special untuk setup mesin high performance. Oli Motul 300V dengan ester core technology. Memberikan perlindungan maksimal pada RPM tinggi." },
+  { name: "Cuci Motor Detailing Premium", description: "Cuci motor detailing premium meliputi foam wash, pembersihan detail dengan kuas, poles body, coating wax, pembersihan mesin, dan semir ban. Motor seperti baru keluar dealer." },
+  { name: "Cuci Motor Biasa", description: "Cuci motor standar meliputi semprot air, foam wash, bilas, keringkan, dan semir ban. Pengerjaan cepat 15-20 menit. Bersih bebas debu dan lumpur." },
+  { name: "Cuci Motor + Poles Body", description: "Cuci motor + poles body untuk menghilangkan swirl marks dan baret halus. Menggunakan dual action polisher dan compound premium. Hasil glossy seperti kaca." },
+  { name: "Balancing & Spooring Roda", description: "Balancing dan spooring roda depan-belakang. Menggunakan mesin balancing digital. Menghilangkan getaran di setang dan meningkatkan stabilitas handling." },
+  { name: "Overhaul Mesin 2-Tak Full", description: "Overhaul total mesin 2-tak meliputi turun mesin, ganti piston kit, boring silinder, ganti semua seal dan bearing, serta penyetelan ulang. Mesin kembali seperti baru." },
+  { name: "Overhaul Mesin 4-Tak Full", description: "Overhaul total mesin 4-tak meliputi turun mesin, ganti ring piston, skir klep, ganti seal klep, ganti tensioner rantai keteng, dan ganti gasket full set." },
+  { name: "Overhaul Mesin Racing", description: "Overhaul spesifikasi racing meliputi bore up, porting polish, ganti piston forged, camshaft racing, dan pengaturan ulang ECU/karburator. Output tenaga maksimal." },
+  { name: "Tambal Ban Tubeless", description: "Tambal ban tubeless dengan metode mushroom plug dari dalam. Lebih aman dan permanen dibanding tambal tusuk dari luar. Termasuk balancing roda." },
+  { name: "Tambal Ban Biasa", description: "Tambal ban biasa (tube type) dengan patch dingin. Proses lem dan patch rubber. Cocok untuk ban dalam Vespa klasik. Pengerjaan cepat 15 menit." },
+  { name: "Ganti Ban Baru + Balancing", description: "Paket ganti ban baru termasuk balancing dan pemasangan. Tersedia berbagai merek: Pirelli, Michelin, Metzeler. Termasuk pentil baru dan pembuangan ban bekas." },
+  { name: "Service CVT & Pulley", description: "Service CVT dan pulley meliputi pembersihan total, ganti roller, pengecekan belt, pembersihan torque driver, dan pelumasan moving part. Tarikan kembali responsif." },
+  { name: "Service Karburator Vespa", description: "Service karburator meliputi pembongkaran, pembersihan ultrasonic, ganti main jet/pilot jet sesuai kebutuhan, setel AFR, dan sinkronisasi. Mesin lebih halus dan irit." },
+  { name: "Service Injeksi Vespa Matic", description: "Service sistem injeksi meliputi pembersihan injector dengan ultrasonic cleaner, pembersihan throttle body, reset TPS, dan pengecekan fuel pump. Tarikan lebih responsif." },
+  { name: "Ganti Kampas Rem Depan & Belakang", description: "Paket ganti kampas rem depan dan belakang. Termasuk pembersihan kaliper, piston, dan sliding pin. Pilihan kampas standar atau racing sesuai kebutuhan." },
+  { name: "Bore Up Mesin 175cc", description: "Bore up mesin 150cc ke 175cc menggunakan piston kit Malossi. Termasuk boring silinder, porting intake/exhaust, dan penyetelan ulang. Estimasi kenaikan 3-4 HP." },
+  { name: "Bore Up Mesin 200cc Racing", description: "Bore up ekstrem ke 200cc menggunakan piston Polini forged. Termasuk boring dan honing presisi CNC, porting polish full, dan dyno tuning. Output hingga 20+ HP." },
+  { name: "Setting Karburator Racing", description: "Setting karburator racing meliputi penggantian jet sesuai setup mesin, setel ketinggian pelampung, setel jarum skep, dan fine tuning AFR menggunakan wideband O2 sensor." },
+  { name: "Setting ECU Racing Vespa", description: "Setting ECU racing menggunakan software Rexxer Pro. Remapping fuel map, ignition timing, rev limiter, dan speed limiter. Termasuk dyno test before-after." },
+  { name: "Pemasangan Knalpot Racing", description: "Jasa pemasangan knalpot racing aftermarket. Termasuk penyesuaian bracket, pemasangan gasket baru, dan pengecekan kebocoran. Tersedia juga jasa setting ulang." },
+  { name: "Pemasangan CDI Racing", description: "Pemasangan CDI racing plug and play. Termasuk penyetelan timing dasar dan pengecekan kelistrikan. Bisa request setting timing sesuai karakter mesin." },
+  { name: "Overhaul Suspensi Depan", description: "Overhaul suspensi depan meliputi ganti seal, ganti oli, pembersihan tabung, dan pengecekan bushing. Handling kembali mantap tanpa bocor." },
+  { name: "Ganti Seal Shockbreaker", description: "Ganti seal shockbreaker depan-belakang. Termasuk pembersihan tabung, ganti oli, dan pengecekan shaft. Satu set untuk shockbreaker depan atau belakang." },
+  { name: "Setting Suspensi Racing", description: "Setting suspensi untuk racing meliputi penyesuaian preload, rebound, dan compression damping. Menggunakan tools khusus untuk pengukuran sag dan stroke." },
+  { name: "Pengecatan Body Vespa", description: "Jasa pengecatan body Vespa full set. Mulai dari pengamplasan, epoxy primer, cat warna pilihan, clear coat, dan compounding. Hasil showroom quality dengan garansi." },
+  { name: "Pemasangan Aksesoris Racing", description: "Jasa pemasangan berbagai aksesoris racing: rearset, clip-on handlebar, windshield, belly pan, dll. Pengerjaan rapi dan presisi sesuai standar racing." },
+  { name: "Modifikasi Custom Vespa", description: "Jasa modifikasi custom Vespa sesuai permintaan. Dari classic resto, cafe racer, scrambler, hingga modern custom. Konsultasi gratis dan pengerjaan detail." },
 ];
 
 const defaultSettings = [
@@ -132,11 +132,6 @@ const defaultSettings = [
   { key: "mechanic_max_tasks", value: "5" },
   { key: "shift_min_starting_cash", value: "1000000" },
   { key: "stock_low_threshold", value: "5" },
-  { key: "shop_name", value: "Bengkel Vespa Jaya Motor" },
-  { key: "shop_address", value: "Jl. Raya Vespa No. 123, Bandung" },
-  { key: "shop_phone", value: "022-12345678" },
-  { key: "opening_time", value: "08:00" },
-  { key: "closing_time", value: "20:00" },
 ];
 
 // 26 Users: 2 Admin, 5 Kasir, 19 Mekanik
@@ -281,23 +276,24 @@ async function seed() {
   console.log(`   ✅ ${dbCustomers.length} customers created (~${Math.floor(dbCustomers.length * 2)} vehicles)\n`);
 
   // ============================================================
-  // STEP 3: Products & Initial Stock
+  // STEP 3: Products & Initial Stock (DENGAN DESKRIPSI)
   // ============================================================
-  console.log(`🏍️  [3/6] Membuat Products & Initial Stock (${sparepartNames.length + serviceNames.length} products)...`);
+  console.log(`🏍️  [3/6] Membuat Products & Initial Stock (${sparepartData.length + serviceData.length} products)...`);
 
   const spareparts = [];
   const services = [];
 
-  for (let i = 0; i < sparepartNames.length; i++) {
+  for (let i = 0; i < sparepartData.length; i++) {
     const price = faker.number.int({ min: 15000, max: 1000000 });
     const cost = Math.floor(price * 0.6);
     const initialStock = faker.number.int({ min: 50, max: 150 });
 
     const p = await prisma.product.create({
       data: {
-        name: sparepartNames[i],
+        name: sparepartData[i].name,
         sku: generateSku("SPAREPART", i),
         type: "SPAREPART",
+        description: sparepartData[i].description,
         price,
         cost,
         stock: initialStock,
@@ -328,15 +324,16 @@ async function seed() {
     });
   }
 
-  for (let i = 0; i < serviceNames.length; i++) {
+  for (let i = 0; i < serviceData.length; i++) {
     const price = faker.number.int({ min: 50000, max: 1000000 });
     const cost = Math.floor(price * 0.4);
 
     const p = await prisma.product.create({
       data: {
-        name: serviceNames[i],
+        name: serviceData[i].name,
         sku: generateSku("SERVICE", i),
         type: "SERVICE",
+        description: serviceData[i].description,
         price,
         cost,
         stock: 0,
@@ -355,7 +352,7 @@ async function seed() {
     });
   }
 
-  console.log(`   ✅ ${spareparts.length} spareparts & ${services.length} services created\n`);
+  console.log(`   ✅ ${spareparts.length} spareparts & ${services.length} services created (dengan deskripsi)\n`);
 
   // ============================================================
   // STEP 4: Shifts & Expenses (3 bulan: Jan-Mar 2026)
@@ -397,7 +394,6 @@ async function seed() {
     });
     shifts.push(shift);
 
-    // 1-3 expenses per shift
     const numExpenses = faker.number.int({ min: 1, max: 3 });
     for (let e = 0; e < numExpenses; e++) {
       await prisma.expense.create({
@@ -416,13 +412,13 @@ async function seed() {
   console.log(`   ✅ ${shifts.length} shifts created (ALL CLOSED)\n`);
 
   // ============================================================
-  // STEP 5: Orders (DENGAN COUNTER UNTUK ANTI DUPLICATE)
+  // STEP 5: Orders
   // ============================================================
   console.log("📋 [5/6] Membuat Orders dengan STRICT BUSINESS LOGIC...\n");
   console.log("   ⚠️  1 ORDER = 1 MEKANIK (tidak campur) | Order Number anti-duplicate\n");
 
   let orderCount = 0;
-  let globalOrderCounter = 0; // Counter global untuk unique order number
+  let globalOrderCounter = 0;
 
   const mechanicDailyTasks = {};
   mechanics.forEach((m) => {
@@ -443,7 +439,6 @@ async function seed() {
       }
     });
 
-    // 8-15 orders per shift
     const totalOrders = faker.number.int({ min: 8, max: 15 });
 
     const draftCount = Math.max(0, Math.floor(totalOrders * 0.05));
@@ -469,7 +464,7 @@ async function seed() {
 
     for (const status of orderStatuses) {
       globalOrderCounter++;
-      
+
       const customer = faker.helpers.arrayElement(dbCustomers);
       const vehicles = await prisma.vehicle.findMany({
         where: { customerId: customer.id },
@@ -479,7 +474,6 @@ async function seed() {
 
       const vehicle = faker.helpers.arrayElement(vehicles);
 
-      // === 1 ORDER = 1 MEKANIK ===
       let assignedMechanicId = null;
 
       if (!["DRAFT", "CANCELLED"].includes(status)) {
@@ -572,7 +566,6 @@ async function seed() {
           break;
       }
 
-      // ORDER NUMBER DENGAN COUNTER UNIK
       const orderNumber = generateOrderNumber(baseDate, globalOrderCounter);
 
       const order = await prisma.order.create({
@@ -597,7 +590,6 @@ async function seed() {
       });
       orderCount++;
 
-      // Order items & mechanic assignments
       for (const item of selectedItems) {
         const orderItem = await prisma.orderItem.create({
           data: {
@@ -611,7 +603,6 @@ async function seed() {
           },
         });
 
-        // Semua item service dalam 1 order di-assign ke MEKANIK YANG SAMA
         if (item.isService && assignedMechanicId && !["DRAFT", "CANCELLED"].includes(status)) {
           await prisma.mechanicAssignment.create({
             data: {
@@ -623,7 +614,6 @@ async function seed() {
           });
         }
 
-        // Stock movement untuk SPAREPART
         if (item.product.type === "SPAREPART" && ["IN_PROGRESS", "COMPLETED", "CLOSED"].includes(status)) {
           if (stockTracker[item.product.id] >= item.qty) {
             await prisma.stockMovement.create({
@@ -647,7 +637,6 @@ async function seed() {
         }
       }
 
-      // Payment
       if (!["DRAFT", "CANCELLED"].includes(status)) {
         await prisma.payment.create({
           data: {
@@ -661,7 +650,6 @@ async function seed() {
         });
       }
 
-      // Order Status History
       const statusFlow = [];
 
       statusFlow.push({
@@ -746,7 +734,6 @@ async function seed() {
     },
   });
 
-  // Notif untuk semua user
   for (const user of createdUsers) {
     if (user.role === "ADMIN") continue;
     await prisma.notification.create({
@@ -765,7 +752,7 @@ async function seed() {
   // TOTAL ESTIMASI
   // ============================================================
   const totalEstimasi =
-    defaultSettings.length +                              // settings (9)
+    defaultSettings.length +                              // settings (4)
     createdUsers.length +                                 // users (26)
     dbCustomers.length +                                  // customers (80)
     Math.floor(dbCustomers.length * 2) +                  // vehicles (~160)
@@ -784,10 +771,12 @@ async function seed() {
   console.log("==================================================");
   console.log("✅ SEEDING BERHASIL");
   console.log("==================================================");
+  console.log(`⚙️  Settings       : ${defaultSettings.length}`);
   console.log(`👥 Users          : ${createdUsers.length} (${admins.length} Admin, ${cashiers.length} Kasir, ${mechanics.length} Mekanik)`);
   console.log(`👤 Customers      : ${dbCustomers.length}`);
   console.log(`🚗 Vehicles       : ~${Math.floor(dbCustomers.length * 2)}`);
   console.log(`🏍️  Products       : ${spareparts.length + services.length} (${spareparts.length} Spareparts, ${services.length} Services)`);
+  console.log(`📝 Deskripsi      : ✅ Semua produk memiliki deskripsi`);
   console.log(`🕐 Shifts         : ${shifts.length} (ALL CLOSED)`);
   console.log(`💰 Expenses       : ~${Math.floor(shifts.length * 2)}`);
   console.log(`📋 Orders         : ${orderCount}`);

@@ -1,10 +1,3 @@
-// src/application/web.js
-
-/**
- * Konfigurasi Utama Express.js - Bengkel Vespa API
- * Mengatur Middleware, Keamanan, CORS, Routing, dan Error Handling.
- */
-
 import express from "express";
 import helmet from "helmet";
 import morgan from "morgan";
@@ -20,52 +13,95 @@ import { errorMiddleware } from "#middleware/errorMiddleware.js";
 import { isProd } from "#config/env.js";
 
 /**
- * ============================================================
- * Initialize Express
- * ============================================================
+ * Instance utama Express.js untuk aplikasi Bengkel Vespa API.
+ * 
+ * @constant {express.Application}
  */
 const web = express();
 
 web.set("trust proxy", 1);
 
 /**
- * ============================================================
- * Resolve Paths
- * ============================================================
+ * Resolve path file dan direktori saat ini untuk keperluan loading file statis.
  */
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 /**
- * ============================================================
- * Swagger Configuration
- * ============================================================
+ * Versi API yang sedang berjalan.
+ * 
+ * @constant {string}
+ * @default "v1"
+ */
+const version = process.env.API_VERSION || "v1";
+
+/**
+ * Base URL aplikasi yang digunakan untuk dokumentasi Swagger dan response.
+ * Di production menggunakan APP_URL, di development fallback ke localhost.
+ * 
+ * @constant {string}
+ * @example
+ * // Production
+ * "https://api.bengkel-vespa.com"
+ * 
+ * @example
+ * // Development
+ * "http://localhost:3000"
+ */
+const appUrl = process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`;
+
+/**
+ * Path ke file dokumentasi Swagger YAML.
+ * 
+ * @constant {string}
  */
 const swaggerPath = path.resolve(__dirname, "../docs/swagger.yml");
-const swaggerDocument = YAML.load(swaggerPath);
 
-const version = process.env.API_VERSION || "v1";
-const serverUrl = isProd
-  ? process.env.APP_URL
-  : `http://localhost:${process.env.PORT || 3000}`;
+/**
+ * Dokumen Swagger yang sudah di-parse dari file YAML.
+ * 
+ * @constant {Object}
+ */
+const swaggerDocument = YAML.load(swaggerPath);
 
 swaggerDocument.servers = [
   {
-    url: `${serverUrl}/api/${version}`,
+    url: `${appUrl}/api/${version}`,
     description: isProd ? "Production Server" : "Development Server",
   },
 ];
 
 /**
- * ============================================================
- * CORS Configuration
- * ============================================================
+ * Daftar origin yang diizinkan untuk mengakses API di production.
+ * Dipisahkan dengan koma dari environment variable ALLOWED_ORIGINS.
+ * 
+ * @constant {string[]}
+ * @example
+ * ["https://bengkel-vespa.com", "https://admin.bengkel-vespa.com"]
  */
 const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",").map((o) => o.trim()) || [];
 
+/**
+ * Konfigurasi CORS untuk mengontrol akses dari origin yang berbeda.
+ * 
+ * Di development: semua origin diizinkan.
+ * Di production: hanya origin yang terdaftar di ALLOWED_ORIGINS yang diizinkan.
+ * 
+ * @constant {cors.CorsOptions}
+ * 
+ * @property {Function} origin - Callback untuk validasi origin request
+ * @property {boolean} credentials - Mengizinkan pengiriman cookies dan header authorization
+ * @property {string[]} methods - HTTP methods yang diizinkan
+ * @property {string[]} allowedHeaders - Header yang diizinkan dari client
+ * @property {string[]} exposedHeaders - Header yang bisa diakses oleh client
+ * @property {number} optionsSuccessStatus - Status code untuk successful OPTIONS request
+ * @property {boolean} preflightContinue - Apakah preflight request diteruskan ke route handler
+ * @property {number} maxAge - Cache duration untuk preflight request (24 jam)
+ */
 const corsOptions = {
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);
+    
     if (!isProd) return callback(null, true);
 
     if (allowedOrigins.includes(origin)) {
@@ -91,11 +127,6 @@ const corsOptions = {
   maxAge: 86400,
 };
 
-/**
- * ============================================================
- * Middleware Setup
- * ============================================================
- */
 web.use(cors(corsOptions));
 web.use(
   helmet({
@@ -108,67 +139,85 @@ web.use(express.json({ limit: "1mb" }));
 web.use(express.urlencoded({ extended: true, limit: "1mb" }));
 web.use(morgan(isProd ? "combined" : "dev"));
 
-/**
- * ============================================================
- * Development: Swagger UI
- * ============================================================
- */
-if (!isProd) {
-  web.use(
-    "/docs",
-    swaggerUi.serve,
-    swaggerUi.setup(swaggerDocument, {
-      customCss: ".swagger-ui .topbar { display: none }",
-      customSiteTitle: "Bengkel Vespa API Docs",
-      customfavIcon: "/favicon.ico",
-      swaggerOptions: {
-        tryItOutEnabled: true,
-        filter: true,
-        displayRequestDuration: true,
-      },
-    })
-  );
-
-  web.get("/", (_req, res) => {
-    res.redirect("/docs");
-  });
-}
+web.use(
+  "/docs",
+  swaggerUi.serve,
+  swaggerUi.setup(swaggerDocument, {
+    customCss: ".swagger-ui .topbar { display: none }",
+    customSiteTitle: "Bengkel Vespa API Docs",
+    customfavIcon: "/favicon.ico",
+    swaggerOptions: {
+      tryItOutEnabled: true,
+      filter: true,
+      displayRequestDuration: true,
+    },
+  })
+);
 
 /**
- * ============================================================
- * Production: HTTPS Redirect
- * ============================================================
+ * Root endpoint yang menampilkan informasi API.
+ * 
+ * Di production: mengembalikan JSON dengan informasi API dan link dokumentasi.
+ * Di development: redirect ke halaman dokumentasi Swagger UI.
+ * 
+ * @name GET /
+ * @function
+ * 
+ * @example
+ * // Production Response
+ * {
+ *   "success": true,
+ *   "message": "Bengkel Vespa API",
+ *   "version": "v1",
+ *   "environment": "production",
+ *   "docs": "https://api.bengkel-vespa.com/docs"
+ * }
  */
+web.get("/", (_req, res) => {
+  if (isProd) {
+    return res.status(200).json({
+      success: true,
+      message: "Bengkel Vespa API",
+      version,
+      environment: "production",
+      docs: `${appUrl}/docs`,
+    });
+  }
+
+  return res.redirect("/docs");
+});
+
 if (isProd) {
+  /**
+   * Middleware untuk memaksa redirect HTTP ke HTTPS di production.
+   * Mengecek header x-forwarded-proto dari reverse proxy (Nginx, etc).
+   * 
+   * @name HTTPS Redirect
+   * @function
+   */
   web.use((req, res, next) => {
     if (req.headers["x-forwarded-proto"] !== "https") {
       return res.redirect(301, `https://${req.headers.host}${req.url}`);
     }
     next();
   });
-
-  web.get("/", (_req, res) => {
-    res.status(200).json({
-      success: true,
-      message: "Bengkel Vespa API",
-      version,
-      environment: "production",
-    });
-  });
 }
 
-/**
- * ============================================================
- * Routes
- * ============================================================
- */
 web.use(publicRouter);
 web.use(privateRouter);
 
 /**
- * ============================================================
- * 404 Handler
- * ============================================================
+ * Global 404 handler untuk endpoint yang tidak ditemukan.
+ * 
+ * @name 404 Handler
+ * @function
+ * 
+ * @example
+ * // Response
+ * {
+ *   "success": false,
+ *   "message": "Endpoint tidak ditemukan atau tidak tersedia."
+ * }
  */
 web.use((_req, res) => {
   res.status(404).json({
@@ -177,11 +226,6 @@ web.use((_req, res) => {
   });
 });
 
-/**
- * ============================================================
- * Global Error Handler
- * ============================================================
- */
 web.use(errorMiddleware);
 
 export default web;
