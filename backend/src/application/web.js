@@ -19,10 +19,13 @@ import { isProd } from "#config/env.js";
  */
 const web = express();
 
+/**
+ * Mempercayai proxy headers (diperlukan untuk production di belakang reverse proxy).
+ */
 web.set("trust proxy", 1);
 
 /**
- * Resolve path file dan direktori saat ini untuk keperluan loading file statis.
+ * Resolve path file dan direktori saat ini.
  */
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -31,22 +34,13 @@ const __dirname = path.dirname(__filename);
  * Versi API yang sedang berjalan.
  * 
  * @constant {string}
- * @default "v1"
  */
 const version = process.env.API_VERSION || "v1";
 
 /**
- * Base URL aplikasi yang digunakan untuk dokumentasi Swagger dan response.
- * Di production menggunakan APP_URL, di development fallback ke localhost.
+ * Base URL aplikasi.
  * 
  * @constant {string}
- * @example
- * // Production
- * "https://api.bengkel-vespa.com"
- * 
- * @example
- * // Development
- * "http://localhost:3000"
  */
 const appUrl = process.env.APP_URL || `http://localhost:${process.env.PORT || 3000}`;
 
@@ -72,37 +66,31 @@ swaggerDocument.servers = [
 ];
 
 /**
- * Daftar origin yang diizinkan untuk mengakses API di production.
- * Dipisahkan dengan koma dari environment variable ALLOWED_ORIGINS.
+ * Daftar origin yang diizinkan untuk mengakses API.
+ * Diambil dari environment variable ALLOWED_ORIGINS.
  * 
  * @constant {string[]}
- * @example
- * ["https://bengkel-vespa.com", "https://admin.bengkel-vespa.com"]
  */
 const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",").map((o) => o.trim()) || [];
 
 /**
- * Konfigurasi CORS untuk mengontrol akses dari origin yang berbeda.
- * 
- * Di development: semua origin diizinkan.
- * Di production: hanya origin yang terdaftar di ALLOWED_ORIGINS yang diizinkan.
+ * Konfigurasi CORS.
  * 
  * @constant {cors.CorsOptions}
- * 
- * @property {Function} origin - Callback untuk validasi origin request
- * @property {boolean} credentials - Mengizinkan pengiriman cookies dan header authorization
- * @property {string[]} methods - HTTP methods yang diizinkan
- * @property {string[]} allowedHeaders - Header yang diizinkan dari client
- * @property {string[]} exposedHeaders - Header yang bisa diakses oleh client
- * @property {number} optionsSuccessStatus - Status code untuk successful OPTIONS request
- * @property {boolean} preflightContinue - Apakah preflight request diteruskan ke route handler
- * @property {number} maxAge - Cache duration untuk preflight request (24 jam)
  */
 const corsOptions = {
   origin: (origin, callback) => {
-    if (!origin) return callback(null, true);
+    if (!origin) {
+      return callback(null, true);
+    }
     
-    if (!isProd) return callback(null, true);
+    if (!isProd) {
+      return callback(null, true);
+    }
+
+    if (allowedOrigins.length === 0) {
+      return callback(null, true);
+    }
 
     if (allowedOrigins.includes(origin)) {
       return callback(null, true);
@@ -120,25 +108,61 @@ const corsOptions = {
     "Origin",
     "Referer",
     "User-Agent",
+    "X-CSRF-Token",
   ],
-  exposedHeaders: ["set-cookie", "Authorization"],
-  optionsSuccessStatus: 200,
+  exposedHeaders: [
+    "Content-Length",
+    "X-Request-Id",
+    "Set-Cookie",
+  ],
+  optionsSuccessStatus: 204,
   preflightContinue: false,
   maxAge: 86400,
 };
 
+/**
+ * CORS middleware - harus di-apply sebelum middleware lain.
+ * 
+ * Catatan: `cors(corsOptions)` sudah otomatis menangani OPTIONS preflight.
+ * Tidak perlu menambahkan `web.options()` terpisah.
+ */
 web.use(cors(corsOptions));
+
+/**
+ * Helmet security headers dengan konfigurasi yang kompatibel dengan CORS.
+ */
 web.use(
   helmet({
     crossOriginResourcePolicy: { policy: "cross-origin" },
     crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
+    contentSecurityPolicy: isProd ? undefined : false,
+    crossOriginEmbedderPolicy: false,
   })
 );
+
+/**
+ * Compression middleware untuk response body.
+ */
 web.use(compression());
+
+/**
+ * JSON body parser dengan limit 1MB.
+ */
 web.use(express.json({ limit: "1mb" }));
+
+/**
+ * URL-encoded body parser dengan limit 1MB.
+ */
 web.use(express.urlencoded({ extended: true, limit: "1mb" }));
+
+/**
+ * HTTP request logger.
+ */
 web.use(morgan(isProd ? "combined" : "dev"));
 
+/**
+ * Swagger UI documentation endpoint.
+ */
 web.use(
   "/docs",
   swaggerUi.serve,
@@ -155,23 +179,8 @@ web.use(
 );
 
 /**
- * Root endpoint yang menampilkan informasi API.
- * 
- * Di production: mengembalikan JSON dengan informasi API dan link dokumentasi.
- * Di development: redirect ke halaman dokumentasi Swagger UI.
- * 
- * @name GET /
- * @function
- * 
- * @example
- * // Production Response
- * {
- *   "success": true,
- *   "message": "Bengkel Vespa API",
- *   "version": "v1",
- *   "environment": "production",
- *   "docs": "https://api.bengkel-vespa.com/docs"
- * }
+ * Root endpoint.
+ * Di production mengembalikan JSON, di development redirect ke /docs.
  */
 web.get("/", (_req, res) => {
   if (isProd) {
@@ -187,14 +196,11 @@ web.get("/", (_req, res) => {
   return res.redirect("/docs");
 });
 
+/**
+ * HTTPS Redirect middleware untuk production.
+ * Redirect semua HTTP request ke HTTPS.
+ */
 if (isProd) {
-  /**
-   * Middleware untuk memaksa redirect HTTP ke HTTPS di production.
-   * Mengecek header x-forwarded-proto dari reverse proxy (Nginx, etc).
-   * 
-   * @name HTTPS Redirect
-   * @function
-   */
   web.use((req, res, next) => {
     if (req.headers["x-forwarded-proto"] !== "https") {
       return res.redirect(301, `https://${req.headers.host}${req.url}`);
@@ -203,21 +209,19 @@ if (isProd) {
   });
 }
 
+/**
+ * Public routes - tidak memerlukan autentikasi.
+ */
 web.use(publicRouter);
+
+/**
+ * Private routes - memerlukan autentikasi.
+ */
 web.use(privateRouter);
 
 /**
- * Global 404 handler untuk endpoint yang tidak ditemukan.
- * 
- * @name 404 Handler
- * @function
- * 
- * @example
- * // Response
- * {
- *   "success": false,
- *   "message": "Endpoint tidak ditemukan atau tidak tersedia."
- * }
+ * Global 404 handler.
+ * Di-trigger ketika tidak ada route yang match.
  */
 web.use((_req, res) => {
   res.status(404).json({
@@ -226,6 +230,10 @@ web.use((_req, res) => {
   });
 });
 
+/**
+ * Global error handler middleware.
+ * Harus diletakkan paling akhir setelah semua route dan middleware.
+ */
 web.use(errorMiddleware);
 
 export default web;
