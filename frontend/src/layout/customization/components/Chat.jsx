@@ -1,3 +1,22 @@
+/**
+ * Chat - Chatbot dialog dengan typewriter effect, markdown rendering, dan fullscreen mobile.
+ *
+ * Fitur:
+ * - Fullscreen di mobile untuk UX yang lebih baik
+ * - Typewriter effect untuk pesan terakhir dari agent
+ * - Markdown rendering dengan GitHub Flavored Markdown
+ * - Empty state dengan sapaan personal (nama user)
+ * - Loading dots animation saat menunggu response
+ * - Auto-focus input saat dialog dibuka
+ * - Riwayat chat persisten selama sesi (tidak reset saat tutup)
+ * - Scroll otomatis ke bawah saat ada pesan baru
+ * - Send button dengan animasi hover
+ * - Error state untuk pesan gagal (warna merah)
+ *
+ * @param {Object} props
+ * @param {boolean} props.open - Status dialog terbuka/tutup
+ * @param {Function} props.onClose - Handler untuk menutup dialog
+ */
 import { useEffect, useRef, useState } from "react";
 import { useSelector } from "react-redux";
 import {
@@ -18,24 +37,45 @@ import rehypeRaw from "rehype-raw";
 import { useChat } from "@layout/customization/hooks";
 import { selectUser } from "@store/auth/authSelector.js";
 
+/**
+ * Keyframe animasi fade-in dari bawah.
+ *
+ * @type {Object}
+ */
 const fadeInUp = keyframes`
   from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
 `;
 
+/**
+ * Keyframe animasi jumping dots untuk loading indicator.
+ *
+ * @type {Object}
+ */
 const jumpDots = keyframes`
   0%, 80%, 100% { transform: translateY(0); }
   40% { transform: translateY(-5px); }
 `;
 
 /**
- * TypewriterMessage - Menampilkan teks dengan efek ketik.
+ * TypewriterMessage - Menampilkan teks dengan efek ketik karakter per karakter.
+ *
  * @param {Object} props
- * @param {string} props.content
+ * @param {string} props.content - Konten teks yang akan dianimasikan
+ * @returns {JSX.Element} Komponen typewriter
  */
 const TypewriterMessage = ({ content }) => {
+  /**
+   * Teks yang sudah ditampilkan sejauh ini.
+   *
+   * @type {[string, Function]}
+   */
   const [displayed, setDisplayed] = useState("");
 
+  /**
+   * Effect: Animasi ketik karakter per karakter.
+   * Reset jika konten berubah menjadi lebih pendek.
+   */
   useEffect(() => {
     if (!content || content.length < displayed.length) {
       setDisplayed("");
@@ -54,13 +94,29 @@ const TypewriterMessage = ({ content }) => {
 };
 
 /**
- * MarkdownContent - Render markdown dengan styling theme.
+ * MarkdownContent - Render markdown dengan styling yang menyesuaikan theme.
+ *
+ * Mendukung:
+ * - Paragraph, heading (h1-h6)
+ * - List (ordered & unordered)
+ * - Bold, italic, strikethrough
+ * - Inline code & code blocks
+ * - Table
+ * - Blockquote
+ * - Horizontal rule
+ *
  * @param {Object} props
- * @param {string} props.content
+ * @param {string} props.content - Konten markdown
+ * @returns {JSX.Element} Konten markdown yang sudah dirender
  */
 const MarkdownContent = ({ content }) => {
   const theme = useTheme();
 
+  /**
+   * Style untuk elemen-elemen markdown.
+   *
+   * @type {Object}
+   */
   const markdownStyles = {
     "& p": { m: 0, lineHeight: 1.7, color: "inherit" },
     "& p:not(:last-child)": { mb: 1 },
@@ -137,15 +193,26 @@ const MarkdownContent = ({ content }) => {
 };
 
 /**
- * Chat - Chatbot dialog dengan typewriter effect dan markdown rendering.
- * Riwayat chat tetap tersimpan selama sesi (tidak di-reset saat buka/tutup).
+ * Chat - Dialog chatbot fullscreen di mobile.
+ *
  * @param {Object} props
- * @param {boolean} props.open
- * @param {Function} props.onClose
+ * @param {boolean} props.open - Status dialog
+ * @param {Function} props.onClose - Handler tutup dialog
+ * @returns {JSX.Element} Dialog chatbot
  */
 const Chat = ({ open, onClose }) => {
   const theme = useTheme();
+
+  /**
+   * Data user dari Redux store.
+   *
+   * @type {Object}
+   */
   const user = useSelector(selectUser);
+
+  /**
+   * Hook chat yang menyediakan messages, input, dan handler.
+   */
   const {
     messages,
     input,
@@ -155,16 +222,33 @@ const Chat = ({ open, onClose }) => {
     isPending,
     scrollRef,
   } = useChat();
+
+  /**
+   * Ref untuk input field.
+   *
+   * @type {React.RefObject<HTMLInputElement>}
+   */
   const inputRef = useRef(null);
 
   /**
    * Flag untuk menandai apakah chat sudah pernah diinisialisasi.
-   * Hanya panggil initChat() sekali — saat pertama kali komponen mount.
+   * Hanya panggil initChat() sekali saat pertama kali komponen mount.
+   *
+   * @type {React.MutableRefObject<boolean>}
    */
   const hasInitialized = useRef(false);
 
+  /**
+   * Nama depan user untuk sapaan personal.
+   *
+   * @type {string}
+   */
   const firstName = user?.fullName?.split(" ")[0] || "Sobat";
 
+  /**
+   * Effect: Inisialisasi chat saat dialog pertama kali dibuka.
+   * Auto-focus input field setelah dialog terbuka.
+   */
   useEffect(() => {
     if (open && !hasInitialized.current) {
       initChat();
@@ -175,12 +259,20 @@ const Chat = ({ open, onClose }) => {
     }
   }, [open, initChat]);
 
+  /**
+   * Handler keyboard: Kirim pesan saat Enter (tanpa Shift).
+   *
+   * @param {React.KeyboardEvent} e - Event keyboard
+   */
   const handleKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
     }
   };
+
+  /** @type {string} Nilai border radius dari theme */
+  const borderRadius = `${theme.shape.borderRadius}px`;
 
   return (
     <Box
@@ -193,26 +285,25 @@ const Chat = ({ open, onClose }) => {
         inset: 0,
         zIndex: theme.zIndex.modal + 1,
         display: open ? "flex" : "none",
-        alignItems: { xs: "flex-end", sm: "center" },
+        alignItems: "center",
         justifyContent: "center",
-        p: { xs: 2, sm: 3 },
-        bgcolor: "rgba(0,0,0,0.4)",
-        backdropFilter: "blur(6px)",
+        bgcolor: { xs: "background.paper", sm: "rgba(0,0,0,0.4)" },
+        backdropFilter: { xs: "none", sm: "blur(6px)" },
       }}
     >
       <Box
         onClick={(e) => e.stopPropagation()}
         sx={{
           width: { xs: "100%", sm: 460 },
-          maxWidth: 460,
-          height: { xs: "92vh", sm: 620 },
-          maxHeight: "92vh",
+          maxWidth: { xs: "100%", sm: 460 },
+          height: { xs: "100%", sm: 620 },
+          maxHeight: { xs: "100%", sm: "92vh" },
           display: "flex",
           flexDirection: "column",
-          borderRadius: 3,
+          borderRadius: { xs: 0, sm: borderRadius },
           bgcolor: "background.paper",
-          border: `1px solid ${theme.palette.divider}`,
-          boxShadow: `0 16px 48px rgba(0,0,0,0.18)`,
+          border: { xs: "none", sm: `1px solid ${theme.palette.divider}` },
+          boxShadow: { xs: "none", sm: `0 16px 48px rgba(0,0,0,0.18)` },
           overflow: "hidden",
           animation: `${fadeInUp} 0.35s ${theme.transitions.easing.easeOut}`,
         }}
@@ -243,10 +334,7 @@ const Chat = ({ open, onClose }) => {
               <Bot size={24} strokeWidth={1.5} />
             </Avatar>
             <Box>
-              <Typography
-                variant="subtitle2"
-                sx={{ fontWeight: 700, lineHeight: 1.3 }}
-              >
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, lineHeight: 1.3 }}>
                 G-Speed Copilot
               </Typography>
               <Stack direction="row" sx={{ gap: 1, alignItems: "center", mt: 0.25 }}>
@@ -271,7 +359,7 @@ const Chat = ({ open, onClose }) => {
             aria-label="Tutup Chat"
             sx={{
               color: "text.secondary",
-              borderRadius: 2,
+              borderRadius: borderRadius,
               "&:hover": { color: "text.primary", bgcolor: "action.hover" },
             }}
           >
@@ -285,7 +373,7 @@ const Chat = ({ open, onClose }) => {
           sx={{
             flex: 1,
             overflowY: "auto",
-            px: 3,
+            px: { xs: 2, sm: 3 },
             py: 3,
             display: "flex",
             flexDirection: "column",
@@ -337,8 +425,7 @@ const Chat = ({ open, onClose }) => {
           {/* MESSAGES */}
           {messages.map((msg, i) => {
             const isAgent = msg.role === "AGENT";
-            const isLastAgentMessage =
-              isAgent && i === messages.length - 1 && !isPending;
+            const isLastAgentMessage = isAgent && i === messages.length - 1 && !isPending;
 
             return (
               <Stack
@@ -462,8 +549,8 @@ const Chat = ({ open, onClose }) => {
           sx={{
             alignItems: "flex-end",
             gap: 1.5,
-            px: 3,
-            py: 3,
+            px: { xs: 2, sm: 3 },
+            py: { xs: 2, sm: 3 },
             borderTop: `1px solid ${theme.palette.divider}`,
             bgcolor: "background.default",
             flexShrink: 0,
@@ -482,7 +569,7 @@ const Chat = ({ open, onClose }) => {
             maxRows={4}
             sx={{
               "& .MuiOutlinedInput-root": {
-                borderRadius: 3,
+                borderRadius: borderRadius,
                 bgcolor: "background.paper",
                 "& fieldset": { borderColor: "divider" },
                 "&:hover fieldset": { borderColor: "secondary.main" },

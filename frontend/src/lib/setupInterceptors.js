@@ -4,8 +4,8 @@ import { showNotification } from "@store/notifications/notificationsSlice.js";
 import { logger } from "@lib/logger.js";
 
 /**
- * Setup Axios Interceptors untuk request dan response
- * Menangani auth token, error handling, dan notifikasi
+ * Setup Axios Interceptors untuk request dan response.
+ * Menangani auth token, error handling, retry untuk cold start, dan notifikasi.
  *
  * @param {Object} params
  * @param {import("@reduxjs/toolkit").EnhancedStore} params.store - Redux store
@@ -98,7 +98,6 @@ export function setupInterceptors({ store }) {
           message,
         });
       } else if (error.code === "ECONNABORTED") {
-        // Handling khusus untuk ECONNABORTED
         errorCode = "CONNECTION_ABORTED";
         message =
           "Koneksi terputus secara tiba-tiba. Periksa koneksi internet Anda dan coba kembali.";
@@ -132,8 +131,24 @@ export function setupInterceptors({ store }) {
           code: error.code,
           message: error.message,
         });
+
+        /**
+         * RETRY LOGIC untuk Render cold start.
+         * Jika server unreachable (cold start), retry dengan exponential backoff.
+         */
+        if (!config._retryCount || config._retryCount < 2) {
+          config._retryCount = (config._retryCount || 0) + 1;
+          const delay = Math.min(3000 * 2 ** (config._retryCount - 1), 12000);
+
+          logger.info(
+            `🔄 Retry ${config._retryCount}/2 dalam ${delay}ms untuk:`,
+            config.url
+          );
+
+          await new Promise((resolve) => setTimeout(resolve, delay));
+          return Client(config);
+        }
       } else if (error.code === "ECONNREFUSED") {
-        // Handling khusus untuk ECONNREFUSED
         errorCode = "CONNECTION_REFUSED";
         message =
           "Koneksi ke server ditolak. Server mungkin sedang dalam pemeliharaan. Silakan coba beberapa saat lagi.";
@@ -142,13 +157,11 @@ export function setupInterceptors({ store }) {
           message: error.message,
         });
       } else if (error.code === "ERR_CANCELED") {
-        // Handling untuk request yang dibatalkan
         errorCode = "REQUEST_CANCELED";
         message = "Permintaan dibatalkan.";
         logger.debug("🛑 Request canceled:", config?.url);
       }
 
-      // Handling untuk status 401 (Unauthorized)
       if (statusCode === 401 && !isRedirecting) {
         const currentPath = window.location.pathname;
 
@@ -188,7 +201,9 @@ export function setupInterceptors({ store }) {
         });
       }
 
-      // Tampilkan notifikasi untuk error koneksi yang critical
+      /**
+       * Tampilkan notifikasi hanya untuk error yang bukan dari retry.
+       */
       const connectionErrors = [
         "NO_INTERNET_CONNECTION",
         "REQUEST_TIMEOUT",
@@ -199,7 +214,8 @@ export function setupInterceptors({ store }) {
 
       if (
         connectionErrors.includes(errorCode) &&
-        !config?.skipErrorNotification
+        !config?.skipErrorNotification &&
+        (!config._retryCount || config._retryCount >= 2)
       ) {
         store.dispatch(
           showNotification({
@@ -227,7 +243,7 @@ export function setupInterceptors({ store }) {
 }
 
 /**
- * Mendapatkan judul error yang mudah dibaca berdasarkan error code
+ * Mendapatkan judul error yang mudah dibaca berdasarkan error code.
  *
  * @param {string} code - Error code dari response
  * @returns {string} Judul error dalam Bahasa Indonesia

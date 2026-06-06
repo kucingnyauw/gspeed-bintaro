@@ -528,7 +528,7 @@ const AppTable = memo(
             <Stack sx={{ gap: 1.5, alignItems: "center" }}>
               <Typography
                 color="text.secondary"
-                variant="body1"
+                variant="h6"
                 fontWeight={600}
               >
                 {emptyStateMessage}

@@ -1,4 +1,22 @@
-import { useState } from "react";
+/**
+ * OrderFilterDialog - Dialog filter untuk data pesanan.
+ *
+ * Fitur:
+ * - Filter berdasarkan status pesanan
+ * - Pencarian pelanggan dengan AsyncAutocomplete (debounced)
+ * - Filter rentang tanggal (Dari/Sampai)
+ * - Tombol Reset, Batal, dan Terapkan
+ *
+ * @component
+ * @param {Object} props - Props komponen
+ * @param {boolean} props.open - Status dialog terbuka/tutup
+ * @param {Object} props.tempFilters - Object filter sementara
+ * @param {Function} props.onClose - Handler tutup dialog
+ * @param {Function} props.onFilterChange - Handler perubahan filter
+ * @param {Function} props.onApply - Handler terapkan filter
+ * @param {Function} props.onReset - Handler reset filter ke default
+ * @returns {JSX.Element} Dialog filter pesanan
+ */
 import { Calendar, X } from "lucide-react";
 
 import {
@@ -22,7 +40,6 @@ import { MobileDatePicker } from "@mui/x-date-pickers/MobileDatePicker";
 
 import { getCustomers } from "@api/customerApi.js";
 import { AsyncAutocomplete } from "@components";
-import { useDebounce } from "@hooks";
 import { OrderStatus } from "@shared/constant";
 import { normalizeEnumText } from "@shared/utils/utils.js";
 
@@ -34,13 +51,50 @@ const OrderFilterDialog = ({
   open,
   tempFilters,
 }) => {
-  const [customerSearch, setCustomerSearch] = useState("");
-  const debouncedCustomerSearch = useDebounce(customerSearch);
+  /**
+   * Handler perubahan customer.
+   *
+   * @param {Object|null} val - Customer yang dipilih
+   */
+  const handleCustomerChange = (val) => {
+    onFilterChange({ ...tempFilters, customer: val });
+  };
+
+  /**
+   * Handler perubahan status.
+   *
+   * @param {Object} e - Event change Select
+   */
+  const handleStatusChange = (e) => {
+    onFilterChange({ ...tempFilters, status: e.target.value });
+  };
+
+  /**
+   * Handler perubahan tanggal mulai.
+   *
+   * @param {Date|null} val - Tanggal yang dipilih
+   */
+  const handleStartDateChange = (val) => {
+    onFilterChange({ ...tempFilters, startDate: val });
+  };
+
+  /**
+   * Handler perubahan tanggal akhir.
+   *
+   * @param {Date|null} val - Tanggal yang dipilih
+   */
+  const handleEndDateChange = (val) => {
+    onFilterChange({ ...tempFilters, endDate: val });
+  };
 
   return (
     <Dialog fullWidth maxWidth="xs" onClose={onClose} open={open}>
+      {/* Header */}
       <DialogTitle sx={{ pb: 1.5 }}>
-        <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center" }}>
+        <Stack
+          direction="row"
+          sx={{ justifyContent: "space-between", alignItems: "center" }}
+        >
           <Typography variant="h6" component="span" sx={{ fontWeight: 600 }}>
             Filter Pesanan
           </Typography>
@@ -52,67 +106,79 @@ const OrderFilterDialog = ({
 
       <Divider />
 
-      <DialogContent sx={{ pt: 2.5, pb: 1 }}>
+      {/* Content */}
+      <DialogContent sx={{ pt: 2.5, pb: 3 }}>
         <Stack sx={{ gap: 3 }}>
+          {/* Status Filter */}
           <FormControl fullWidth>
             <InputLabel>Status</InputLabel>
             <Select
               value={tempFilters.status || ""}
-              onChange={(e) => onFilterChange({ ...tempFilters, status: e.target.value })}
+              onChange={handleStatusChange}
               label="Status"
             >
               <MenuItem value="">Semua Status</MenuItem>
               {Object.entries(OrderStatus).map(([key, value]) => (
-                <MenuItem key={key} value={value}>{normalizeEnumText(value)}</MenuItem>
+                <MenuItem key={key} value={value}>
+                  {normalizeEnumText(value)}
+                </MenuItem>
               ))}
             </Select>
           </FormControl>
 
+          {/* Customer Search */}
           <AsyncAutocomplete
-            fetchOptions={async () => {
-              const res = await getCustomers({ limit: 10, page: 1, search: debouncedCustomerSearch });
+            value={tempFilters.customer || null}
+            onChange={handleCustomerChange}
+            queryKey={["customers-filter"]}
+            fetchOptions={async (search) => {
+              const res = await getCustomers({
+                page: 1,
+                limit: 10,
+                search: search || "",
+              });
               return res?.data || [];
             }}
             getOptionLabel={(o) => o?.name || ""}
-            inputValue={customerSearch}
-            onInputChange={(val) => setCustomerSearch(val)}
-            onChange={(val) => onFilterChange({ ...tempFilters, customer: val })}
             placeholder="Cari pelanggan..."
-            queryKey={["customers-filter", debouncedCustomerSearch]}
             renderOption={(props, option) => {
               const { key, ...rest } = props;
               return (
                 <Box component="li" key={key} {...rest}>
                   <Box>
                     <Typography variant="body2">{option.name}</Typography>
-                    <Typography color="text.secondary" variant="caption">{option.phone}</Typography>
+                    <Typography color="text.secondary" variant="caption">
+                      {option.phone || "Tanpa nomor telepon"}
+                    </Typography>
                   </Box>
                 </Box>
               );
             }}
-            value={tempFilters.customer}
           />
 
+          {/* Start Date */}
           <MobileDatePicker
             label="Dari Tanggal"
-            onChange={(val) => onFilterChange({ ...tempFilters, startDate: val })}
+            value={tempFilters.startDate || null}
+            onChange={handleStartDateChange}
             slots={{ openPickerIcon: () => <Calendar size={16} strokeWidth={1.5} /> }}
             slotProps={{ textField: { fullWidth: true } }}
-            value={tempFilters.startDate}
           />
 
+          {/* End Date */}
           <MobileDatePicker
             label="Sampai Tanggal"
-            onChange={(val) => onFilterChange({ ...tempFilters, endDate: val })}
+            value={tempFilters.endDate || null}
+            onChange={handleEndDateChange}
             slots={{ openPickerIcon: () => <Calendar size={16} strokeWidth={1.5} /> }}
             slotProps={{ textField: { fullWidth: true } }}
-            value={tempFilters.endDate}
           />
         </Stack>
       </DialogContent>
 
       <Divider />
 
+      {/* Actions */}
       <DialogActions sx={{ px: 3, py: 2.5, justifyContent: "space-between" }}>
         <Button color="inherit" variant="outlined" onClick={onReset}>
           Reset

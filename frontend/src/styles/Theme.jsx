@@ -199,8 +199,6 @@ const componentsOverride = (theme) => ({
         backgroundColor: theme.palette.background.paper,
         border: `1px solid ${theme.palette.divider}`,
         boxShadow: theme.shadows[1],
-  
-   
       },
     },
   },
@@ -579,8 +577,6 @@ const componentsOverride = (theme) => ({
     styleOverrides: {
       paper: {
         borderRadius: `${theme.shape.borderRadius}px`,
-        border: `1px solid ${theme.palette.divider}`,
-        boxShadow: theme.shadows[4],
         overflow: "hidden",
         backgroundColor: theme.palette.background.paper,
       },

@@ -1,15 +1,33 @@
+/**
+ * Todo - Dialog catatan cepat dengan fitur CRUD, checklist, dan animasi.
+ *
+ * Fitur:
+ * - Tambah catatan baru dengan input + tombol Plus
+ * - Checklist/toggle status selesai dengan SVG custom checkbox
+ * - Hapus catatan individual dengan tombol X (muncul saat hover)
+ * - Bersihkan semua catatan yang sudah selesai
+ * - Animasi Framer Motion untuk add/remove item
+ * - Empty state dengan ilustrasi SVG
+ * - Counter "belum" di header
+ * - Scroll area untuk daftar catatan
+ * - Font monospace untuk nilai uang (opsional)
+ * - Animasi active scale pada tombol
+ *
+ * @param {Object} props
+ * @param {boolean} props.open - Status dialog terbuka/tutup
+ * @param {Function} props.onClose - Handler untuk menutup dialog
+ * @returns {JSX.Element|null} Komponen dialog catatan cepat
+ */
 import { useCallback, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import {
   Box,
-  Checkbox,
   IconButton,
   Stack,
   TextField,
   Typography,
   Button,
   useTheme,
-  Tooltip,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { motion, AnimatePresence } from "framer-motion";
@@ -28,6 +46,9 @@ import {
 
 /**
  * EmptyState - Tampilan saat belum ada catatan.
+ * Menampilkan ilustrasi checklist dengan pesan informatif.
+ *
+ * @returns {JSX.Element} Komponen empty state
  */
 const EmptyState = () => {
   const theme = useTheme();
@@ -70,23 +91,10 @@ const EmptyState = () => {
         </svg>
       </Box>
       <Box sx={{ textAlign: "center", maxWidth: 260 }}>
-        <Typography
-          variant="subtitle1"
-          sx={{
-            fontWeight: 600,
-            color: "text.secondary",
-            mb: 0.75,
-          }}
-        >
+        <Typography variant="subtitle1" sx={{ fontWeight: 600, color: "text.secondary", mb: 0.75 }}>
           Belum ada catatan
         </Typography>
-        <Typography
-          variant="body2"
-          sx={{
-            color: "text.disabled",
-            lineHeight: 1.6,
-          }}
-        >
+        <Typography variant="body2" sx={{ color: "text.disabled", lineHeight: 1.6 }}>
           Tulis catatan baru untuk memulai
         </Typography>
       </Box>
@@ -94,6 +102,14 @@ const EmptyState = () => {
   );
 };
 
+/**
+ * Variants animasi untuk item todo.
+ * hidden: transparan, bergeser ke kiri, tinggi 0
+ * visible: muncul dengan spring animation
+ * exit: transparan, bergeser ke kanan, tinggi 0
+ *
+ * @type {Object}
+ */
 const itemVariants = {
   hidden: { opacity: 0, x: -20, height: 0 },
   visible: {
@@ -111,19 +127,52 @@ const itemVariants = {
 };
 
 /**
- * Todo - Dialog catatan cepat dengan fitur tambah, checklist, hapus, dan bersihkan.
+ * Todo - Dialog catatan cepat.
+ *
  * @param {Object} props
- * @param {boolean} props.open
- * @param {Function} props.onClose
+ * @param {boolean} props.open - Status dialog
+ * @param {Function} props.onClose - Handler tutup dialog
+ * @returns {JSX.Element} Dialog catatan cepat
  */
 const Todo = ({ open, onClose }) => {
   const theme = useTheme();
   const dispatch = useDispatch();
+
+  /**
+   * Semua todo items dari Redux store.
+   *
+   * @type {Array<Object>}
+   */
   const todos = useSelector(selectTodos);
+
+  /**
+   * Todo yang belum selesai.
+   *
+   * @type {Array<Object>}
+   */
   const pendingTodos = useSelector(selectPendingTodos);
+
+  /**
+   * Todo yang sudah selesai.
+   *
+   * @type {Array<Object>}
+   */
   const completedTodos = useSelector(selectCompletedTodos);
+
+  /**
+   * Teks input untuk todo baru.
+   *
+   * @type {[string, Function]}
+   */
   const [text, setText] = useState("");
 
+  /** @type {string} Nilai border radius dari theme */
+  const borderRadius = `${theme.shape.borderRadius}px`;
+
+  /**
+   * Handler tambah todo baru.
+   * Hanya dispatch jika teks tidak kosong setelah di-trim.
+   */
   const handleAdd = useCallback(() => {
     const trimmed = text.trim();
     if (!trimmed) return;
@@ -131,6 +180,11 @@ const Todo = ({ open, onClose }) => {
     setText("");
   }, [text, dispatch]);
 
+  /**
+   * Handler keyboard: Tambah todo saat Enter ditekan.
+   *
+   * @param {React.KeyboardEvent} e - Event keyboard
+   */
   const handleKeyDown = useCallback(
     (e) => {
       if (e.key === "Enter") handleAdd();
@@ -138,16 +192,29 @@ const Todo = ({ open, onClose }) => {
     [handleAdd]
   );
 
+  /**
+   * Handler toggle status selesai todo.
+   *
+   * @param {string} id - ID todo
+   */
   const handleToggle = useCallback(
     (id) => dispatch(toggleTodoStatus(id)),
     [dispatch]
   );
 
+  /**
+   * Handler hapus todo.
+   *
+   * @param {string} id - ID todo
+   */
   const handleDelete = useCallback(
     (id) => dispatch(deleteTodo(id)),
     [dispatch]
   );
 
+  /**
+   * Handler bersihkan semua todo yang sudah selesai.
+   */
   const handleClearCompleted = useCallback(
     () => dispatch(clearCompletedTodos()),
     [dispatch]
@@ -180,7 +247,7 @@ const Todo = ({ open, onClose }) => {
           maxHeight: "88vh",
           display: "flex",
           flexDirection: "column",
-          borderRadius: 3,
+          borderRadius: borderRadius,
           bgcolor: "background.paper",
           border: `1px solid ${theme.palette.divider}`,
           boxShadow: `0 24px 64px ${alpha(theme.palette.common.black, 0.2)}`,
@@ -201,15 +268,7 @@ const Todo = ({ open, onClose }) => {
           }}
         >
           <Stack direction="row" sx={{ gap: 1.5, alignItems: "center" }}>
-            <Typography
-              variant="h6"
-              sx={{
-                fontWeight: 700,
-                color: "text.primary",
-                fontSize: "1.0625rem",
-                letterSpacing: "-0.01em",
-              }}
-            >
+            <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
               Catatan Cepat
             </Typography>
             {todos.length > 0 && (
@@ -217,58 +276,41 @@ const Todo = ({ open, onClose }) => {
                 sx={{
                   px: 1.25,
                   py: 0.375,
-                  borderRadius: 1.5,
+                  borderRadius: borderRadius,
                   bgcolor: alpha(theme.palette.secondary.main, 0.1),
                   border: `1px solid ${alpha(theme.palette.secondary.main, 0.15)}`,
                 }}
               >
                 <Typography
                   variant="caption"
-                  sx={{
-                    fontWeight: 700,
-                    color: "secondary.main",
-                    fontSize: "0.75rem",
-                  }}
+                  sx={{ fontWeight: 700, color: "secondary.main", fontSize: "0.75rem" }}
                 >
                   {pendingTodos.length} belum
                 </Typography>
               </Box>
             )}
           </Stack>
-          <Tooltip title="Tutup" arrow>
-            <IconButton
-              onClick={onClose}
-              size="small"
-              aria-label="Tutup catatan"
-              sx={{
-                color: "text.secondary",
-                borderRadius: 2,
-                "&:hover": {
-                  color: "error.main",
-                  bgcolor: alpha(theme.palette.error.main, 0.08),
-                },
-              }}
-            >
-              <X size={20} strokeWidth={1.5} />
-            </IconButton>
-          </Tooltip>
+          <IconButton
+            onClick={onClose}
+            size="small"
+            aria-label="Tutup catatan"
+            sx={{
+              color: "text.secondary",
+              borderRadius: borderRadius,
+              "&:hover": {
+                color: "error.main",
+                bgcolor: alpha(theme.palette.error.main, 0.08),
+              },
+            }}
+          >
+            <X size={20} strokeWidth={1.5} />
+          </IconButton>
         </Stack>
 
         {/* BODY */}
-        <Box
-          sx={{
-            p: 3,
-            flex: 1,
-            display: "flex",
-            flexDirection: "column",
-            overflow: "hidden",
-          }}
-        >
+        <Box sx={{ p: 3, flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
           {/* INPUT ROW */}
-          <Stack
-            direction="row"
-            sx={{ gap: 1.5, mb: 3, flexShrink: 0 }}
-          >
+          <Stack direction="row" sx={{ gap: 1.5, mb: 3, flexShrink: 0 }}>
             <TextField
               fullWidth
               size="medium"
@@ -279,15 +321,11 @@ const Todo = ({ open, onClose }) => {
               autoFocus
               sx={{
                 "& .MuiOutlinedInput-root": {
-                  borderRadius: 2,
+                  borderRadius: borderRadius,
                   bgcolor: "background.default",
                   fontSize: "0.9375rem",
-                  "& fieldset": {
-                    borderColor: "divider",
-                  },
-                  "&:hover fieldset": {
-                    borderColor: "secondary.main",
-                  },
+                  "& fieldset": { borderColor: "divider" },
+                  "&:hover fieldset": { borderColor: "secondary.main" },
                   "&.Mui-focused fieldset": {
                     borderColor: "secondary.main",
                     borderWidth: 1,
@@ -295,39 +333,35 @@ const Todo = ({ open, onClose }) => {
                 },
               }}
             />
-            <Tooltip title="Tambah catatan" arrow>
-              <IconButton
-                onClick={handleAdd}
-                disabled={!text.trim()}
-                sx={{
-                  width: 50,
-                  height: 50,
-                  borderRadius: 2,
-                  color: "secondary.contrastText",
-                  bgcolor: "secondary.main",
-                  boxShadow: `0 4px 14px ${alpha(theme.palette.secondary.main, 0.3)}`,
-                  transition: (t) =>
-                    t.transitions.create(
-                      ["background-color", "transform", "box-shadow"],
-                      { duration: t.transitions.duration.shorter }
-                    ),
-                  "&:hover": {
-                    bgcolor: "secondary.dark",
-                    boxShadow: `0 6px 20px ${alpha(theme.palette.secondary.main, 0.4)}`,
-                  },
-                  "&:active": {
-                    transform: "scale(0.94)",
-                  },
-                  "&.Mui-disabled": {
-                    bgcolor: "action.disabledBackground",
-                    color: "action.disabled",
-                    boxShadow: "none",
-                  },
-                }}
-              >
-                <Plus size={24} strokeWidth={2} />
-              </IconButton>
-            </Tooltip>
+            <IconButton
+              onClick={handleAdd}
+              disabled={!text.trim()}
+              aria-label="Tambah catatan"
+              sx={{
+                width: 50,
+                height: 50,
+                borderRadius: borderRadius,
+                color: "secondary.contrastText",
+                bgcolor: "secondary.main",
+                boxShadow: `0 4px 14px ${alpha(theme.palette.secondary.main, 0.3)}`,
+                transition: (t) =>
+                  t.transitions.create(["background-color", "transform", "box-shadow"], {
+                    duration: t.transitions.duration.shorter,
+                  }),
+                "&:hover": {
+                  bgcolor: "secondary.dark",
+                  boxShadow: `0 6px 20px ${alpha(theme.palette.secondary.main, 0.4)}`,
+                },
+                "&:active": { transform: "scale(0.94)" },
+                "&.Mui-disabled": {
+                  bgcolor: "action.disabledBackground",
+                  color: "action.disabled",
+                  boxShadow: "none",
+                },
+              }}
+            >
+              <Plus size={24} strokeWidth={2} />
+            </IconButton>
           </Stack>
 
           {/* EMPTY STATE */}
@@ -342,10 +376,7 @@ const Todo = ({ open, onClose }) => {
                 overflowY: "auto",
                 "&::-webkit-scrollbar": { width: 5 },
                 "&::-webkit-scrollbar-track": { bgcolor: "transparent" },
-                "&::-webkit-scrollbar-thumb": {
-                  bgcolor: "divider",
-                  borderRadius: 10,
-                },
+                "&::-webkit-scrollbar-thumb": { bgcolor: "divider", borderRadius: 10 },
               }}
             >
               <AnimatePresence>
@@ -366,20 +397,16 @@ const Todo = ({ open, onClose }) => {
                         gap: 1.5,
                         py: 1.75,
                         px: 2,
-                        borderRadius: 2,
+                        borderRadius: borderRadius,
                         transition: (t) =>
                           t.transitions.create("background-color", {
                             duration: t.transitions.duration.shorter,
                           }),
-                        "&:hover": {
-                          bgcolor: "action.hover",
-                        },
-                        "&:hover .delete-btn": {
-                          opacity: 1,
-                        },
+                        "&:hover": { bgcolor: "action.hover" },
+                        "&:hover .delete-btn": { opacity: 1 },
                       }}
                     >
-                      {/* Custom outlined checkbox via SVG */}
+                      {/* Custom SVG Checkbox */}
                       <Box
                         onClick={() => handleToggle(todo.id)}
                         sx={{
@@ -407,9 +434,7 @@ const Todo = ({ open, onClose }) => {
                           strokeLinejoin="round"
                         >
                           <rect x="3" y="3" width="18" height="18" rx="4" ry="4" />
-                          {todo.isCompleted && (
-                            <polyline points="8 12 11 15 16 9" />
-                          )}
+                          {todo.isCompleted && <polyline points="8 12 11 15 16 9" />}
                         </svg>
                       </Box>
 
@@ -417,12 +442,8 @@ const Todo = ({ open, onClose }) => {
                         variant="body1"
                         sx={{
                           flex: 1,
-                          textDecoration: todo.isCompleted
-                            ? "line-through"
-                            : "none",
-                          color: todo.isCompleted
-                            ? "text.disabled"
-                            : "text.primary",
+                          textDecoration: todo.isCompleted ? "line-through" : "none",
+                          color: todo.isCompleted ? "text.disabled" : "text.primary",
                           fontSize: "0.9375rem",
                           lineHeight: 1.5,
                         }}
@@ -430,30 +451,28 @@ const Todo = ({ open, onClose }) => {
                         {todo.text}
                       </Typography>
 
-                      <Tooltip title="Hapus" arrow>
-                        <IconButton
-                          size="small"
-                          onClick={() => handleDelete(todo.id)}
-                          className="delete-btn"
-                          sx={{
-                            opacity: 0,
-                            transition: (t) =>
-                              t.transitions.create(
-                                ["opacity", "background-color"],
-                                { duration: t.transitions.duration.shorter }
-                              ),
-                            color: "text.secondary",
-                            p: 0.75,
-                            borderRadius: 2,
-                            "&:hover": {
-                              bgcolor: alpha(theme.palette.error.main, 0.08),
-                              color: "error.main",
-                            },
-                          }}
-                        >
-                          <X size={16} strokeWidth={2} />
-                        </IconButton>
-                      </Tooltip>
+                      <IconButton
+                        size="small"
+                        onClick={() => handleDelete(todo.id)}
+                        className="delete-btn"
+                        aria-label="Hapus catatan"
+                        sx={{
+                          opacity: 0,
+                          transition: (t) =>
+                            t.transitions.create(["opacity", "background-color"], {
+                              duration: t.transitions.duration.shorter,
+                            }),
+                          color: "text.secondary",
+                          p: 0.75,
+                          borderRadius: borderRadius,
+                          "&:hover": {
+                            bgcolor: alpha(theme.palette.error.main, 0.08),
+                            color: "error.main",
+                          },
+                        }}
+                      >
+                        <X size={16} strokeWidth={2} />
+                      </IconButton>
                     </Stack>
                   </Box>
                 ))}
@@ -481,10 +500,8 @@ const Todo = ({ open, onClose }) => {
                   color: "error.main",
                   px: 3,
                   py: 1.25,
-                  borderRadius: 2,
-                  "&:hover": {
-                    bgcolor: alpha(theme.palette.error.main, 0.06),
-                  },
+                  borderRadius: borderRadius,
+                  "&:hover": { bgcolor: alpha(theme.palette.error.main, 0.06) },
                 }}
               >
                 Bersihkan yang selesai ({completedTodos.length})

@@ -7,12 +7,14 @@
  * @param {boolean} props.isCollapsed - Whether sidebar is collapsed
  * @param {number} [props.level=0] - Nesting level for indentation
  * @param {Function} [props.onItemClick] - Callback when item is clicked
+ * @param {boolean} [props.isLastGroup=false] - Whether this is the last group item
  * @returns {JSX.Element} Rendered menu item
  */
 import { useState, useEffect, memo } from "react";
 import {
   Box,
   Collapse,
+  Divider,
   Typography,
   ListItemButton,
   ListItemIcon,
@@ -33,17 +35,39 @@ const MenuItem = memo(function MenuItem({
   isCollapsed,
   level = 0,
   onItemClick,
+  isLastGroup = false,
 }) {
   const theme = useTheme();
   const location = useLocation();
   const dispatch = useDispatch();
+
+  /**
+   * ID item yang sedang aktif dari Redux store.
+   *
+   * @type {string|null}
+   */
   const activeItemId = useSelector(selectSidebarActiveItem);
 
+  /**
+   * State untuk collapse/expand submenu.
+   *
+   * @type {[boolean, Function]}
+   */
   const [open, setOpen] = useState(false);
 
+  /**
+   * Apakah item ini exact match dengan URL atau activeItemId.
+   *
+   * @type {boolean}
+   */
   const isExactMatch =
     activeItemId === item.id || location.pathname === item.url;
 
+  /**
+   * Apakah salah satu child dari item ini yang aktif.
+   *
+   * @type {boolean}
+   */
   const isChildMatch =
     item.type === "collapse" &&
     item.children?.some(
@@ -51,14 +75,29 @@ const MenuItem = memo(function MenuItem({
         child.id === activeItemId || location.pathname === child.url
     );
 
+  /**
+   * Apakah item ini dalam state selected (exact atau child).
+   *
+   * @type {boolean}
+   */
   const isSelected = isExactMatch || isChildMatch;
 
+  /**
+   * Effect: Auto-open collapse jika ada child yang aktif.
+   */
   useEffect(() => {
     if (item.type === "collapse") {
       setOpen(isSelected && !isCollapsed);
     }
   }, [isSelected, item.type, isCollapsed]);
 
+  /**
+   * Handler klik item.
+   * Untuk collapse: toggle open/close.
+   * Untuk link: set active dan navigasi.
+   *
+   * @param {React.MouseEvent} e - Event klik
+   */
   const handleClick = (e) => {
     if (item.type === "collapse") {
       if (!isCollapsed) {
@@ -72,6 +111,9 @@ const MenuItem = memo(function MenuItem({
     onItemClick?.();
   };
 
+  /**
+   * Render group type: label + children.
+   */
   if (item.type === "group") {
     return (
       <Box
@@ -109,6 +151,17 @@ const MenuItem = memo(function MenuItem({
             />
           ))}
         </Box>
+
+        {/* Divider di akhir group (kecuali group terakhir) */}
+        {!isLastGroup && (
+          <Divider
+            sx={{
+              mt: 2,
+              mb: 1,
+              opacity: 0.4,
+            }}
+          />
+        )}
       </Box>
     );
   }

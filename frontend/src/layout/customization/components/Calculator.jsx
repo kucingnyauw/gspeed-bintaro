@@ -1,8 +1,31 @@
+/**
+ * Calculator - Dialog kalkulator dengan mode ilmiah, memori, dan tampilan responsif.
+ *
+ * Fitur:
+ * - Mode ilmiah (fx) dengan fungsi trigonometri, logaritma, faktorial, dll.
+ * - Memori (MC, MR, M+, M-) dengan indikator "M" di header
+ * - Display ekspresi dan hasil dengan font monospace
+ * - Tombol angka, operator, dan fungsi dengan tooltip
+ * - Animasi active scale pada semua tombol
+ * - Responsif: tampilan vertikal di mobile, horizontal di desktop
+ * - Empty state untuk memori kosong (MR disabled)
+ * - Error state (display "Error")
+ *
+ * @param {Object} props
+ * @param {boolean} props.open - Status dialog terbuka/tutup
+ * @param {Function} props.onClose - Handler untuk menutup dialog
+ */
 import { Box, Button, IconButton, Stack, Tooltip, Typography, useTheme } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { X } from "lucide-react";
 import { useCalculator } from "../hooks";
 
+/**
+ * Konfigurasi tombol fungsi ilmiah per baris.
+ * Setiap objek memiliki label, func identifier, dan tooltip.
+ *
+ * @type {Array<Array<{label: string, func: string, tooltip: string}>>}
+ */
 const scientificButtons = [
   [
     { label: "sin", func: "sin", tooltip: "Sinus (derajat)" },
@@ -31,6 +54,11 @@ const scientificButtons = [
   ],
 ];
 
+/**
+ * Konfigurasi tombol memori.
+ *
+ * @type {Array<{label: string, action: string, tooltip: string}>}
+ */
 const memoryButtons = [
   { label: "MC", action: "MC", tooltip: "Hapus memori" },
   { label: "MR", action: "MR", tooltip: "Panggil memori" },
@@ -38,6 +66,11 @@ const memoryButtons = [
   { label: "M-", action: "M-", tooltip: "Kurang dari memori" },
 ];
 
+/**
+ * Konfigurasi tombol operator matematika.
+ *
+ * @type {Array<{label: string, op: string, tooltip: string}>}
+ */
 const operatorButtons = [
   { label: "÷", op: "÷", tooltip: "Bagi" },
   { label: "×", op: "×", tooltip: "Kali" },
@@ -46,13 +79,19 @@ const operatorButtons = [
 ];
 
 /**
- * Calculator - Dialog kalkulator dengan mode ilmiah, memori, dan tampilan responsif.
+ * Kalkulator dialog component.
+ *
  * @param {Object} props
- * @param {boolean} props.open
- * @param {Function} props.onClose
+ * @param {boolean} props.open - Status dialog
+ * @param {Function} props.onClose - Handler tutup dialog
+ * @returns {JSX.Element} Dialog kalkulator
  */
 const Calculator = ({ open, onClose }) => {
   const theme = useTheme();
+
+  /**
+   * Hook kalkulator yang menyediakan semua state dan handler.
+   */
   const {
     display,
     expression,
@@ -69,10 +108,19 @@ const Calculator = ({ open, onClose }) => {
     formatDisplay,
   } = useCalculator();
 
+  /** @type {string} Nilai border radius dari theme */
+  const borderRadius = `${theme.shape.borderRadius}px`;
+
+  /**
+   * Base style untuk semua tombol.
+   * Termasuk animasi active scale.
+   *
+   * @type {Object}
+   */
   const baseBtnSx = {
     minWidth: 0,
     textTransform: "none",
-    borderRadius: 2,
+    borderRadius: borderRadius,
     transition: theme.transitions.create(
       ["background-color", "transform", "box-shadow"],
       { duration: theme.transitions.duration.shorter }
@@ -82,6 +130,11 @@ const Calculator = ({ open, onClose }) => {
     },
   };
 
+  /**
+   * Style untuk tombol angka (0-9, 00, .).
+   *
+   * @type {Object}
+   */
   const numberBtnSx = {
     ...baseBtnSx,
     flex: 1,
@@ -99,6 +152,11 @@ const Calculator = ({ open, onClose }) => {
     },
   };
 
+  /**
+   * Style untuk tombol operator (+, -, ×, ÷).
+   *
+   * @type {Object}
+   */
   const operatorBtnSx = {
     ...baseBtnSx,
     flex: 1,
@@ -115,6 +173,11 @@ const Calculator = ({ open, onClose }) => {
     },
   };
 
+  /**
+   * Style untuk tombol fungsi ilmiah.
+   *
+   * @type {Object}
+   */
   const functionBtnSx = {
     ...baseBtnSx,
     flex: 1,
@@ -124,6 +187,7 @@ const Calculator = ({ open, onClose }) => {
     color: "text.secondary",
     bgcolor: "transparent",
     border: `1px solid transparent`,
+    borderRadius: borderRadius,
     "&:hover": {
       bgcolor: "action.hover",
       color: "secondary.main",
@@ -131,15 +195,24 @@ const Calculator = ({ open, onClose }) => {
     },
   };
 
+  /**
+   * Style untuk tombol memori.
+   * Berubah warna saat memori tidak kosong.
+   *
+   * @type {Object}
+   */
   const memoryBtnSx = {
     ...baseBtnSx,
     flex: 1,
     py: 0.75,
     fontSize: "0.75rem",
     fontWeight: 600,
+    borderRadius: borderRadius,
     color: memory !== 0 ? "secondary.main" : "text.disabled",
     bgcolor: memory !== 0 ? alpha(theme.palette.secondary.main, 0.04) : "transparent",
-    border: `1px solid ${memory !== 0 ? alpha(theme.palette.secondary.main, 0.15) : "transparent"}`,
+    border: `1px solid ${
+      memory !== 0 ? alpha(theme.palette.secondary.main, 0.15) : "transparent"
+    }`,
     "&:hover": {
       bgcolor: memory !== 0 ? alpha(theme.palette.secondary.main, 0.1) : "action.hover",
     },
@@ -168,7 +241,7 @@ const Calculator = ({ open, onClose }) => {
         sx={{
           width: { xs: "100%", sm: 720 },
           maxWidth: 720,
-          borderRadius: 3,
+          borderRadius: borderRadius,
           bgcolor: "background.paper",
           border: `1px solid ${theme.palette.divider}`,
           boxShadow: `0 24px 64px ${alpha(theme.palette.common.black, 0.2)}`,
@@ -197,10 +270,7 @@ const Calculator = ({ open, onClose }) => {
                 boxShadow: `0 0 0 3px ${alpha(theme.palette.success.main, 0.2)}`,
               }}
             />
-            <Typography
-              variant="subtitle2"
-              sx={{ fontWeight: 700, color: "text.primary" }}
-            >
+            <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
               Kalkulator
             </Typography>
             {memory !== 0 && (
@@ -208,7 +278,7 @@ const Calculator = ({ open, onClose }) => {
                 sx={{
                   px: 1,
                   py: 0.25,
-                  borderRadius: 1,
+                  borderRadius: borderRadius,
                   bgcolor: alpha(theme.palette.secondary.main, 0.12),
                   border: `1px solid ${alpha(theme.palette.secondary.main, 0.2)}`,
                 }}
@@ -228,10 +298,7 @@ const Calculator = ({ open, onClose }) => {
             )}
           </Stack>
           <Stack direction="row" sx={{ gap: 1, alignItems: "center" }}>
-            <Tooltip
-              title={showScientific ? "Sembunyikan ilmiah" : "Tampilkan ilmiah"}
-              arrow
-            >
+            <Tooltip title={showScientific ? "Sembunyikan ilmiah" : "Tampilkan ilmiah"} arrow>
               <Button
                 onClick={toggleScientific}
                 sx={{
@@ -240,6 +307,7 @@ const Calculator = ({ open, onClose }) => {
                   py: 0.5,
                   fontSize: "0.8125rem",
                   fontWeight: 700,
+                  borderRadius: borderRadius,
                   color: showScientific ? "secondary.main" : "text.secondary",
                   bgcolor: showScientific
                     ? alpha(theme.palette.secondary.main, 0.08)
@@ -264,7 +332,7 @@ const Calculator = ({ open, onClose }) => {
                 aria-label="Tutup kalkulator"
                 sx={{
                   color: "text.secondary",
-                  borderRadius: 2,
+                  borderRadius: borderRadius,
                   "&:hover": {
                     color: "error.main",
                     bgcolor: alpha(theme.palette.error.main, 0.08),
@@ -295,7 +363,7 @@ const Calculator = ({ open, onClose }) => {
             <Box
               sx={{
                 p: 3,
-                borderRadius: 2,
+                borderRadius: borderRadius,
                 bgcolor: "background.paper",
                 border: `1px solid ${theme.palette.divider}`,
                 boxShadow: `inset 0 2px 6px ${alpha(theme.palette.common.black, 0.04)}`,
@@ -394,6 +462,7 @@ const Calculator = ({ open, onClose }) => {
                     py: 1.5,
                     fontSize: "0.875rem",
                     fontWeight: 700,
+                    borderRadius: borderRadius,
                     color: "error.main",
                     bgcolor: alpha(theme.palette.error.main, 0.06),
                     border: `1px solid ${alpha(theme.palette.error.main, 0.15)}`,
@@ -415,6 +484,7 @@ const Calculator = ({ open, onClose }) => {
                     py: 1.5,
                     fontSize: "0.875rem",
                     fontWeight: 700,
+                    borderRadius: borderRadius,
                     color: "text.secondary",
                     bgcolor: alpha(theme.palette.secondary.main, 0.04),
                     border: `1px solid ${alpha(theme.palette.secondary.main, 0.1)}`,
@@ -476,7 +546,7 @@ const Calculator = ({ open, onClose }) => {
                       py: 1.75,
                       fontSize: "1.75rem",
                       fontWeight: 700,
-                      borderRadius: 2,
+                      borderRadius: borderRadius,
                       textTransform: "none",
                       color: "secondary.contrastText",
                       bgcolor: "secondary.main",

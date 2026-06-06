@@ -1,16 +1,25 @@
 /**
  * HeaderCart - Cart dialog for managing order items, customer selection, and checkout.
  *
+ * Fitur:
+ * - Fullscreen di mobile untuk UX yang lebih baik
+ * - Manajemen item keranjang (tambah, kurang, hapus)
+ * - Pencarian dan pemilihan pelanggan dengan AsyncAutocomplete
+ * - Pemilihan kendaraan pelanggan
+ * - Perhitungan otomatis subtotal, pajak, dan total
+ * - Empty state dengan ilustrasi SVG
+ * - Quantity control untuk item sparepart
+ * - Loading skeleton untuk kalkulasi harga
+ * - Tombol submit dengan loading indicator
+ *
  * @component
  * @param {Object} props - Component props
  * @param {boolean} props.open - Dialog open state
  * @param {Function} props.onClose - Close handler
- *
  * @returns {JSX.Element} Rendered header cart dialog
  */
-import { useState } from "react";
 import { Controller } from "react-hook-form";
-import { Minus, Plus, Trash2, X, ShoppingBag } from "lucide-react";
+import { Minus, Plus, Trash2, X } from "lucide-react";
 
 import {
   Autocomplete,
@@ -29,20 +38,18 @@ import {
   TextField,
   Typography,
   useTheme,
-  Badge,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 
 import { getCustomers } from "@api/customerApi.js";
 import { formatToIdr } from "@shared/utils";
 import { ProductType } from "@shared/constant";
-import { useDevice, useDebounce } from "@hooks";
+import { useDevice } from "@hooks";
 import { AsyncAutocomplete } from "@components";
 import { useHeaderCart } from "../hooks/useHeaderCart";
 
 /**
  * SVG ilustrasi untuk keranjang kosong.
- * Menampilkan ikon shopping bag dengan smiley face.
  *
  * @param {Object} props - Props komponen
  * @param {number} [props.opacity=0.15] - Tingkat opacity ilustrasi
@@ -59,7 +66,6 @@ const EmptyCartSvg = ({ opacity = 0.15 }) => (
       color: "text.secondary",
     }}
   >
-    {/* Shopping Bag Body */}
     <path
       d="M35 40 L35 30 C35 16.2 46.2 5 60 5 C73.8 5 85 16.2 85 30 L85 40"
       fill="none"
@@ -68,7 +74,6 @@ const EmptyCartSvg = ({ opacity = 0.15 }) => (
       strokeLinecap="round"
       strokeLinejoin="round"
     />
-    {/* Shopping Bag */}
     <rect
       x="25"
       y="40"
@@ -79,7 +84,6 @@ const EmptyCartSvg = ({ opacity = 0.15 }) => (
       stroke="currentColor"
       strokeWidth="3"
     />
-    {/* Handle */}
     <path
       d="M40 40 L40 25 C40 17.8 37 12 30 12"
       fill="none"
@@ -94,7 +98,6 @@ const EmptyCartSvg = ({ opacity = 0.15 }) => (
       strokeWidth="3"
       strokeLinecap="round"
     />
-    {/* Smiley Face */}
     <circle cx="60" cy="68" r="16" fill="none" stroke="currentColor" strokeWidth="2.5" />
     <circle cx="54" cy="65" r="2" fill="currentColor" />
     <circle cx="66" cy="65" r="2" fill="currentColor" />
@@ -120,6 +123,7 @@ const EmptyCartSvg = ({ opacity = 0.15 }) => (
  */
 const QuantityControl = ({ quantity, maxLimit, onChange, disabled }) => {
   const theme = useTheme();
+  const borderRadius = `${theme.shape.borderRadius}px`;
 
   return (
     <Stack
@@ -127,7 +131,7 @@ const QuantityControl = ({ quantity, maxLimit, onChange, disabled }) => {
       sx={{
         alignItems: "center",
         border: `1px solid ${theme.palette.divider}`,
-        borderRadius: `${theme.shape.borderRadius}px`,
+        borderRadius: borderRadius,
         bgcolor: "background.paper",
         overflow: "hidden",
       }}
@@ -143,12 +147,12 @@ const QuantityControl = ({ quantity, maxLimit, onChange, disabled }) => {
       <Typography
         variant="body2"
         sx={{
-          minWidth: 32,
+          minWidth: 36,
           textAlign: "center",
           userSelect: "none",
           fontVariantNumeric: "tabular-nums",
           fontWeight: 600,
-          px: 0.5,
+          px: 1,
         }}
       >
         {quantity}
@@ -167,18 +171,9 @@ const QuantityControl = ({ quantity, maxLimit, onChange, disabled }) => {
 
 /**
  * CartItemCard - Kartu item dalam keranjang belanja.
- * Menampilkan informasi produk, kontrol quantity, dan total harga per item.
  *
  * @param {Object} props - Props komponen
  * @param {Object} props.item - Data item keranjang
- * @param {string} props.item.productId - ID produk
- * @param {string} props.item.productName - Nama produk
- * @param {string} props.item.type - Tipe produk (SERVICE/SPAREPART)
- * @param {number} props.item.unitPrice - Harga satuan
- * @param {number} props.item.quantity - Jumlah
- * @param {Object} [props.item.image] - Gambar produk
- * @param {number} [props.item.maxQuantity] - Maksimal quantity
- * @param {number} [props.item.productStock] - Stok produk
  * @param {Function} props.onRemove - Handler hapus item
  * @param {Function} props.onQuantityChange - Handler perubahan quantity
  * @param {boolean} [props.disabled=false] - Status disabled
@@ -186,6 +181,7 @@ const QuantityControl = ({ quantity, maxLimit, onChange, disabled }) => {
  */
 const CartItemCard = ({ item, onRemove, onQuantityChange, disabled }) => {
   const theme = useTheme();
+  const borderRadius = `${theme.shape.borderRadius}px`;
   const isSparepart = item.type === ProductType.SPAREPART;
   const maxLimit = item.maxQuantity || item.productStock || 999;
   const itemTotal = (item.unitPrice || 0) * item.quantity;
@@ -197,28 +193,29 @@ const CartItemCard = ({ item, onRemove, onQuantityChange, disabled }) => {
         transition: theme.transitions.create("opacity"),
         border: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
         boxShadow: "none",
+        borderRadius: borderRadius,
         "&:hover": {
           borderColor: alpha(theme.palette.secondary.main, 0.2),
         },
       }}
     >
-      <CardContent sx={{ p: 2, "&:last-child": { pb: 2 } }}>
-        <Stack direction="row" sx={{ alignItems: "flex-start", gap: 2 }}>
+      <CardContent sx={{ p: 2.5, "&:last-child": { pb: 2.5 } }}>
+        <Stack direction="row" sx={{ alignItems: "flex-start", gap: 2.5 }}>
           {/* Avatar Produk */}
           <Avatar
             alt={item.productName}
             src={item.image?.url || ""}
             variant="rounded"
             sx={{
-              width: 48,
-              height: 48,
+              width: 52,
+              height: 52,
               flexShrink: 0,
-              borderRadius: `${theme.shape.borderRadius}px`,
+              borderRadius: borderRadius,
               bgcolor: !item.image?.url
                 ? alpha(theme.palette.secondary.main, 0.08)
                 : "transparent",
               color: !item.image?.url ? theme.palette.secondary.main : "transparent",
-              fontSize: "1rem",
+              fontSize: "1.125rem",
               fontWeight: 700,
             }}
           >
@@ -226,24 +223,24 @@ const CartItemCard = ({ item, onRemove, onQuantityChange, disabled }) => {
           </Avatar>
 
           {/* Detail Item */}
-          <Stack sx={{ flex: 1, minWidth: 0, gap: 1.5 }}>
-            {/* Header: Nama & Hapus */}
+          <Stack sx={{ flex: 1, minWidth: 0, gap: 2 }}>
+            {/* Header Row */}
             <Stack
               direction="row"
               sx={{
                 alignItems: "flex-start",
                 justifyContent: "space-between",
-                gap: 1,
+                gap: 1.5,
               }}
             >
-              <Stack sx={{ minWidth: 0, gap: 0.5 }}>
+              <Stack sx={{ minWidth: 0, gap: 1 }}>
                 <Stack direction="row" sx={{ alignItems: "center", gap: 1, flexWrap: "wrap" }}>
                   <Chip
                     label={isSparepart ? "Sparepart" : "Servis"}
                     size="small"
                     variant="outlined"
                     color={isSparepart ? "warning" : "secondary"}
-                    sx={{ height: 22, fontWeight: 500 }}
+                    sx={{ height: 22, fontWeight: 500, borderRadius: borderRadius }}
                   />
                   <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>
                     {item.productName}
@@ -254,16 +251,16 @@ const CartItemCard = ({ item, onRemove, onQuantityChange, disabled }) => {
                 </Typography>
               </Stack>
 
-              <Stack sx={{ alignItems: "flex-end", gap: 1, flexShrink: 0 }}>
-                {/* Delete Button */}
+              <Stack sx={{ alignItems: "flex-end", gap: 1.5, flexShrink: 0 }}>
                 <IconButton
                   size="small"
                   onClick={() => onRemove(item.productId)}
                   disabled={disabled}
+                  aria-label="Hapus item"
                   sx={{
                     border: "1px solid",
                     borderColor: alpha(theme.palette.divider, 0.8),
-                    borderRadius: `${theme.shape.borderRadius}px`,
+                    borderRadius: borderRadius,
                     bgcolor: alpha(theme.palette.background.paper, 0.6),
                     color: "text.secondary",
                     transition: theme.transitions.create(
@@ -279,14 +276,13 @@ const CartItemCard = ({ item, onRemove, onQuantityChange, disabled }) => {
                 >
                   <Trash2 size={14} strokeWidth={1.5} />
                 </IconButton>
-                {/* Total per Item */}
                 <Typography variant="body2" sx={{ fontWeight: 700 }}>
                   {formatToIdr(itemTotal)}
                 </Typography>
               </Stack>
             </Stack>
 
-            {/* Quantity Control & Stok (hanya untuk Sparepart) */}
+            {/* Quantity Control & Stok */}
             {isSparepart && (
               <Stack
                 direction="row"
@@ -328,10 +324,7 @@ const CartItemCard = ({ item, onRemove, onQuantityChange, disabled }) => {
  * @returns {JSX.Element} Baris harga
  */
 const PriceRow = ({ label, value, isPending, skeletonWidth = 80, bold, color }) => (
-  <Stack
-    direction="row"
-    sx={{ justifyContent: "space-between", alignItems: "center" }}
-  >
+  <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center" }}>
     <Typography variant="body2" color="text.secondary">
       {label}
     </Typography>
@@ -350,25 +343,17 @@ const PriceRow = ({ label, value, isPending, skeletonWidth = 80, bold, color }) 
 );
 
 /**
- * HeaderCart - Dialog keranjang belanja untuk mengelola item pesanan, pemilihan pelanggan, dan checkout.
- *
- * Fitur:
- * - Manajemen item keranjang (tambah, kurang, hapus)
- * - Pencarian dan pemilihan pelanggan dengan AsyncAutocomplete
- * - Pemilihan kendaraan pelanggan
- * - Perhitungan otomatis subtotal, pajak, dan total
- * - Tampilan responsif (dialog di desktop, fullscreen di mobile)
- * - Empty state dengan ilustrasi
+ * HeaderCart - Dialog keranjang belanja fullscreen di mobile.
  *
  * @param {Object} props - Props komponen
- * @param {boolean} props.open - Status dialog terbuka/tutup
- * @param {Function} props.onClose - Handler untuk menutup dialog
+ * @param {boolean} props.open - Status dialog
+ * @param {Function} props.onClose - Handler tutup dialog
  * @returns {JSX.Element} Dialog keranjang belanja
  */
 const HeaderCart = ({ open, onClose }) => {
   const theme = useTheme();
   const { isMobile } = useDevice();
-  const [customerSearch, setCustomerSearch] = useState("");
+  const borderRadius = `${theme.shape.borderRadius}px`;
 
   const {
     control,
@@ -391,7 +376,6 @@ const HeaderCart = ({ open, onClose }) => {
 
   /**
    * Handler perubahan quantity item.
-   * Positive increment untuk tambah, negative untuk kurang.
    *
    * @param {string} productId - ID produk
    * @param {number} currentQty - Quantity saat ini
@@ -430,34 +414,30 @@ const HeaderCart = ({ open, onClose }) => {
             justifyContent: "space-between",
             alignItems: "center",
             px: 3,
-            py: 2,
+            py: 2.5,
             borderBottom: `1px solid ${theme.palette.divider}`,
             flexShrink: 0,
             bgcolor: alpha(theme.palette.background.default, 0.6),
           }}
         >
-          <Stack direction="row" sx={{ alignItems: "center", gap: 1.5 }}>
-            <Badge badgeContent={items.length} color="secondary" max={99}>
-              <ShoppingBag size={20} strokeWidth={1.5} />
-            </Badge>
-            <Box>
-              <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1.3 }}>
-                Keranjang
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                {items.length > 0
-                  ? `${items.length} item dalam keranjang`
-                  : "Keranjang kosong"}
-              </Typography>
-            </Box>
-          </Stack>
+          <Box>
+            <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1.3 }}>
+              Keranjang
+            </Typography>
+            <Typography variant="caption" color="text.secondary">
+              {items.length > 0
+                ? `${items.length} item dalam keranjang`
+                : "Keranjang kosong"}
+            </Typography>
+          </Box>
           <IconButton
             onClick={onClose}
             disabled={isProcessing}
             size="small"
+            aria-label="Tutup keranjang"
             sx={{
               color: "text.secondary",
-              borderRadius: `${theme.shape.borderRadius}px`,
+              borderRadius: borderRadius,
               "&:hover": {
                 color: "error.main",
                 bgcolor: alpha(theme.palette.error.main, 0.08),
@@ -476,12 +456,12 @@ const HeaderCart = ({ open, onClose }) => {
                 height: "100%",
                 alignItems: "center",
                 justifyContent: "center",
-                gap: 3,
-                py: 6,
+                gap: 4,
+                py: 8,
               }}
             >
               <EmptyCartSvg />
-              <Stack sx={{ gap: 1, alignItems: "center", textAlign: "center" }}>
+              <Stack sx={{ gap: 1.5, alignItems: "center", textAlign: "center" }}>
                 <Typography variant="body1" sx={{ fontWeight: 600 }}>
                   Keranjang masih kosong
                 </Typography>
@@ -491,16 +471,17 @@ const HeaderCart = ({ open, onClose }) => {
               </Stack>
             </Stack>
           ) : (
-            <Stack sx={{ gap: 3 }}>
+            <Stack sx={{ gap: 4 }}>
               {/* Customer Section */}
               <Card
                 sx={{
                   border: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
                   boxShadow: "none",
+                  borderRadius: borderRadius,
                 }}
               >
-                <CardContent sx={{ p: 2.5, "&:last-child": { pb: 2.5 } }}>
-                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>
+                <CardContent sx={{ p: 3, "&:last-child": { pb: 3 } }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2.5 }}>
                     Informasi Pelanggan
                   </Typography>
 
@@ -514,7 +495,6 @@ const HeaderCart = ({ open, onClose }) => {
                           field.onChange(val);
                           setValue("vehicle", null);
                         }}
-                        onInputChange={setCustomerSearch}
                         queryKey={["customers-list"]}
                         fetchOptions={async (search) => {
                           const res = await getCustomers({
@@ -533,7 +513,7 @@ const HeaderCart = ({ open, onClose }) => {
                           const { key, ...rest } = props;
                           return (
                             <Box key={key} component="li" {...rest}>
-                              <Stack>
+                              <Stack sx={{ gap: 0.5 }}>
                                 <Typography variant="body2" sx={{ fontWeight: 500 }}>
                                   {option.name}
                                 </Typography>
@@ -549,7 +529,7 @@ const HeaderCart = ({ open, onClose }) => {
                   />
 
                   {selectedCustomer && (
-                    <Box sx={{ mt: 2 }}>
+                    <Box sx={{ mt: 2.5 }}>
                       <Controller
                         name="vehicle"
                         control={control}
@@ -573,7 +553,7 @@ const HeaderCart = ({ open, onClose }) => {
                             )}
                             renderOption={(props, option) => (
                               <li {...props}>
-                                <Stack>
+                                <Stack sx={{ gap: 0.5 }}>
                                   <Typography variant="body2" sx={{ fontWeight: 500 }}>
                                     {option.plateNumber || option.brand}
                                   </Typography>
@@ -595,10 +575,10 @@ const HeaderCart = ({ open, onClose }) => {
 
               {/* Items Section */}
               <Box>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2 }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2.5 }}>
                   Item Pesanan ({items.length})
                 </Typography>
-                <Stack sx={{ gap: 1.5 }}>
+                <Stack sx={{ gap: 2 }}>
                   {items.map((item, i) => (
                     <CartItemCard
                       key={item.productId || i}
@@ -620,13 +600,12 @@ const HeaderCart = ({ open, onClose }) => {
             sx={{
               p: 3,
               borderTop: `1px solid ${theme.palette.divider}`,
-              gap: 2.5,
+              gap: 3,
               flexShrink: 0,
               bgcolor: alpha(theme.palette.secondary.main, 0.02),
             }}
           >
-            {/* Price Summary */}
-            <Stack sx={{ gap: 1.5 }}>
+            <Stack sx={{ gap: 2 }}>
               <PriceRow
                 label="Subtotal"
                 value={calcData.subtotal || 0}
@@ -659,6 +638,7 @@ const HeaderCart = ({ open, onClose }) => {
                 fontWeight: 700,
                 textTransform: "none",
                 fontSize: "0.9375rem",
+                borderRadius: borderRadius,
               }}
             >
               {isSubmitting ? (

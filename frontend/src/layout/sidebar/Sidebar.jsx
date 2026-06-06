@@ -1,7 +1,8 @@
 /**
- * Sidebar - Application sidebar dengan menu items, responsive drawer untuk mobile, 
- * dan role-based filtering
- * Hanya dirender ketika user sudah terautentikasi (status: "auth")
+ * Sidebar - Application sidebar dengan menu items, responsive drawer untuk mobile,
+ * dan role-based filtering.
+ * Hanya dirender ketika user sudah terautentikasi (status: "auth").
+ *
  * @component
  * @returns {JSX.Element} Rendered sidebar component
  */
@@ -34,8 +35,16 @@ const Sidebar = () => {
   const isSidebarOpen = useSelector(selectSidebarIsOpen);
   const { isMobile, isTablet } = useDevice();
 
+  /**
+   * Menu yang sudah difilter berdasarkan role user.
+   *
+   * @type {Array<Object>}
+   */
   const filteredMenu = filterMenuByRole(menuItems.items, user?.role);
 
+  /**
+   * Effect: Cari dan set active item berdasarkan URL saat ini.
+   */
   useEffect(() => {
     const findActiveItem = (items) => {
       for (const item of items) {
@@ -55,14 +64,21 @@ const Sidebar = () => {
     if (activeId) dispatch(setActiveItem(activeId));
   }, [location.pathname, filteredMenu, dispatch]);
 
+  /**
+   * Handler klik item: tutup sidebar di mobile/tablet.
+   */
   const handleItemClick = () => {
     if (isMobile || isTablet) dispatch(closeSidebar());
   };
 
+  /** @type {number} Lebar sidebar berdasarkan state */
   const sidebarWidth = isSidebarOpen
     ? SIDEBAR.EXPANDED_WIDTH
     : SIDEBAR.COLLAPSED_WIDTH;
 
+  /**
+   * Logo section untuk mobile drawer.
+   */
   const LogoSection = (
     <Box
       sx={{
@@ -91,6 +107,36 @@ const Sidebar = () => {
     </Box>
   );
 
+  /**
+   * Render semua group menu.
+   * Setiap group dipisahkan dengan Divider (kecuali group terakhir).
+   *
+   * @param {Array<Object>} items - Array menu items
+   * @returns {Array<JSX.Element>} Array elemen menu
+   */
+  const renderMenuWithDividers = (items) => {
+    return items.map((item, index) => {
+      const isLastGroup =
+        item.type === "group" &&
+        items.filter((i) => i.type === "group").length - 1 ===
+          items.filter((i) => i.type === "group").indexOf(item);
+
+      return (
+        <MenuItem
+          key={item.id}
+          item={item}
+          isCollapsed={!isSidebarOpen && !isMobile}
+          level={0}
+          onItemClick={handleItemClick}
+          isLastGroup={isLastGroup}
+        />
+      );
+    });
+  };
+
+  /**
+   * Menu content yang di-scroll.
+   */
   const MenuContent = (
     <Box
       sx={{
@@ -101,7 +147,7 @@ const Sidebar = () => {
         py: 1.5,
         display: "flex",
         flexDirection: "column",
-        gap: 0.5,
+        gap: 0,
         "&::-webkit-scrollbar": {
           width: "4px",
         },
@@ -117,15 +163,7 @@ const Sidebar = () => {
         },
       }}
     >
-      {filteredMenu.map((item) => (
-        <MenuItem
-          key={item.id}
-          item={item}
-          isCollapsed={!isSidebarOpen && !isMobile}
-          level={0}
-          onItemClick={handleItemClick}
-        />
-      ))}
+      {renderMenuWithDividers(filteredMenu)}
     </Box>
   );
 
