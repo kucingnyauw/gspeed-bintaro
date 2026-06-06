@@ -941,7 +941,7 @@ Job aktif & antrian, performa pribadi, pendapatan pribadi, efisiensi & kecepatan
       name: user.fullName,
     });
 
-    // Cek cache Q&A
+
     const qHash = this.#hashQuestion(message);
     const cachedReply = await this.qaCache.get(`${userId}:${qHash}`);
     if (cachedReply) {

@@ -89,7 +89,7 @@ publicRouter.post(
  * @route   POST /api/{version}/auth/validate/email
  * @desc    Memvalidasi email pengguna untuk keperluan autentikasi (Magic Link/Login)
  * @access  Public
- * @rate    10 requests per minute
+ * @rate    5 requests per minute
  * 
  * @body    { email: string }
  * @returns { success: boolean, message: string, data: { id, email, isActive, isAuthenticated } }
@@ -112,7 +112,7 @@ publicRouter.post(
  */
 publicRouter.post(
   `${prefix}/auth/validate/email`,
-  strictLimiter,
+  authLimiter,
   UserController.validateUserEmail
 );
 
