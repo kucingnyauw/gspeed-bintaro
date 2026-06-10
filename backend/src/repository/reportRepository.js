@@ -15,13 +15,109 @@ class ReportRepository {
   }
 
   /**
+   * Mendapatkan threshold stok rendah dari settings
+   * @returns {Promise<number>} Threshold stok rendah (default 5)
+   * @private
+   */
+  async #getStockLowThreshold() {
+    const setting = await prisma.setting.findUnique({
+      where: { key: "stock_low_threshold" },
+      select: { value: true },
+    });
+    return setting ? parseInt(setting.value, 10) : 5;
+  }
+
+  /**
+   * Mendapatkan batas maksimal task mekanik dari settings
+   * @returns {Promise<number>} Max tasks (default 5)
+   * @private
+   */
+  async #getMechanicMaxTasks() {
+    const setting = await prisma.setting.findUnique({
+      where: { key: "mechanic_max_tasks" },
+      select: { value: true },
+    });
+    return setting ? parseInt(setting.value, 10) : 5;
+  }
+
+  /**
+   * Mendapatkan minimal modal awal shift dari settings
+   * @returns {Promise<number>} Minimal starting cash (default 1000000)
+   * @private
+   */
+  async #getShiftMinStartingCash() {
+    const setting = await prisma.setting.findUnique({
+      where: { key: "shift_min_starting_cash" },
+      select: { value: true },
+    });
+    return setting ? parseInt(setting.value, 10) : 1000000;
+  }
+
+  /**
+   * Mendapatkan tax rate dari settings
+   * @returns {Promise<number>} Tax rate dalam persen (default 11)
+   * @private
+   */
+  async #getTaxRate() {
+    const setting = await prisma.setting.findUnique({
+      where: { key: "tax_rate" },
+      select: { value: true },
+    });
+    return setting ? parseFloat(setting.value) : 11;
+  }
+
+  /**
+   * Mendapatkan status enable PPN dari settings
+   * @returns {Promise<boolean>}
+   * @private
+   */
+  async #isPPNEnabled() {
+    const setting = await prisma.setting.findUnique({
+      where: { key: "enable_ppn" },
+      select: { value: true },
+    });
+    return setting?.value === "true";
+  }
+
+  /**
+   * Mendapatkan status enable PPH dari settings
+   * @returns {Promise<boolean>}
+   * @private
+   */
+  async #isPPHEnabled() {
+    const setting = await prisma.setting.findUnique({
+      where: { key: "enable_pph" },
+      select: { value: true },
+    });
+    return setting?.value === "true";
+  }
+
+  /**
+   * Mendapatkan target revenue bulanan dari settings
+   * @returns {Promise<number>} Target revenue (default 0)
+   * @private
+   */
+  async #getMonthlyRevenueTarget() {
+    const setting = await prisma.setting.findUnique({
+      where: { key: "monthly_revenue_target" },
+      select: { value: true },
+    });
+    return setting ? parseInt(setting.value, 10) : 0;
+  }
+
+  /**
    * Mendapatkan data penjualan agregat dalam rentang waktu tertentu
    * @param {Date} startDate - Tanggal mulai
    * @param {Date} endDate - Tanggal akhir
-   * @returns {Promise<{totalOrders: number, totalSales: number, totalSubtotal: number, totalTax: number, totalPPH: number, pphRate: number, averageOrderValue: number}>}
+   * @returns {Promise<Object>}
    */
   async getSalesData(startDate, endDate) {
-    const pphRate = await this.#getPPHRate();
+    const [pphRate, taxRate, pphEnabled, ppnEnabled] = await Promise.all([
+      this.#getPPHRate(),
+      this.#getTaxRate(),
+      this.#isPPHEnabled(),
+      this.#isPPNEnabled(),
+    ]);
 
     const aggregations = await prisma.order.aggregate({
       _sum: { subtotal: true, tax: true, total: true },
@@ -36,15 +132,20 @@ class ReportRepository {
     });
 
     const totalSubtotal = Number(aggregations._sum.subtotal || 0);
-    const totalPPH = Math.round((totalSubtotal * pphRate) / 100);
+    const totalPPH = ppnEnabled
+      ? Math.round((totalSubtotal * pphRate) / 100)
+      : 0;
 
     return {
       totalOrders: aggregations._count.id || 0,
       totalSales: Number(aggregations._sum.total || 0),
-      totalSubtotal: totalSubtotal,
+      totalSubtotal,
       totalTax: Number(aggregations._sum.tax || 0),
-      totalPPH: totalPPH,
-      pphRate: pphRate,
+      totalPPH,
+      pphRate,
+      taxRate,
+      pphEnabled,
+      ppnEnabled,
       averageOrderValue: Math.round(Number(aggregations._avg.total || 0)),
     };
   }
@@ -53,10 +154,13 @@ class ReportRepository {
    * Mendapatkan ringkasan penjualan harian untuk chart dan export
    * @param {Date} startDate - Tanggal mulai
    * @param {Date} endDate - Tanggal akhir
-   * @returns {Promise<Array<{date: string, orderCount: number, totalSales: number, totalSubtotal: number, totalTax: number, totalPPH: number, averageOrderValue: number}>>}
+   * @returns {Promise<Array>}
    */
   async getDailySalesSummary(startDate, endDate) {
-    const pphRate = await this.#getPPHRate();
+    const [pphRate, pphEnabled] = await Promise.all([
+      this.#getPPHRate(),
+      this.#isPPHEnabled(),
+    ]);
 
     const query = `
       SELECT 
@@ -85,7 +189,9 @@ class ReportRepository {
       totalSales: Number(item.totalSales),
       totalSubtotal: Number(item.totalSubtotal),
       totalTax: Number(item.totalTax),
-      totalPPH: Math.round((Number(item.totalSubtotal) * pphRate) / 100),
+      totalPPH: pphEnabled
+        ? Math.round((Number(item.totalSubtotal) * pphRate) / 100)
+        : 0,
       averageOrderValue: Math.round(Number(item.averageOrderValue)),
     }));
   }
@@ -94,7 +200,7 @@ class ReportRepository {
    * Mendapatkan ringkasan penjualan per jam untuk chart daily
    * @param {Date} startDate - Tanggal mulai
    * @param {Date} endDate - Tanggal akhir
-   * @returns {Promise<Array<{hour: string, orderCount: number, totalSales: number, averageOrderValue: number}>>}
+   * @returns {Promise<Array>}
    */
   async getHourlySalesSummary(startDate, endDate) {
     const query = `
@@ -116,7 +222,7 @@ class ReportRepository {
 
     const rawData = await prisma.$queryRawUnsafe(query, startDate, endDate);
 
-    const hours = Array.from({ length: 24 }, (_, i) => {
+    return Array.from({ length: 24 }, (_, i) => {
       const found = rawData.find((item) => Number(item.hour) === i);
       return {
         hour: `${String(i).padStart(2, "0")}:00`,
@@ -127,18 +233,19 @@ class ReportRepository {
           : 0,
       };
     });
-
-    return hours;
   }
 
   /**
    * Mendapatkan data laba rugi
    * @param {Date} startDate - Tanggal mulai
    * @param {Date} endDate - Tanggal akhir
-   * @returns {Promise<{grossRevenue: number, totalCogs: number, grossProfit: number, grossMargin: number, totalOperatingExpenses: number, netProfit: number, netMargin: number, totalPPH: number, pphRate: number, netProfitAfterPPH: number, netMarginAfterPPH: number}>}
+   * @returns {Promise<Object>}
    */
   async getProfitLossData(startDate, endDate) {
-    const pphRate = await this.#getPPHRate();
+    const [pphRate, pphEnabled] = await Promise.all([
+      this.#getPPHRate(),
+      this.#isPPHEnabled(),
+    ]);
 
     const query = `
       WITH expense_total AS (
@@ -176,20 +283,23 @@ class ReportRepository {
 
     const grossRevenue = Number(result.grossRevenue);
     const netProfit = Number(result.netProfit);
-    const totalPPH = Math.round((grossRevenue * pphRate) / 100);
+    const totalPPH = pphEnabled
+      ? Math.round((grossRevenue * pphRate) / 100)
+      : 0;
     const netProfitAfterPPH = netProfit - totalPPH;
 
     return {
-      grossRevenue: grossRevenue,
+      grossRevenue,
       totalCogs: Number(result.totalCogs),
       grossProfit: Number(result.grossProfit),
       grossMargin: Math.round(Number(result.grossMargin) * 100) / 100,
       totalOperatingExpenses: Number(result.totalOperatingExpenses),
-      netProfit: netProfit,
+      netProfit,
       netMargin: Math.round(Number(result.netMargin) * 100) / 100,
-      totalPPH: totalPPH,
-      pphRate: pphRate,
-      netProfitAfterPPH: netProfitAfterPPH,
+      totalPPH,
+      pphRate,
+      pphEnabled,
+      netProfitAfterPPH,
       netMarginAfterPPH:
         grossRevenue > 0
           ? Math.round((netProfitAfterPPH / grossRevenue) * 100 * 100) / 100
@@ -201,10 +311,13 @@ class ReportRepository {
    * Mendapatkan data laba rugi harian untuk chart dan export
    * @param {Date} startDate - Tanggal mulai
    * @param {Date} endDate - Tanggal akhir
-   * @returns {Promise<Array<{date: string, grossRevenue: number, totalCogs: number, grossProfit: number, totalOperatingExpenses: number, netProfit: number, totalPPH: number, netProfitAfterPPH: number}>>}
+   * @returns {Promise<Array>}
    */
   async getDailyProfitLossSummary(startDate, endDate) {
-    const pphRate = await this.#getPPHRate();
+    const [pphRate, pphEnabled] = await Promise.all([
+      this.#getPPHRate(),
+      this.#isPPHEnabled(),
+    ]);
 
     const query = `
       WITH daily_expenses AS (
@@ -245,41 +358,45 @@ class ReportRepository {
     return rawData.map((item) => {
       const netProfit = Number(item.netProfit);
       const grossRevenue = Number(item.grossRevenue);
-      const totalPPH = Math.round((grossRevenue * pphRate) / 100);
+      const totalPPH = pphEnabled
+        ? Math.round((grossRevenue * pphRate) / 100)
+        : 0;
       const netProfitAfterPPH = netProfit - totalPPH;
 
       return {
         date: item.date,
-        grossRevenue: grossRevenue,
+        grossRevenue,
         totalCogs: Number(item.totalCogs),
         grossProfit: Number(item.grossProfit),
         totalOperatingExpenses: Number(item.totalOperatingExpenses),
-        netProfit: netProfit,
-        totalPPH: totalPPH,
-        netProfitAfterPPH: netProfitAfterPPH,
+        netProfit,
+        totalPPH,
+        netProfitAfterPPH,
       };
     });
   }
 
   /**
    * Mendapatkan snapshot inventori saat ini
+   * Threshold stok rendah diambil dari settings `stock_low_threshold`
    * @param {Object} [options={}] - Opsi pagination
    * @param {number} [options.page=1] - Halaman
    * @param {number} [options.limit=10] - Jumlah per halaman
-   * @returns {Promise<{summary: Object, items: Array, metadata: Object}>}
+   * @returns {Promise<Object>}
    */
   async getInventorySnapshot(options = {}) {
     const page = options.page || 1;
     const limit = options.limit || 10;
     const skip = (page - 1) * limit;
+    const lowThreshold = await this.#getStockLowThreshold();
 
     const [result, total, products] = await Promise.all([
       prisma.$queryRaw`
         SELECT 
           COUNT(*)::int as "totalItems",
           COUNT(*) FILTER (WHERE "stock" = 0)::int as "outOfStock",
-          COUNT(*) FILTER (WHERE "stock" > 0 AND "stock" <= 5)::int as "lowStock",
-          COUNT(*) FILTER (WHERE "stock" > 5)::int as "healthy",
+          COUNT(*) FILTER (WHERE "stock" > 0 AND "stock" <= ${lowThreshold})::int as "lowStock",
+          COUNT(*) FILTER (WHERE "stock" > ${lowThreshold})::int as "healthy",
           COALESCE(SUM("stock" * "cost"), 0)::bigint as "totalAssetValue",
           COALESCE(SUM("stock" * "price"), 0)::bigint as "totalRetailValue",
           COALESCE(SUM("stock" * "price") - SUM("stock" * "cost"), 0)::bigint as "potentialProfit",
@@ -291,9 +408,7 @@ class ReportRepository {
         FROM "Product"
         WHERE "type" = 'SPAREPART' AND "isActive" = true
       `,
-      prisma.product.count({
-        where: { type: "SPAREPART", isActive: true },
-      }),
+      prisma.product.count({ where: { type: "SPAREPART", isActive: true } }),
       prisma.product.findMany({
         where: { type: "SPAREPART", isActive: true },
         select: {
@@ -329,32 +444,26 @@ class ReportRepository {
         stockStatus:
           product.stock === 0
             ? "OUT_OF_STOCK"
-            : product.stock <= 5
+            : product.stock <= lowThreshold
             ? "LOW_STOCK"
             : "HEALTHY",
       };
     });
 
-    const summary = {
-      totalItems: Number(result[0].totalItems),
-      totalAssetValue: Number(result[0].totalAssetValue),
-      totalRetailValue: Number(result[0].totalRetailValue),
-      potentialProfit: Number(result[0].potentialProfit),
-      profitMargin: Math.round(Number(result[0].profitMargin) * 100) / 100,
-      outOfStock: Number(result[0].outOfStock),
-      lowStock: Number(result[0].lowStock),
-      healthy: Number(result[0].healthy),
-    };
-
     return {
-      summary,
-      items,
-      metadata: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
+      summary: {
+        totalItems: Number(result[0].totalItems),
+        totalAssetValue: Number(result[0].totalAssetValue),
+        totalRetailValue: Number(result[0].totalRetailValue),
+        potentialProfit: Number(result[0].potentialProfit),
+        profitMargin: Math.round(Number(result[0].profitMargin) * 100) / 100,
+        outOfStock: Number(result[0].outOfStock),
+        lowStock: Number(result[0].lowStock),
+        healthy: Number(result[0].healthy),
+        lowThreshold,
       },
+      items,
+      metadata: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
   }
 
@@ -364,6 +473,8 @@ class ReportRepository {
    * @returns {Promise<Object|null>}
    */
   async getShiftSummary(shiftId) {
+    const minStartingCash = await this.#getShiftMinStartingCash();
+
     const [shift, expensesAgg, paymentBreakdown] = await Promise.all([
       prisma.shift.findUnique({
         where: { id: shiftId },
@@ -383,14 +494,16 @@ class ReportRepository {
           _count: { select: { orders: true } },
         },
       }),
-      prisma.expense.aggregate({
-        where: { shiftId },
-        _sum: { amount: true },
-      }),
+      prisma.expense.aggregate({ where: { shiftId }, _sum: { amount: true } }),
       prisma.payment.groupBy({
         by: ["method"],
         where: {
-          order: { shiftId, deletedAt: null },
+          order: {
+            shiftId,
+            deletedAt: null,
+            status: { in: ["COMPLETED", "CLOSED"] },
+          },
+          status: "PAID",
         },
         _sum: { amountPaid: true },
         _count: { method: true },
@@ -417,6 +530,7 @@ class ReportRepository {
       orderCount: shift._count.orders,
       totalExpenses,
       netSales: shift.cashSales - totalExpenses,
+      minStartingCash,
       paymentBreakdown: paymentBreakdown.map((item) => ({
         method: item.method,
         total: Number(item._sum.amountPaid || 0),
@@ -428,9 +542,11 @@ class ReportRepository {
   /**
    * Mendapatkan statistik task per order
    * @param {string} orderId - ID order
-   * @returns {Promise<{total: number, assigned: number, unassigned: number, tasks: Array}>}
+   * @returns {Promise<Object>}
    */
   async getTaskStatsByOrder(orderId) {
+    const mechanicMaxTasks = await this.#getMechanicMaxTasks();
+
     const [total, assigned] = await Promise.all([
       prisma.orderItem.count({
         where: { orderId, product: { type: "SERVICE" } },
@@ -464,6 +580,7 @@ class ReportRepository {
       total,
       assigned,
       unassigned: total - assigned,
+      mechanicMaxTasks,
       tasks: tasks.map((t) => ({
         id: t.id,
         serviceName: t.productNameSnapshot,
@@ -480,9 +597,11 @@ class ReportRepository {
   /**
    * Mendapatkan statistik tugas mekanik
    * @param {string} mechanicId - ID mekanik
-   * @returns {Promise<{totalTasks: number, completedTasks: number, pendingTasks: number}>}
+   * @returns {Promise<Object>}
    */
   async getMechanicTaskStats(mechanicId) {
+    const mechanicMaxTasks = await this.#getMechanicMaxTasks();
+
     const [pending, completed, total] = await Promise.all([
       prisma.mechanicAssignment.count({
         where: {
@@ -501,31 +620,29 @@ class ReportRepository {
           mechanicId,
           endAt: { not: null },
           orderItem: {
-            order: {
-              status: { in: ["COMPLETED", "CLOSED"] },
-              deletedAt: null,
-            },
+            order: { status: { in: ["COMPLETED", "CLOSED"] }, deletedAt: null },
           },
         },
       }),
-      prisma.mechanicAssignment.count({
-        where: { mechanicId },
-      }),
+      prisma.mechanicAssignment.count({ where: { mechanicId } }),
     ]);
 
     return {
       totalTasks: total,
       completedTasks: completed,
       pendingTasks: pending,
+      maxTasks: mechanicMaxTasks,
+      available: Math.max(0, mechanicMaxTasks - pending),
+      isOverloaded: pending >= mechanicMaxTasks,
     };
   }
 
   /**
    * Mendapatkan total pendapatan dari tugas mekanik
    * @param {string} mechanicId - ID mekanik
-   * @param {Date} startDate - Tanggal mulai filter endAt
-   * @param {Date} endDate - Tanggal akhir filter endAt
-   * @returns {Promise<{totalEarnings: number, taskCount: number, averagePerTask: number}>}
+   * @param {Date} startDate - Tanggal mulai
+   * @param {Date} endDate - Tanggal akhir
+   * @returns {Promise<Object>}
    */
   async getTotalEarningsByMechanic(mechanicId, startDate, endDate) {
     const query = `
@@ -549,7 +666,6 @@ class ReportRepository {
       startDate,
       endDate
     );
-
     const totalEarnings = Number(result.totalEarnings);
     const taskCount = Number(result.taskCount);
 
@@ -564,16 +680,11 @@ class ReportRepository {
    * Mendapatkan ringkasan pengeluaran
    * @param {Date} startDate - Tanggal mulai
    * @param {Date} endDate - Tanggal akhir
-   * @param {Object} [filters={}]
-   * @param {string} [filters.shiftId]
-   * @param {string} [filters.category]
-   * @returns {Promise<{totalAmount: number, count: number, byCategory: Array}>}
+   * @param {Object} [filters={}] - Filter tambahan
+   * @returns {Promise<Object>}
    */
   async getExpensesSummary(startDate, endDate, filters = {}) {
-    const where = {
-      date: { gte: startDate, lte: endDate },
-    };
-
+    const where = { date: { gte: startDate, lte: endDate } };
     if (filters.shiftId) where.shiftId = filters.shiftId;
     if (filters.category) where.category = filters.category;
 
@@ -606,22 +717,17 @@ class ReportRepository {
    * Mendapatkan pengeluaran harian untuk chart dan export
    * @param {Date} startDate - Tanggal mulai
    * @param {Date} endDate - Tanggal akhir
-   * @returns {Promise<Array<{date: string, totalAmount: number, count: number}>>}
+   * @returns {Promise<Array>}
    */
   async getDailyExpensesSummary(startDate, endDate) {
     const query = `
-      SELECT 
-        DATE("date") as date,
-        COALESCE(SUM("amount"), 0)::bigint as "totalAmount",
-        COUNT("id")::int as "count"
+      SELECT DATE("date") as date, COALESCE(SUM("amount"), 0)::bigint as "totalAmount", COUNT("id")::int as "count"
       FROM "Expense"
       WHERE "date" >= $1::timestamp AND "date" <= $2::timestamp
-      GROUP BY DATE("date")
-      ORDER BY DATE("date") ASC
+      GROUP BY DATE("date") ORDER BY DATE("date") ASC
     `;
 
     const rawData = await prisma.$queryRawUnsafe(query, startDate, endDate);
-
     return rawData.map((item) => ({
       date: item.date,
       totalAmount: Number(item.totalAmount),
@@ -630,24 +736,18 @@ class ReportRepository {
   }
 
   /**
-   * Mendapatkan ringkasan pergerakan stok dalam rentang waktu
+   * Mendapatkan ringkasan pergerakan stok
    * @param {string} productId - ID produk
    * @param {Date} startDate - Tanggal mulai
    * @param {Date} endDate - Tanggal akhir
    * @param {Object} [options={}] - Opsi pagination
-   * @param {number} [options.page=1] - Halaman
-   * @param {number} [options.limit=10] - Jumlah per halaman
-   * @returns {Promise<{IN: number, OUT: number, ADJUSTMENT: number, netChange: number, movements: Array, metadata: Object}>}
+   * @returns {Promise<Object>}
    */
   async getMovementSummary(productId, startDate, endDate, options = {}) {
     const page = options.page || 1;
     const limit = options.limit || 10;
     const skip = (page - 1) * limit;
-
-    const where = {
-      productId,
-      createdAt: { gte: startDate, lte: endDate },
-    };
+    const where = { productId, createdAt: { gte: startDate, lte: endDate } };
 
     const [movementTypes, total, movements] = await Promise.all([
       prisma.stockMovement.groupBy({
@@ -695,12 +795,7 @@ class ReportRepository {
         orderItemId: m.orderItem?.id || null,
         orderId: m.orderItem?.orderId || null,
       })),
-      metadata: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
+      metadata: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
   }
 
@@ -719,20 +814,16 @@ class ReportRepository {
     let calculatedStock = 0;
     for (const m of movements) {
       const qty = Number(m._sum.quantity || 0);
-      if (m.type === "IN" || m.type === "ADJUSTMENT") {
-        calculatedStock += qty;
-      } else if (m.type === "OUT") {
-        calculatedStock -= qty;
-      }
+      if (m.type === "IN" || m.type === "ADJUSTMENT") calculatedStock += qty;
+      else if (m.type === "OUT") calculatedStock -= qty;
     }
-
     return calculatedStock;
   }
 
   /**
    * Validasi konsistensi stok produk
    * @param {string} productId - ID produk
-   * @returns {Promise<{current: number, calculated: number, difference: number, isConsistent: boolean}|null>}
+   * @returns {Promise<Object|null>}
    */
   async validateStockConsistency(productId) {
     const [product, calculatedStock] = await Promise.all([
@@ -742,7 +833,6 @@ class ReportRepository {
       }),
       this.calculateStockFromMovements(productId),
     ]);
-
     if (!product) return null;
 
     return {
@@ -758,9 +848,7 @@ class ReportRepository {
    * @param {Date} startDate - Tanggal mulai
    * @param {Date} endDate - Tanggal akhir
    * @param {Object} [options={}] - Opsi pagination
-   * @param {number} [options.page=1] - Halaman
-   * @param {number} [options.limit=10] - Jumlah per halaman
-   * @returns {Promise<{data: Array, metadata: Object}>}
+   * @returns {Promise<Object>}
    */
   async getMechanicPerformanceReport(startDate, endDate, options = {}) {
     const page = options.page || 1;
@@ -771,34 +859,26 @@ class ReportRepository {
       SELECT COUNT(DISTINCT u."id")::int as "total"
       FROM "User" u
       LEFT JOIN "MechanicAssignment" ma ON u."id" = ma."mechanicId" 
-        AND ma."createdAt" >= $1::timestamp 
-        AND ma."createdAt" <= $2::timestamp
+        AND ma."createdAt" >= $1::timestamp AND ma."createdAt" <= $2::timestamp
       WHERE u."role" = 'MECHANIC'
     `;
 
     const dataQuery = `
       SELECT 
-        u."id" as "mechanicId",
-        u."fullName" as "mechanicName",
-        u."email",
+        u."id" as "mechanicId", u."fullName" as "mechanicName", u."email",
         COUNT(DISTINCT ma."id")::int as "totalTasks",
-        COUNT(DISTINCT CASE WHEN ma."endAt" IS NOT NULL AND o."status" IN ('COMPLETED', 'CLOSED') AND o."deletedAt" IS NULL THEN ma."id" END)::int as "completedTasks",
-        COUNT(DISTINCT CASE WHEN ma."endAt" IS NULL AND o."status" IN ('QUEUED', 'IN_PROGRESS') AND o."deletedAt" IS NULL THEN ma."id" END)::int as "pendingTasks",
-        COALESCE(SUM(CASE WHEN ma."endAt" IS NOT NULL AND o."status" IN ('COMPLETED', 'CLOSED') AND o."deletedAt" IS NULL THEN oi."subtotal" ELSE 0 END), 0)::bigint as "totalEarnings",
-        CASE 
-          WHEN COUNT(DISTINCT CASE WHEN ma."endAt" IS NOT NULL AND o."status" IN ('COMPLETED', 'CLOSED') AND o."deletedAt" IS NULL THEN ma."id" END) > 0 
-          THEN COALESCE(SUM(CASE WHEN ma."endAt" IS NOT NULL AND o."status" IN ('COMPLETED', 'CLOSED') AND o."deletedAt" IS NULL THEN oi."subtotal" ELSE 0 END), 0) / COUNT(DISTINCT CASE WHEN ma."endAt" IS NOT NULL AND o."status" IN ('COMPLETED', 'CLOSED') AND o."deletedAt" IS NULL THEN ma."id" END)
-          ELSE 0 
-        END as "averagePerTask",
-        CASE 
-          WHEN COUNT(DISTINCT ma."id") > 0 
-          THEN (COUNT(DISTINCT CASE WHEN ma."endAt" IS NOT NULL AND o."status" IN ('COMPLETED', 'CLOSED') AND o."deletedAt" IS NULL THEN ma."id" END)::float / COUNT(DISTINCT ma."id") * 100)
-          ELSE 0 
-        END as "completionRate"
+        COUNT(DISTINCT CASE WHEN ma."endAt" IS NOT NULL AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL THEN ma."id" END)::int as "completedTasks",
+        COUNT(DISTINCT CASE WHEN ma."endAt" IS NULL AND o."status" IN ('QUEUED','IN_PROGRESS') AND o."deletedAt" IS NULL THEN ma."id" END)::int as "pendingTasks",
+        COALESCE(SUM(CASE WHEN ma."endAt" IS NOT NULL AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL THEN oi."subtotal" ELSE 0 END), 0)::bigint as "totalEarnings",
+        CASE WHEN COUNT(DISTINCT CASE WHEN ma."endAt" IS NOT NULL AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL THEN ma."id" END) > 0 
+          THEN COALESCE(SUM(CASE WHEN ma."endAt" IS NOT NULL AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL THEN oi."subtotal" ELSE 0 END), 0) / COUNT(DISTINCT CASE WHEN ma."endAt" IS NOT NULL AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL THEN ma."id" END)
+          ELSE 0 END as "averagePerTask",
+        CASE WHEN COUNT(DISTINCT ma."id") > 0 
+          THEN (COUNT(DISTINCT CASE WHEN ma."endAt" IS NOT NULL AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL THEN ma."id" END)::float / COUNT(DISTINCT ma."id") * 100)
+          ELSE 0 END as "completionRate"
       FROM "User" u
       LEFT JOIN "MechanicAssignment" ma ON u."id" = ma."mechanicId" 
-        AND ma."createdAt" >= $1::timestamp 
-        AND ma."createdAt" <= $2::timestamp
+        AND ma."createdAt" >= $1::timestamp AND ma."createdAt" <= $2::timestamp
       LEFT JOIN "OrderItem" oi ON ma."orderItemId" = oi."id"
       LEFT JOIN "Order" o ON oi."orderId" = o."id"
       WHERE u."role" = 'MECHANIC'
@@ -826,23 +906,16 @@ class ReportRepository {
         averagePerTask: Number(item.averagePerTask),
         completionRate: Math.round(Number(item.completionRate) * 100) / 100,
       })),
-      metadata: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
+      metadata: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
   }
 
   /**
-   * Mendapatkan laporan penjualan per produk dengan pagination
+   * Mendapatkan laporan penjualan per produk
    * @param {Date} startDate - Tanggal mulai
    * @param {Date} endDate - Tanggal akhir
    * @param {Object} [options={}] - Opsi pagination
-   * @param {number} [options.page=1] - Halaman
-   * @param {number} [options.limit=10] - Jumlah per halaman
-   * @returns {Promise<{data: Array, metadata: Object}>}
+   * @returns {Promise<Object>}
    */
   async getProductSalesReport(startDate, endDate, options = {}) {
     const page = options.page || 1;
@@ -854,39 +927,30 @@ class ReportRepository {
       FROM "OrderItem" oi
       INNER JOIN "Order" o ON oi."orderId" = o."id"
       INNER JOIN "Payment" p2 ON o."id" = p2."orderId"
-      WHERE o."status" IN ('COMPLETED', 'CLOSED')
-        AND o."deletedAt" IS NULL
+      WHERE o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL
         AND p2."status" = 'PAID'
-        AND o."createdAt" >= $1::timestamp
-        AND o."createdAt" <= $2::timestamp
+        AND o."createdAt" >= $1::timestamp AND o."createdAt" <= $2::timestamp
     `;
 
     const dataQuery = `
       SELECT 
-        oi."productId",
-        MAX(oi."productNameSnapshot") as "productName",
-        MAX(p."sku") as "sku",
-        MAX(p."type") as "type",
-        f."path" as "image",
+        oi."productId", MAX(oi."productNameSnapshot") as "productName",
+        MAX(p."sku") as "sku", MAX(p."type") as "type", f."path" as "image",
         SUM(oi."quantity")::int as "quantitySold",
         SUM(oi."subtotal")::bigint as "totalRevenue",
         SUM(oi."unitCostSnapshot" * oi."quantity")::bigint as "totalCost",
         SUM(oi."subtotal") - SUM(oi."unitCostSnapshot" * oi."quantity")::bigint as "profit",
-        CASE 
-          WHEN SUM(oi."subtotal") > 0 
+        CASE WHEN SUM(oi."subtotal") > 0 
           THEN ((SUM(oi."subtotal") - SUM(oi."unitCostSnapshot" * oi."quantity"))::float / SUM(oi."subtotal") * 100)
-          ELSE 0 
-        END as "profitMargin"
+          ELSE 0 END as "profitMargin"
       FROM "OrderItem" oi
       INNER JOIN "Order" o ON oi."orderId" = o."id"
       INNER JOIN "Payment" p2 ON o."id" = p2."orderId"
       LEFT JOIN "Product" p ON oi."productId" = p."id"
       LEFT JOIN "File" f ON p."imageId" = f."id"
-      WHERE o."status" IN ('COMPLETED', 'CLOSED')
-        AND o."deletedAt" IS NULL
+      WHERE o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL
         AND p2."status" = 'PAID'
-        AND o."createdAt" >= $1::timestamp
-        AND o."createdAt" <= $2::timestamp
+        AND o."createdAt" >= $1::timestamp AND o."createdAt" <= $2::timestamp
       GROUP BY oi."productId", f."path"
       ORDER BY "totalRevenue" DESC
       LIMIT $3 OFFSET $4
@@ -912,20 +976,17 @@ class ReportRepository {
         profit: Number(item.profit),
         profitMargin: Math.round(Number(item.profitMargin) * 100) / 100,
       })),
-      metadata: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
+      metadata: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
   }
 
   /**
    * Mendapatkan ringkasan produk untuk dashboard
-   * @returns {Promise<{totalProducts: number, activeProducts: number, inactiveProducts: number, lowStockCount: number, outOfStockCount: number, totalStockValue: number, totalStockQuantity: number, byType: Array}>}
+   * @returns {Promise<Object>}
    */
   async getProductSummary() {
+    const lowThreshold = await this.#getStockLowThreshold();
+
     const [productStats, stockValue, outOfStock] = await Promise.all([
       Promise.all([
         prisma.product.count(),
@@ -933,7 +994,7 @@ class ReportRepository {
         prisma.product.count({
           where: {
             type: "SPAREPART",
-            stock: { lte: 5, gt: 0 },
+            stock: { lte: lowThreshold, gt: 0 },
             isActive: true,
           },
         }),
@@ -947,8 +1008,7 @@ class ReportRepository {
         SELECT 
           COALESCE(SUM("stock"), 0)::int as "totalStockQuantity",
           COALESCE(SUM("stock" * "cost"), 0)::bigint as "totalStockValue"
-        FROM "Product"
-        WHERE "type" = 'SPAREPART'
+        FROM "Product" WHERE "type" = 'SPAREPART'
       `,
       prisma.product.count({
         where: { type: "SPAREPART", stock: 0, isActive: true },
@@ -965,6 +1025,7 @@ class ReportRepository {
       outOfStockCount: outOfStock,
       totalStockValue: Number(stockValue[0].totalStockValue),
       totalStockQuantity: Number(stockValue[0].totalStockQuantity),
+      lowThreshold,
       byType: byType.map((item) => ({
         type: item.type,
         count: item._count.type,
@@ -976,15 +1037,15 @@ class ReportRepository {
   /**
    * Mendapatkan produk dengan stok rendah dengan pagination
    * @param {Object} [options={}] - Opsi
-   * @param {number} [options.threshold=5] - Batas stok rendah
+   * @param {number} [options.threshold] - Batas stok rendah (default dari settings)
    * @param {number} [options.page=1] - Halaman
    * @param {number} [options.limit=10] - Jumlah per halaman
-   * @returns {Promise<{data: Array, metadata: Object}>}
+   * @returns {Promise<Object>}
    */
   async getLowStockProducts(options = {}) {
     const page = options.page || 1;
     const limit = options.limit || 10;
-    const threshold = options.threshold || 5;
+    const threshold = options.threshold || (await this.#getStockLowThreshold());
     const skip = (page - 1) * limit;
 
     const where = {
@@ -1028,6 +1089,7 @@ class ReportRepository {
         page,
         limit,
         totalPages: Math.ceil(total / limit),
+        threshold,
       },
     };
   }
@@ -1036,24 +1098,16 @@ class ReportRepository {
    * Mendapatkan ringkasan pembayaran
    * @param {Date} startDate - Tanggal mulai
    * @param {Date} endDate - Tanggal akhir
-   * @param {Object} [filters={}]
-   * @param {string} [filters.status]
-   * @param {string} [filters.method]
-   * @returns {Promise<{totalAmount: number, totalCount: number, byMethod: Array, byStatus: Array, daily: Array}>}
+   * @param {Object} [filters={}] - Filter tambahan
+   * @returns {Promise<Object>}
    */
   async getPaymentSummary(startDate, endDate, filters = {}) {
-    const where = {
-      createdAt: { gte: startDate, lte: endDate },
-    };
-
+    const where = { createdAt: { gte: startDate, lte: endDate } };
     if (filters.status) where.status = filters.status;
     if (filters.method) where.method = filters.method;
 
     const [totalAmount, count, byMethod, byStatus, daily] = await Promise.all([
-      prisma.payment.aggregate({
-        where,
-        _sum: { amountPaid: true },
-      }),
+      prisma.payment.aggregate({ where, _sum: { amountPaid: true } }),
       prisma.payment.count({ where }),
       prisma.payment.groupBy({
         by: ["method"],
@@ -1068,15 +1122,10 @@ class ReportRepository {
         _count: { status: true },
       }),
       prisma.$queryRaw`
-        SELECT 
-          DATE("createdAt") as date,
-          COALESCE(SUM("amountPaid"), 0)::bigint as "totalAmount",
-          COUNT("id")::int as "count"
+        SELECT DATE("createdAt") as date, COALESCE(SUM("amountPaid"), 0)::bigint as "totalAmount", COUNT("id")::int as "count"
         FROM "Payment"
-        WHERE "createdAt" >= ${startDate}::timestamp 
-          AND "createdAt" <= ${endDate}::timestamp
-        GROUP BY DATE("createdAt")
-        ORDER BY DATE("createdAt") ASC
+        WHERE "createdAt" >= ${startDate}::timestamp AND "createdAt" <= ${endDate}::timestamp
+        GROUP BY DATE("createdAt") ORDER BY DATE("createdAt") ASC
       `,
     ]);
 
@@ -1133,7 +1182,7 @@ class ReportRepository {
   /**
    * Mendapatkan data penjualan hari ini untuk kasir tertentu
    * @param {string} cashierId - ID kasir
-   * @returns {Promise<{todayOrders: number, todaySales: number, pendingOrders: number}>}
+   * @returns {Promise<Object>}
    */
   async getCashierTodaySales(cashierId) {
     const today = new Date();
@@ -1172,7 +1221,7 @@ class ReportRepository {
   /**
    * Mendapatkan data tugas mekanik hari ini
    * @param {string} mechanicId - ID mekanik
-   * @returns {Promise<{pending: number, completed: number, earnings: number}>}
+   * @returns {Promise<Object>}
    */
   async getMechanicTodayTasks(mechanicId) {
     const today = new Date();
@@ -1195,17 +1244,13 @@ class ReportRepository {
         },
       }),
       prisma.$queryRaw`
-        SELECT 
-          COUNT(ma."id")::int as "completedCount",
-          COALESCE(SUM(oi."subtotal"), 0)::bigint as "earnings"
+        SELECT COUNT(ma."id")::int as "completedCount", COALESCE(SUM(oi."subtotal"), 0)::bigint as "earnings"
         FROM "MechanicAssignment" ma
         INNER JOIN "OrderItem" oi ON ma."orderItemId" = oi."id"
         INNER JOIN "Order" o ON oi."orderId" = o."id"
         WHERE ma."mechanicId" = ${mechanicId}
-          AND ma."endAt" >= ${startOfDay}::timestamp
-          AND ma."endAt" <= ${endOfDay}::timestamp
-          AND o."status" IN ('COMPLETED', 'CLOSED')
-          AND o."deletedAt" IS NULL
+          AND ma."endAt" >= ${startOfDay}::timestamp AND ma."endAt" <= ${endOfDay}::timestamp
+          AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL
       `,
     ]);
 
@@ -1220,7 +1265,7 @@ class ReportRepository {
    * Mendapatkan ringkasan statistik pelanggan
    * @param {Date} startDate - Tanggal mulai
    * @param {Date} endDate - Tanggal akhir
-   * @returns {Promise<{totalCustomers: number, newCustomers: number, activeCustomers: number, totalVehicles: number}>}
+   * @returns {Promise<Object>}
    */
   async getCustomerSummary(startDate, endDate) {
     const [totalCustomers, newCustomers, activeCustomers, totalVehicles] =
@@ -1243,22 +1288,15 @@ class ReportRepository {
         prisma.vehicle.count(),
       ]);
 
-    return {
-      totalCustomers,
-      newCustomers,
-      activeCustomers,
-      totalVehicles,
-    };
+    return { totalCustomers, newCustomers, activeCustomers, totalVehicles };
   }
 
   /**
-   * Mendapatkan daftar pelanggan teratas berdasarkan total belanja dengan pagination
+   * Mendapatkan daftar pelanggan teratas berdasarkan total belanja
    * @param {Date} startDate - Tanggal mulai
    * @param {Date} endDate - Tanggal akhir
    * @param {Object} [options={}] - Opsi pagination
-   * @param {number} [options.page=1] - Halaman
-   * @param {number} [options.limit=10] - Jumlah per halaman
-   * @returns {Promise<{data: Array, metadata: Object}>}
+   * @returns {Promise<Object>}
    */
   async getTopCustomers(startDate, endDate, options = {}) {
     const page = options.page || 1;
@@ -1270,18 +1308,13 @@ class ReportRepository {
       FROM "Customer" c
       INNER JOIN "Order" o ON c."id" = o."customerId"
       INNER JOIN "Payment" p ON o."id" = p."orderId"
-      WHERE o."status" IN ('COMPLETED', 'CLOSED')
-        AND o."deletedAt" IS NULL
+      WHERE o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL
         AND p."status" = 'PAID'
-        AND o."createdAt" >= $1::timestamp
-        AND o."createdAt" <= $2::timestamp
+        AND o."createdAt" >= $1::timestamp AND o."createdAt" <= $2::timestamp
     `;
 
     const dataQuery = `
-      SELECT 
-        c."id" as "customerId",
-        c."name" as "customerName",
-        c."phone",
+      SELECT c."id" as "customerId", c."name" as "customerName", c."phone",
         COUNT(DISTINCT o."id")::int as "totalOrders",
         COALESCE(SUM(o."total"), 0)::bigint as "totalSpent",
         COALESCE(AVG(o."total"), 0)::float as "averageOrderValue",
@@ -1291,11 +1324,9 @@ class ReportRepository {
       INNER JOIN "Order" o ON c."id" = o."customerId"
       INNER JOIN "Payment" p ON o."id" = p."orderId"
       LEFT JOIN "Vehicle" v ON c."id" = v."customerId"
-      WHERE o."status" IN ('COMPLETED', 'CLOSED')
-        AND o."deletedAt" IS NULL
+      WHERE o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL
         AND p."status" = 'PAID'
-        AND o."createdAt" >= $1::timestamp
-        AND o."createdAt" <= $2::timestamp
+        AND o."createdAt" >= $1::timestamp AND o."createdAt" <= $2::timestamp
       GROUP BY c."id", c."name", c."phone"
       ORDER BY "totalSpent" DESC
       LIMIT $3 OFFSET $4
@@ -1319,39 +1350,28 @@ class ReportRepository {
         lastOrderDate: item.lastOrderDate,
         vehicles: item.vehiclePlates || [],
       })),
-      metadata: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
+      metadata: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
   }
 
   /**
-   * Mendapatkan akuisisi pelanggan baru harian untuk chart dan export
+   * Mendapatkan akuisisi pelanggan baru harian
    * @param {Date} startDate - Tanggal mulai
    * @param {Date} endDate - Tanggal akhir
-   * @returns {Promise<Array<{date: string, newCustomers: number, totalCustomers: number}>>}
+   * @returns {Promise<Array>}
    */
   async getDailyCustomerAcquisition(startDate, endDate) {
     const query = `
       WITH daily_new AS (
         SELECT DATE("createdAt") as date, COUNT("id")::int as "newCustomers"
-        FROM "Customer"
-        WHERE "createdAt" >= $1::timestamp AND "createdAt" <= $2::timestamp
+        FROM "Customer" WHERE "createdAt" >= $1::timestamp AND "createdAt" <= $2::timestamp
         GROUP BY DATE("createdAt")
       )
-      SELECT 
-        dn.date,
-        dn."newCustomers",
-        SUM(dn."newCustomers") OVER (ORDER BY dn.date)::int as "totalCustomers"
-      FROM daily_new dn
-      ORDER BY dn.date ASC
+      SELECT dn.date, dn."newCustomers", SUM(dn."newCustomers") OVER (ORDER BY dn.date)::int as "totalCustomers"
+      FROM daily_new dn ORDER BY dn.date ASC
     `;
 
     const rawData = await prisma.$queryRawUnsafe(query, startDate, endDate);
-
     return rawData.map((item) => ({
       date: item.date,
       newCustomers: Number(item.newCustomers),
@@ -1363,30 +1383,22 @@ class ReportRepository {
    * Mendapatkan distribusi frekuensi kunjungan pelanggan
    * @param {Date} startDate - Tanggal mulai
    * @param {Date} endDate - Tanggal akhir
-   * @returns {Promise<Array<{visitCount: number, customerCount: number, percentage: number}>>}
+   * @returns {Promise<Array>}
    */
   async getCustomerVisitFrequency(startDate, endDate) {
     const query = `
       WITH customer_visits AS (
-        SELECT 
-          c."id",
-          COUNT(DISTINCT o."id")::int as "visitCount"
+        SELECT c."id", COUNT(DISTINCT o."id")::int as "visitCount"
         FROM "Customer" c
         INNER JOIN "Order" o ON c."id" = o."customerId"
         INNER JOIN "Payment" p ON o."id" = p."orderId"
-        WHERE o."status" IN ('COMPLETED', 'CLOSED')
-          AND o."deletedAt" IS NULL
+        WHERE o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL
           AND p."status" = 'PAID'
-          AND o."createdAt" >= $1::timestamp
-          AND o."createdAt" <= $2::timestamp
+          AND o."createdAt" >= $1::timestamp AND o."createdAt" <= $2::timestamp
         GROUP BY c."id"
       ),
-      total_customers AS (
-        SELECT COUNT(*)::int as "total" FROM customer_visits
-      )
-      SELECT 
-        cv."visitCount",
-        COUNT(cv."id")::int as "customerCount",
+      total_customers AS (SELECT COUNT(*)::int as "total" FROM customer_visits)
+      SELECT cv."visitCount", COUNT(cv."id")::int as "customerCount",
         (COUNT(cv."id")::float / tc."total" * 100) as "percentage"
       FROM customer_visits cv, total_customers tc
       GROUP BY cv."visitCount", tc."total"
@@ -1394,7 +1406,6 @@ class ReportRepository {
     `;
 
     const rawData = await prisma.$queryRawUnsafe(query, startDate, endDate);
-
     return rawData.map((item) => ({
       visitCount: Number(item.visitCount),
       customerCount: Number(item.customerCount),
@@ -1407,7 +1418,7 @@ class ReportRepository {
    * @param {string} customerId - ID pelanggan
    * @param {Date} startDate - Tanggal mulai
    * @param {Date} endDate - Tanggal akhir
-   * @returns {Promise<{customer: Object, orders: Array, summary: Object}|null>}
+   * @returns {Promise<Object|null>}
    */
   async getCustomerTransactionHistory(customerId, startDate, endDate) {
     const [customer, orders, summary] = await Promise.all([
@@ -1465,7 +1476,6 @@ class ReportRepository {
         _avg: { total: true },
       }),
     ]);
-
     if (!customer) return null;
 
     return {
@@ -1503,61 +1513,43 @@ class ReportRepository {
   }
 
   /**
-   * Mendapatkan daftar pelanggan yang sudah lama tidak bertransaksi dengan pagination
+   * Mendapatkan daftar pelanggan yang sudah lama tidak bertransaksi
    * @param {Object} [options={}] - Opsi
    * @param {number} [options.daysThreshold=30] - Batas hari tanpa transaksi
    * @param {number} [options.page=1] - Halaman
    * @param {number} [options.limit=20] - Jumlah per halaman
-   * @returns {Promise<{data: Array, metadata: Object}>}
+   * @returns {Promise<Object>}
    */
   async getInactiveCustomers(options = {}) {
     const page = options.page || 1;
     const limit = options.limit || 20;
     const daysThreshold = options.daysThreshold || 30;
     const offset = (page - 1) * limit;
-
     const thresholdDate = new Date();
     thresholdDate.setDate(thresholdDate.getDate() - daysThreshold);
 
-    const countQuery = `
-      SELECT COUNT(*)::int as "total"
-      FROM "Customer" c
-      LEFT JOIN "Order" o ON c."id" = o."customerId" 
-        AND o."status" IN ('COMPLETED', 'CLOSED')
-        AND o."deletedAt" IS NULL
-      LEFT JOIN "Payment" p ON o."id" = p."orderId" AND p."status" = 'PAID'
-      GROUP BY c."id"
-      HAVING MAX(o."createdAt") IS NULL 
-        OR MAX(o."createdAt") < $1::timestamp
-    `;
-
     const dataQuery = `
-      SELECT 
-        c."id" as "customerId",
-        c."name" as "customerName",
-        c."phone",
+      SELECT c."id" as "customerId", c."name" as "customerName", c."phone",
         MAX(o."createdAt") as "lastOrderDate",
         COUNT(DISTINCT o."id")::int as "totalOrders",
         COALESCE(SUM(o."total"), 0)::bigint as "totalSpent",
         EXTRACT(DAY FROM (NOW() - MAX(o."createdAt")))::int as "daysSinceLastOrder"
       FROM "Customer" c
-      LEFT JOIN "Order" o ON c."id" = o."customerId" 
-        AND o."status" IN ('COMPLETED', 'CLOSED')
-        AND o."deletedAt" IS NULL
+      LEFT JOIN "Order" o ON c."id" = o."customerId" AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL
       LEFT JOIN "Payment" p ON o."id" = p."orderId" AND p."status" = 'PAID'
       GROUP BY c."id", c."name", c."phone"
-      HAVING MAX(o."createdAt") IS NULL 
-        OR MAX(o."createdAt") < $1::timestamp
+      HAVING MAX(o."createdAt") IS NULL OR MAX(o."createdAt") < $1::timestamp
       ORDER BY "daysSinceLastOrder" DESC NULLS FIRST
       LIMIT $2 OFFSET $3
     `;
 
-    const [countResult, rawData] = await Promise.all([
-      prisma.$queryRawUnsafe(countQuery, thresholdDate),
-      prisma.$queryRawUnsafe(dataQuery, thresholdDate, limit, offset),
-    ]);
-
-    const total = countResult.length;
+    const rawData = await prisma.$queryRawUnsafe(
+      dataQuery,
+      thresholdDate,
+      limit,
+      offset
+    );
+    const total = rawData.length;
 
     return {
       data: rawData.map((item) => ({
@@ -1569,55 +1561,39 @@ class ReportRepository {
         totalOrders: Number(item.totalOrders),
         totalSpent: Number(item.totalSpent),
       })),
-      metadata: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
+      metadata: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
   }
 
   /**
-   * Mendapatkan retensi pelanggan bulanan untuk chart
+   * Mendapatkan retensi pelanggan bulanan
    * @param {Date} startDate - Tanggal mulai
    * @param {Date} endDate - Tanggal akhir
-   * @returns {Promise<Array<{month: string, newCustomers: number, returningCustomers: number, totalActiveCustomers: number, retentionRate: number}>>}
+   * @returns {Promise<Array>}
    */
   async getMonthlyCustomerRetention(startDate, endDate) {
     const query = `
       WITH monthly_customers AS (
-        SELECT 
-          DATE_TRUNC('month', o."createdAt") as month,
-          c."id" as "customerId",
+        SELECT DATE_TRUNC('month', o."createdAt") as month, c."id" as "customerId",
           MIN(DATE_TRUNC('month', o."createdAt")) OVER (PARTITION BY c."id") as "firstPurchaseMonth"
         FROM "Customer" c
         INNER JOIN "Order" o ON c."id" = o."customerId"
         INNER JOIN "Payment" p ON o."id" = p."orderId"
-        WHERE o."status" IN ('COMPLETED', 'CLOSED')
-          AND o."deletedAt" IS NULL
-          AND p."status" = 'PAID'
-          AND o."createdAt" >= $1::timestamp
-          AND o."createdAt" <= $2::timestamp
+        WHERE o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL AND p."status" = 'PAID'
+          AND o."createdAt" >= $1::timestamp AND o."createdAt" <= $2::timestamp
         GROUP BY month, c."id"
       )
-      SELECT 
-        month::date as month,
+      SELECT month::date as month,
         COUNT(DISTINCT CASE WHEN "firstPurchaseMonth" = month THEN "customerId" END)::int as "newCustomers",
         COUNT(DISTINCT CASE WHEN "firstPurchaseMonth" < month THEN "customerId" END)::int as "returningCustomers",
         COUNT(DISTINCT "customerId")::int as "totalActiveCustomers",
-        CASE 
-          WHEN COUNT(DISTINCT "customerId") > 0 
+        CASE WHEN COUNT(DISTINCT "customerId") > 0 
           THEN (COUNT(DISTINCT CASE WHEN "firstPurchaseMonth" < month THEN "customerId" END)::float / COUNT(DISTINCT "customerId") * 100)
-          ELSE 0 
-        END as "retentionRate"
-      FROM monthly_customers
-      GROUP BY month
-      ORDER BY month ASC
+          ELSE 0 END as "retentionRate"
+      FROM monthly_customers GROUP BY month ORDER BY month ASC
     `;
 
     const rawData = await prisma.$queryRawUnsafe(query, startDate, endDate);
-
     return rawData.map((item) => ({
       month: item.month,
       newCustomers: Number(item.newCustomers),
@@ -1628,58 +1604,34 @@ class ReportRepository {
   }
 
   /**
-   * Mendapatkan metrik customer lifetime value per pelanggan dengan pagination
+   * Mendapatkan metrik customer lifetime value
    * @param {Object} [options={}] - Opsi pagination
-   * @param {number} [options.page=1] - Halaman
-   * @param {number} [options.limit=20] - Jumlah per halaman
-   * @returns {Promise<{data: Array, metadata: Object}>}
+   * @returns {Promise<Object>}
    */
   async getCustomerLifetimeValue(options = {}) {
     const page = options.page || 1;
     const limit = options.limit || 20;
     const offset = (page - 1) * limit;
 
-    const countQuery = `
-      SELECT COUNT(DISTINCT c."id")::int as "total"
-      FROM "Customer" c
-      INNER JOIN "Order" o ON c."id" = o."customerId"
-      INNER JOIN "Payment" p ON o."id" = p."orderId"
-      WHERE o."status" IN ('COMPLETED', 'CLOSED')
-        AND o."deletedAt" IS NULL
-        AND p."status" = 'PAID'
-      GROUP BY c."id"
-      HAVING COUNT(DISTINCT o."id") > 1
-    `;
-
     const dataQuery = `
-      SELECT 
-        c."id" as "customerId",
-        c."name" as "customerName",
-        c."phone",
+      SELECT c."id" as "customerId", c."name" as "customerName", c."phone",
         COUNT(DISTINCT o."id")::int as "totalOrders",
         COALESCE(SUM(o."total"), 0)::bigint as "totalSpent",
         COALESCE(AVG(o."total"), 0)::float as "averageOrderValue",
-        MIN(o."createdAt") as "firstOrderDate",
-        MAX(o."createdAt") as "lastOrderDate",
+        MIN(o."createdAt") as "firstOrderDate", MAX(o."createdAt") as "lastOrderDate",
         EXTRACT(DAY FROM (MAX(o."createdAt") - MIN(o."createdAt")))::int as "customerLifespanDays"
       FROM "Customer" c
       INNER JOIN "Order" o ON c."id" = o."customerId"
       INNER JOIN "Payment" p ON o."id" = p."orderId"
-      WHERE o."status" IN ('COMPLETED', 'CLOSED')
-        AND o."deletedAt" IS NULL
-        AND p."status" = 'PAID'
+      WHERE o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL AND p."status" = 'PAID'
       GROUP BY c."id", c."name", c."phone"
       HAVING COUNT(DISTINCT o."id") > 1
       ORDER BY "totalSpent" DESC
       LIMIT $1 OFFSET $2
     `;
 
-    const [countResult, rawData] = await Promise.all([
-      prisma.$queryRawUnsafe(countQuery),
-      prisma.$queryRawUnsafe(dataQuery, limit, offset),
-    ]);
-
-    const total = countResult.length;
+    const rawData = await prisma.$queryRawUnsafe(dataQuery, limit, offset);
+    const total = rawData.length;
 
     return {
       data: rawData.map((item) => ({
@@ -1700,18 +1652,13 @@ class ReportRepository {
               )
             : Number(item.totalSpent),
       })),
-      metadata: {
-        total,
-        page,
-        limit,
-        totalPages: Math.ceil(total / limit),
-      },
+      metadata: { total, page, limit, totalPages: Math.ceil(total / limit) },
     };
   }
 
   /**
    * Mendapatkan ringkasan kendaraan pelanggan
-   * @returns {Promise<{totalVehicles: number, byBrand: Array<{brand: string, count: number}>, recentVehicles: Array<{id: string, plateNumber: string, brand: string|null, model: string|null, customerName: string, orderCount: number}>}>}
+   * @returns {Promise<Object>}
    */
   async getVehicleSummary() {
     const [totalVehicles, byBrand, recentVehicles] = await Promise.all([

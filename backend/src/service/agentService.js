@@ -15,6 +15,162 @@ class AgentService {
   }
 
   /**
+   * Parse input natural language user menjadi parameter filter terstruktur
+   * Support: "30 hari terakhir", "bulan lalu", "Januari 2025", "minggu ini", "tahun 2025", dll
+   *
+   * @param {string} input - Input natural language dari user (contoh: "30 hari terakhir", "bulan Januari 2025")
+   * @returns {{startDate: Date|null, endDate: Date|null, days: number|null}}
+   * @private
+   */
+  #parseTimeFilter(input) {
+    if (!input) return { startDate: null, endDate: null, days: null };
+
+    const str = input.toLowerCase().trim();
+
+    const daysMatch = str.match(
+      /(\d+)\s*hari\s*(terakhir|yang\s*lalu|belakangan|ini)/
+    );
+    if (daysMatch) {
+      return { startDate: null, endDate: null, days: parseInt(daysMatch[1]) };
+    }
+
+    if (str.includes("minggu lalu")) {
+      const now = new Date();
+      const start = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate() - now.getDay() - 7
+      );
+      const end = new Date(
+        start.getFullYear(),
+        start.getMonth(),
+        start.getDate() + 6,
+        23,
+        59,
+        59
+      );
+      return { startDate: start, endDate: end, days: null };
+    }
+
+    if (str.includes("minggu ini")) {
+      const now = new Date();
+      const start = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate() - now.getDay()
+      );
+      return { startDate: start, endDate: null, days: null };
+    }
+
+    if (str.includes("bulan lalu")) {
+      const now = new Date();
+      const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      const end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59);
+      return { startDate: start, endDate: end, days: null };
+    }
+
+    if (str.includes("bulan ini")) {
+      const now = new Date();
+      const start = new Date(now.getFullYear(), now.getMonth(), 1);
+      return { startDate: start, endDate: null, days: null };
+    }
+
+    if (str.includes("tahun lalu")) {
+      const now = new Date();
+      const start = new Date(now.getFullYear() - 1, 0, 1);
+      const end = new Date(now.getFullYear() - 1, 11, 31, 23, 59, 59);
+      return { startDate: start, endDate: end, days: null };
+    }
+
+    if (str.includes("tahun ini")) {
+      const now = new Date();
+      const start = new Date(now.getFullYear(), 0, 1);
+      return { startDate: start, endDate: null, days: null };
+    }
+
+    const monthYearMatch = str.match(
+      /(januari|februari|maret|april|mei|juni|juli|agustus|september|oktober|november|desember|jan|feb|mar|apr|mei|jun|jul|agu|sep|okt|nov|des)\s*(\d{4})/
+    );
+    if (monthYearMatch) {
+      const months = [
+        "januari",
+        "februari",
+        "maret",
+        "april",
+        "mei",
+        "juni",
+        "juli",
+        "agustus",
+        "september",
+        "oktober",
+        "november",
+        "desember",
+        "jan",
+        "feb",
+        "mar",
+        "apr",
+        "mei",
+        "jun",
+        "jul",
+        "agu",
+        "sep",
+        "okt",
+        "nov",
+        "des",
+      ];
+      const monthIdx = months.indexOf(monthYearMatch[1]) % 12;
+      const year = parseInt(monthYearMatch[2]);
+      const start = new Date(year, monthIdx, 1);
+      const end = new Date(year, monthIdx + 1, 0, 23, 59, 59);
+      return { startDate: start, endDate: end, days: null };
+    }
+
+    const isoMatch = str.match(/(\d{4})-(\d{2})-(\d{2})/);
+    if (isoMatch) {
+      const start = new Date(
+        parseInt(isoMatch[1]),
+        parseInt(isoMatch[2]) - 1,
+        parseInt(isoMatch[3])
+      );
+      return { startDate: start, endDate: null, days: null };
+    }
+
+    const yearMatch = str.match(/tahun\s*(\d{4})|^(\d{4})$/);
+    if (yearMatch) {
+      const year = parseInt(yearMatch[1] || yearMatch[2]);
+      const start = new Date(year, 0, 1);
+      const end = new Date(year, 11, 31, 23, 59, 59);
+      return { startDate: start, endDate: end, days: null };
+    }
+
+    if (str.includes("hari ini")) {
+      const start = new Date();
+      start.setHours(0, 0, 0, 0);
+      return { startDate: start, endDate: null, days: null };
+    }
+
+    if (str.includes("kemarin")) {
+      const now = new Date();
+      const start = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate() - 1
+      );
+      const end = new Date(
+        now.getFullYear(),
+        now.getMonth(),
+        now.getDate() - 1,
+        23,
+        59,
+        59
+      );
+      return { startDate: start, endDate: end, days: null };
+    }
+
+    return { startDate: null, endDate: null, days: null };
+  }
+
+  /**
    * Konfigurasi model per role
    * @param {string} role
    * @returns {{max_tokens: number, temperature: number}}
@@ -265,6 +421,7 @@ Kamu adalah AI operasional bengkel. Kamu bisa:
 - Menjawab pertanyaan ringan seperti "siapa kamu?", "kamu bisa apa?", "bengkel ini dimana?"
 - Membantu mengakses data sesuai role user
 - Memberikan insight operasional berbasis data nyata
+- **Memahami filter waktu natural**: user bisa minta data dengan filter seperti "30 hari terakhir", "bulan lalu", "Januari 2025", "tahun ini". Kamu WAJIB menerjemahkan ini ke parameter yang sesuai.
 
 Kamu TIDAK bisa:
 - Menjalankan perintah SQL, kode, script, atau query database
@@ -276,22 +433,21 @@ Kamu TIDAK bisa:
 <critical_rules>
 1. HANYA panggil tools yang diberikan. JANGAN mengarang data atau memanggil tools di luar daftar.
 2. Jika user meminta data di luar tools yang tersedia, tolak dengan sopan.
-3. Jika pertanyaan di LUAR konteks bengkel (politik, agama, berita, olahraga, hiburan, presiden, dll), tolak dengan sopan dan arahkan kembali ke topik bengkel.
-4. **KEAMANAN**: Jika user mengirimkan perintah SQL, kode, script, atau query database MENTAH (contoh: SELECT, INSERT, UPDATE, DELETE, DROP, UNION, dsb), TOLAK TEGAS. JANGAN memberikan saran alternatif. JANGAN menyebutkan tools/fungsi yang tersedia. Cukup katakan: "Maaf, saya tidak bisa menjalankan perintah SQL/query database. Saya hanya bisa membantu menjawab pertanyaan seputar operasional G Speed Bintaro. Silakan tanyakan dalam bahasa sehari-hari."
-5. Response WAJIB menggunakan **Markdown**. Format yang didukung: **bold**, *italic*, \`code\`, daftar (- atau 1.), heading (##, ###), tabel, blockquote (>).
+3. Jika pertanyaan di LUAR konteks bengkel, tolak dengan sopan dan arahkan kembali ke topik bengkel.
+4. **KEAMANAN**: Jika user mengirimkan perintah SQL/kode/script MENTAH, TOLAK TEGAS.
+5. Response WAJIB menggunakan **Markdown**.
 6. Nominal uang: **Rp1.000.000** (tanpa spasi setelah Rp, gunakan titik sebagai pemisah ribuan).
-7. Tanggal WAJIB format readable: "Senin, 3 Juni 2026, 14:30 WIB" atau "3 Jun 2026". JANGAN GUNAKAN ISO format (2026-06-03T14:30:00.000Z).
+7. Tanggal WAJIB format readable: "Senin, 3 Juni 2026, 14:30 WIB".
 8. Durasi dalam format: "2 jam 30 menit" atau "45 menit".
-9. JANGAN tampilkan UUID atau ID teknis. Gunakan nama orang, nomor order, atau informasi yang bermakna.
+9. JANGAN tampilkan UUID atau ID teknis.
 10. Profesional tapi ramah, ringkas, langsung ke poin.
-11. Jika data kosong (0 atau null), jelaskan dengan sopan. Contoh: "Hari ini belum ada order yang selesai. Tetap semangat! 💪"
+11. Jika data kosong, jelaskan dengan sopan.
 12. Semua kendaraan adalah Vespa.
-13. Jika user bertanya hal yang tidak jelas, minta klarifikasi dengan ramah.
-14. Gunakan emoji secukupnya untuk membuat percakapan lebih hidup.
-15. Jika ada data yang mengkhawatirkan (stok habis, refund tinggi, growth turun), beri peringatan dengan sopan.
-16. Jika ditanya "siapa kamu" atau sejenisnya, perkenalkan diri sebagai G-Speed Copilot.
-17. Data yang kamu terima dari tools SUDAH dalam format readable. Gunakan langsung tanpa mengkonversi ulang.
-18. **PENTING**: Tools untuk role CASHIER dan MECHANIC TIDAK memerlukan parameter ID. Cukup panggil tool tanpa parameter. Sistem akan otomatis mengambil data milik user yang sedang login.
+13. Gunakan emoji secukupnya.
+14. Jika ada data yang mengkhawatirkan, beri peringatan.
+15. Data yang kamu terima dari tools SUDAH dalam format readable.
+16. **PENTING**: Tools CASHIER/MECHANIC tidak perlu parameter ID. Tools ADMIN bisa menerima parameter opsional untuk filter.
+17. **FILTER WAKTU**: Jika user menyebutkan periode waktu, gunakan parameter yang sesuai.
 </critical_rules>`;
 
     const rolePrompts = {
@@ -301,52 +457,22 @@ Kamu TIDAK bisa:
 <nama>${userName}</nama>
 <tanggal>${today}</tanggal>
 
-<konteks_bisnis>
-G Speed Bintaro adalah bengkel spesialis Vespa. Sebagai admin, Anda mengelola seluruh operasional: tim mekanik, kasir, inventori sparepart, keuangan, dan pertumbuhan bisnis. Data yang Anda lihat adalah data KOLEKTIF seluruh bengkel, bukan data pribadi.
-</konteks_bisnis>
+<filter_guide>
+Untuk tools yang mendukung filter waktu, gunakan parameter berikut:
+- Jika user minta "30 hari terakhir": gunakan parameter { "days": 30 }
+- Jika user minta "bulan lalu" atau "Januari 2025": gunakan parameter { "startDate": "2025-01-01", "endDate": "2025-01-31" }
+- Jika user minta "tahun 2025": gunakan parameter { "startDate": "2025-01-01", "endDate": "2025-12-31" }
+- Jika user tidak menyebutkan periode, gunakan default (30 hari atau 7 hari sesuai deskripsi tool)
+</filter_guide>
 
 <akses_data>
-Anda memiliki akses ke:
-- Dashboard bisnis harian & bulanan (revenue, order, mekanik aktif, shift buka)
-- Performa SEMUA kasir (penjualan, shift, discrepancy)
-- Perbandingan performa SEMUA mekanik (job selesai, completion rate, pendapatan, ranking efisiensi)
-- Kesehatan inventori (nilai stok, dead stock, turnover, profit)
-- Pertumbuhan bisnis (revenue/customer/order growth)
-- Revenue vs target bulanan
-- Laporan laba bersih harian
-- Top sparepart & service terlaris
-- Jam sibuk bengkel (peak hours)
-- Distribusi tipe Vespa yang diservis
-- Alert stok (habis, rendah, over)
-- Refund stats & unpaid orders
-- Aktivitas terbaru bengkel
-- Retensi pelanggan & top customers by visit
-- Rata-rata waktu penyelesaian order
+Anda memiliki akses ke SEMUA data bengkel: dashboard, performa kasir & mekanik, inventori, keuangan, pertumbuhan, pelanggan, dll.
 </akses_data>
 
-<batasan>
-- Anda TIDAK memiliki shift kerja pribadi. "Shift" untuk admin berarti jumlah shift yang sedang buka.
-- Anda TIDAK memiliki job service pribadi. Data mekanik adalah data kolektif seluruh tim.
-- Anda TIDAK bisa melakukan transaksi. Hanya melihat laporan & insight.
-- "Hari ini" = data seluruh bengkel hari ini.
-</batasan>
-
-<fokus>
-Insight strategis, performa tim, kesehatan inventori, pertumbuhan bisnis, efisiensi operasional G Speed Bintaro.
-</fokus>
-
 <cara_menjawab>
-- Jika ditanya "bagaimana kabar bengkel hari ini?", panggil getAdminDashboardSnapshot + getAdminTodaySummary.
-- Jika ditanya "mekanik terbaik?", panggil getAdminMechanicComparison.
-- Jika ditanya "sparepart apa yang laris?", panggil getAdminTopSpareparts.
-- Jika ditanya "kapan bengkel paling ramai?", panggil getAdminPeakHours.
-- Jika ditanya "bagaimana target bulan ini?", panggil getAdminRevenueVsTarget.
-- Jika ditanya "pelanggan paling setia?", panggil getAdminTopCustomersByVisit.
-- Untuk pertanyaan strategis, kombinasikan beberapa tools untuk insight yang kaya.
-- SELALU berikan konteks dan interpretasi data, jangan hanya dump data mentah.
-- Jika ada data yang mengkhawatirkan, highlight dengan **perhatian khusus**.
-- **JIKA USER MENGIRIM SQL/QUERY/SCRIPT: TOLAK TEGAS. JANGAN SEBUTKAN TOOLS.**
-- **ADMIN tools TIDAK memerlukan parameter ID. Panggil tanpa parameter.**
+- Jika ditanya data dengan periode spesifik, gunakan parameter filter yang sesuai.
+- Contoh: "berapa penjualan bulan Agustus 2025?" → panggil getAdminDailyNetReport dengan startDate "2025-08-01" dan endDate "2025-08-31"
+- **ADMIN tools menerima parameter opsional untuk filter waktu.**
 </cara_menjawab>`,
 
       CASHIER: `${base}
@@ -355,45 +481,13 @@ Insight strategis, performa tim, kesehatan inventori, pertumbuhan bisnis, efisie
 <nama>${userName}</nama>
 <tanggal>${today}</tanggal>
 
-<konteks_bisnis>
-Sebagai kasir G Speed Bintaro, Anda melayani pelanggan yang datang servis Vespa. Anda membuat order, memproses pembayaran cash/QRIS, membuka & menutup shift. Data yang Anda lihat adalah data MILIK ANDA SENDIRI sebagai kasir.
-</konteks_bisnis>
-
 <akses_data>
-Anda memiliki akses ke data ANDA SENDIRI:
-- Ringkasan penjualan hari ini (total sales, order, cash, QRIS)
-- Perbandingan penjualan vs kemarin + ranking antar kasir
-- Shift aktif Anda (modal awal, penjualan saat ini, kas bersih, pengeluaran)
-- Order yang masih pending (DRAFT/QUEUED/IN_PROGRESS)
-- Riwayat penjualan harian (7 hari terakhir)
-- Statistik pelanggan Anda (total, baru hari ini, top customer)
-- Riwayat 10 shift terakhir (discrepancy, modal, penjualan)
-- 20 transaksi terbaru
+Anda memiliki akses ke data ANDA SENDIRI: penjualan hari ini, shift aktif, order pending, riwayat transaksi, statistik pelanggan.
 </akses_data>
 
 <batasan>
-- Anda HANYA bisa melihat data transaksi Anda sendiri.
-- Anda TIDAK bisa melihat data mekanik (job, performa, pendapatan).
-- Anda TIDAK bisa melihat data inventori atau stok sparepart.
-- Anda TIDAK bisa melihat data kasir lain.
-- "Shift aktif" = shift Anda sendiri yang sedang buka.
-- Jika ditanya data di luar akses, tolak dengan sopan.
-</batasan>
-
-<fokus>
-Penjualan hari ini, shift aktif, order pending, riwayat transaksi, pelayanan pelanggan.
-</fokus>
-
-<cara_menjawab>
-- Jika ditanya "bagaimana penjualan saya hari ini?", panggil getCashierTodaySummary + getCashierComparisonStats.
-- Jika ditanya "shift saya gimana?", panggil getCashierActiveShift.
-- Jika ditanya "order yang belum selesai?", panggil getCashierPendingOrders.
-- Jika ditanya "siapa pelanggan terbaik saya?", panggil getCashierCustomerStats.
-- **PENTING: Tools kasir TIDAK memerlukan parameter. Cukup panggil tanpa parameter. Sistem otomatis mengambil data Anda.**
-- SELALU gunakan data nyata dari tools. Jangan mengarang.
-- Jika penjualan sepi, beri semangat. Jika ramai, apresiasi.
-- **JIKA USER MENGIRIM SQL/QUERY/SCRIPT: TOLAK TEGAS. JANGAN SEBUTKAN TOOLS.**
-</cara_menjawab>`,
+Anda HANYA bisa melihat data transaksi Anda sendiri. Tools TIDAK memerlukan parameter ID.
+</batasan>`,
 
       MECHANIC: `${base}
 
@@ -401,66 +495,34 @@ Penjualan hari ini, shift aktif, order pending, riwayat transaksi, pelayanan pel
 <nama>${userName}</nama>
 <tanggal>${today}</tanggal>
 
-<konteks_bisnis>
-Sebagai mekanik G Speed Bintaro, Anda mengerjakan service Vespa pelanggan. Setiap job di-assign ke Anda. Anda bisa mengerjakan beberapa job sekaligus (IN_PROGRESS) atau menunggu antrian (QUEUED). Performa Anda diukur dari job selesai, kecepatan kerja, dan pendapatan. Data yang Anda lihat adalah data MILIK ANDA SENDIRI.
-</konteks_bisnis>
-
 <akses_data>
-Anda memiliki akses ke data ANDA SENDIRI:
-- Job yang sedang dikerjakan (IN_PROGRESS) — termasuk plat nomor Vespa
-- Job antrian (QUEUED) yang menunggu dikerjakan
-- Ringkasan performa pribadi (job selesai hari ini/minggu ini/bulan ini + pendapatan)
-- Riwayat kerja harian pribadi (7 hari)
-- Kecepatan kerja pribadi (rata-rata, tercepat, terlama)
-- Ranking efisiensi vs mekanik lain
-- Tren performa mingguan
-- 5 service yang paling sering Anda kerjakan
-- Pendapatan pribadi per hari + total
+Anda memiliki akses ke data ANDA SENDIRI: job aktif, antrian, performa pribadi, pendapatan, ranking efisiensi.
 </akses_data>
 
 <batasan>
-- Anda HANYA bisa melihat job yang di-assign ke Anda.
-- Anda TIDAK bisa melihat data penjualan, transaksi, atau keuangan bengkel.
-- Anda TIDAK bisa melihat data mekanik lain (performa, pendapatan mereka).
-- Anda TIDAK bisa melihat data kasir atau inventori.
-- "Job aktif" = job Anda sendiri yang sedang IN_PROGRESS.
-- Jika ditanya data di luar akses, tolak dengan sopan.
-</batasan>
-
-<fokus>
-Job aktif & antrian, performa pribadi, pendapatan pribadi, efisiensi & kecepatan kerja.
-</fokus>
-
-<cara_menjawab>
-- Jika ditanya "saya lagi ngerjain apa?", panggil getMechanicActiveJobs.
-- Jika ditanya "ada antrian buat saya?", panggil getMechanicPendingJobs.
-- Jika ditanya "performa saya gimana?", panggil getMechanicPerformanceSummary + getMechanicSpeedStats + getMechanicEfficiencyRank.
-- Jika ditanya "berapa pendapatan saya bulan ini?", panggil getMechanicEarningsBreakdown.
-- Jika ditanya "tren kerja saya gimana?", panggil getMechanicWeeklyTrend.
-- **PENTING: Tools mekanik TIDAK memerlukan parameter. Cukup panggil tanpa parameter. Sistem otomatis mengambil data Anda.**
-- SELALU sapa dengan semangat. Mekanik adalah jantung bengkel. 🔧
-- Jika performa bagus, apresiasi. Jika ada yang bisa ditingkatkan, beri motivasi positif.
-- **JIKA USER MENGIRIM SQL/QUERY/SCRIPT: TOLAK TEGAS. JANGAN SEBUTKAN TOOLS.**
-</cara_menjawab>`,
+Anda HANYA bisa melihat job yang di-assign ke Anda. Tools TIDAK memerlukan parameter ID.
+</batasan>`,
     };
 
     return rolePrompts[role] || base;
   }
 
   /**
-   * Bangun definisi tools sesuai role (TANPA parameter ID)
+   * Bangun definisi tools sesuai role
+   * Admin tools menerima parameter opsional untuk filter waktu
    * @param {string} role
    * @returns {Array}
    * @private
    */
   #buildTools(role) {
     const defs = {
+      // Mekanik (tanpa parameter)
       getMechanicActiveJobs: {
         type: "function",
         function: {
           name: "getMechanicActiveJobs",
           description:
-            "Job yang sedang dikerjakan (IN_PROGRESS) - milik mekanik sendiri. TIDAK perlu parameter.",
+            "Job yang sedang dikerjakan (IN_PROGRESS) - milik mekanik sendiri.",
           parameters: { type: "object", properties: {} },
         },
       },
@@ -468,8 +530,7 @@ Job aktif & antrian, performa pribadi, pendapatan pribadi, efisiensi & kecepatan
         type: "function",
         function: {
           name: "getMechanicPendingJobs",
-          description:
-            "Job antrian (QUEUED) - milik mekanik sendiri. TIDAK perlu parameter.",
+          description: "Job antrian (QUEUED) - milik mekanik sendiri.",
           parameters: { type: "object", properties: {} },
         },
       },
@@ -478,7 +539,7 @@ Job aktif & antrian, performa pribadi, pendapatan pribadi, efisiensi & kecepatan
         function: {
           name: "getMechanicPerformanceSummary",
           description:
-            "Performa pribadi: job selesai hari ini/minggu ini/bulan ini + pendapatan bulanan. TIDAK perlu parameter.",
+            "Performa pribadi: job selesai hari ini/minggu ini/bulan ini + pendapatan.",
           parameters: { type: "object", properties: {} },
         },
       },
@@ -487,16 +548,20 @@ Job aktif & antrian, performa pribadi, pendapatan pribadi, efisiensi & kecepatan
         function: {
           name: "getMechanicDailyHistory",
           description:
-            "Riwayat kerja harian pribadi (default 7 hari). TIDAK perlu parameter.",
-          parameters: { type: "object", properties: {} },
+            "Riwayat kerja harian pribadi (default 7 hari). Gunakan parameter days untuk custom.",
+          parameters: {
+            type: "object",
+            properties: {
+              days: { type: "number", description: "Jumlah hari (default 7)" },
+            },
+          },
         },
       },
       getMechanicSpeedStats: {
         type: "function",
         function: {
           name: "getMechanicSpeedStats",
-          description:
-            "Kecepatan kerja pribadi: rata-rata, tercepat, terlama (dalam menit). TIDAK perlu parameter.",
+          description: "Kecepatan kerja pribadi: rata-rata, tercepat, terlama.",
           parameters: { type: "object", properties: {} },
         },
       },
@@ -504,8 +569,7 @@ Job aktif & antrian, performa pribadi, pendapatan pribadi, efisiensi & kecepatan
         type: "function",
         function: {
           name: "getMechanicTopServices",
-          description:
-            "5 service yang paling sering dikerjakan pribadi. TIDAK perlu parameter.",
+          description: "5 service yang paling sering dikerjakan.",
           parameters: { type: "object", properties: {} },
         },
       },
@@ -514,16 +578,20 @@ Job aktif & antrian, performa pribadi, pendapatan pribadi, efisiensi & kecepatan
         function: {
           name: "getMechanicEarningsBreakdown",
           description:
-            "Pendapatan pribadi per hari + total + rata-rata per hari (default 30 hari). TIDAK perlu parameter.",
-          parameters: { type: "object", properties: {} },
+            "Pendapatan pribadi per hari (default 30 hari). Gunakan days untuk custom.",
+          parameters: {
+            type: "object",
+            properties: {
+              days: { type: "number", description: "Jumlah hari (default 30)" },
+            },
+          },
         },
       },
       getMechanicEfficiencyRank: {
         type: "function",
         function: {
           name: "getMechanicEfficiencyRank",
-          description:
-            "Ranking efisiensi pribadi vs semua mekanik lain. TIDAK perlu parameter.",
+          description: "Ranking efisiensi vs mekanik lain.",
           parameters: { type: "object", properties: {} },
         },
       },
@@ -531,16 +599,21 @@ Job aktif & antrian, performa pribadi, pendapatan pribadi, efisiensi & kecepatan
         type: "function",
         function: {
           name: "getMechanicWeeklyTrend",
-          description: "Tren performa mingguan. TIDAK perlu parameter.",
-          parameters: { type: "object", properties: {} },
+          description: "Tren performa mingguan (default 30 hari).",
+          parameters: {
+            type: "object",
+            properties: {
+              days: { type: "number", description: "Jumlah hari (default 30)" },
+            },
+          },
         },
       },
+      // Kasir (tanpa parameter)
       getCashierTodaySummary: {
         type: "function",
         function: {
           name: "getCashierTodaySummary",
-          description:
-            "Ringkasan penjualan hari ini: total sales, jumlah order, cash, QRIS. TIDAK perlu parameter.",
+          description: "Ringkasan penjualan hari ini.",
           parameters: { type: "object", properties: {} },
         },
       },
@@ -548,8 +621,7 @@ Job aktif & antrian, performa pribadi, pendapatan pribadi, efisiensi & kecepatan
         type: "function",
         function: {
           name: "getCashierActiveShift",
-          description:
-            "Shift aktif: modal awal, penjualan saat ini, kas bersih, pengeluaran. TIDAK perlu parameter.",
+          description: "Shift aktif saat ini.",
           parameters: { type: "object", properties: {} },
         },
       },
@@ -557,8 +629,7 @@ Job aktif & antrian, performa pribadi, pendapatan pribadi, efisiensi & kecepatan
         type: "function",
         function: {
           name: "getCashierPendingOrders",
-          description:
-            "Order pending: jumlah per status (DRAFT/QUEUED/IN_PROGRESS). TIDAK perlu parameter.",
+          description: "Order pending per status.",
           parameters: { type: "object", properties: {} },
         },
       },
@@ -566,17 +637,20 @@ Job aktif & antrian, performa pribadi, pendapatan pribadi, efisiensi & kecepatan
         type: "function",
         function: {
           name: "getCashierDailyHistory",
-          description:
-            "Riwayat penjualan harian (default 7 hari). TIDAK perlu parameter.",
-          parameters: { type: "object", properties: {} },
+          description: "Riwayat penjualan harian (default 7 hari).",
+          parameters: {
+            type: "object",
+            properties: {
+              days: { type: "number", description: "Jumlah hari (default 7)" },
+            },
+          },
         },
       },
       getCashierCustomerStats: {
         type: "function",
         function: {
           name: "getCashierCustomerStats",
-          description:
-            "Statistik pelanggan: total, baru hari ini, top customer. TIDAK perlu parameter.",
+          description: "Statistik pelanggan.",
           parameters: { type: "object", properties: {} },
         },
       },
@@ -584,8 +658,7 @@ Job aktif & antrian, performa pribadi, pendapatan pribadi, efisiensi & kecepatan
         type: "function",
         function: {
           name: "getCashierShiftHistory",
-          description:
-            "10 shift terakhir: discrepancy, modal, penjualan, rata-rata selisih. TIDAK perlu parameter.",
+          description: "10 shift terakhir.",
           parameters: { type: "object", properties: {} },
         },
       },
@@ -593,7 +666,7 @@ Job aktif & antrian, performa pribadi, pendapatan pribadi, efisiensi & kecepatan
         type: "function",
         function: {
           name: "getCashierRecentTransactions",
-          description: "20 transaksi terbaru. TIDAK perlu parameter.",
+          description: "20 transaksi terbaru.",
           parameters: { type: "object", properties: {} },
         },
       },
@@ -601,11 +674,11 @@ Job aktif & antrian, performa pribadi, pendapatan pribadi, efisiensi & kecepatan
         type: "function",
         function: {
           name: "getCashierComparisonStats",
-          description:
-            "Perbandingan penjualan hari ini vs kemarin + ranking. TIDAK perlu parameter.",
+          description: "Perbandingan penjualan hari ini vs kemarin.",
           parameters: { type: "object", properties: {} },
         },
       },
+      // Admin (dengan parameter opsional)
       getAdminDashboardSnapshot: {
         type: "function",
         function: {
@@ -619,8 +692,7 @@ Job aktif & antrian, performa pribadi, pendapatan pribadi, efisiensi & kecepatan
         type: "function",
         function: {
           name: "getAdminTodaySummary",
-          description:
-            "Ringkasan bisnis hari ini: revenue, jumlah order, rata-rata order, top product.",
+          description: "Ringkasan bisnis hari ini.",
           parameters: { type: "object", properties: {} },
         },
       },
@@ -629,8 +701,21 @@ Job aktif & antrian, performa pribadi, pendapatan pribadi, efisiensi & kecepatan
         function: {
           name: "getAdminCashierPerformance",
           description:
-            "Performa SEMUA kasir: jumlah shift, total penjualan, rata-rata selisih (default 30 hari).",
-          parameters: { type: "object", properties: {} },
+            "Performa SEMUA kasir. Gunakan days, startDate, atau endDate.",
+          parameters: {
+            type: "object",
+            properties: {
+              days: { type: "number", description: "Jumlah hari (default 30)" },
+              startDate: {
+                type: "string",
+                description: "Tanggal mulai (YYYY-MM-DD)",
+              },
+              endDate: {
+                type: "string",
+                description: "Tanggal akhir (YYYY-MM-DD)",
+              },
+            },
+          },
         },
       },
       getAdminMechanicComparison: {
@@ -638,16 +723,28 @@ Job aktif & antrian, performa pribadi, pendapatan pribadi, efisiensi & kecepatan
         function: {
           name: "getAdminMechanicComparison",
           description:
-            "Perbandingan SEMUA mekanik: total job, job selesai, completion rate, pendapatan (default 30 hari).",
-          parameters: { type: "object", properties: {} },
+            "Perbandingan SEMUA mekanik. Gunakan days, startDate, atau endDate.",
+          parameters: {
+            type: "object",
+            properties: {
+              days: { type: "number", description: "Jumlah hari (default 30)" },
+              startDate: {
+                type: "string",
+                description: "Tanggal mulai (YYYY-MM-DD)",
+              },
+              endDate: {
+                type: "string",
+                description: "Tanggal akhir (YYYY-MM-DD)",
+              },
+            },
+          },
         },
       },
       getAdminExpenseOverview: {
         type: "function",
         function: {
           name: "getAdminExpenseOverview",
-          description:
-            "Pengeluaran bulan ini: total, kategori terbesar, growth vs bulan lalu.",
+          description: "Pengeluaran bulan ini.",
           parameters: { type: "object", properties: {} },
         },
       },
@@ -655,17 +752,28 @@ Job aktif & antrian, performa pribadi, pendapatan pribadi, efisiensi & kecepatan
         type: "function",
         function: {
           name: "getAdminOrderStatusDistribution",
-          description:
-            "Distribusi status SEMUA order (default 30 hari): jumlah & persentase per status.",
-          parameters: { type: "object", properties: {} },
+          description: "Distribusi status order. Gunakan days atau startDate.",
+          parameters: {
+            type: "object",
+            properties: {
+              days: { type: "number", description: "Jumlah hari (default 30)" },
+              startDate: {
+                type: "string",
+                description: "Tanggal mulai (YYYY-MM-DD)",
+              },
+              endDate: {
+                type: "string",
+                description: "Tanggal akhir (YYYY-MM-DD)",
+              },
+            },
+          },
         },
       },
       getAdminInventoryHealth: {
         type: "function",
         function: {
           name: "getAdminInventoryHealth",
-          description:
-            "Kesehatan inventori: total nilai stok, dead stock, turnover rate, produk paling profitable.",
+          description: "Kesehatan inventori.",
           parameters: { type: "object", properties: {} },
         },
       },
@@ -673,8 +781,7 @@ Job aktif & antrian, performa pribadi, pendapatan pribadi, efisiensi & kecepatan
         type: "function",
         function: {
           name: "getAdminBusinessGrowth",
-          description:
-            "Pertumbuhan bisnis bulan ini vs bulan lalu: revenue growth, customer growth, order growth (%).",
+          description: "Pertumbuhan bisnis bulan ini vs bulan lalu.",
           parameters: { type: "object", properties: {} },
         },
       },
@@ -683,43 +790,91 @@ Job aktif & antrian, performa pribadi, pendapatan pribadi, efisiensi & kecepatan
         function: {
           name: "getAdminDailyNetReport",
           description:
-            "Laporan laba bersih harian: revenue, expenses, net per hari (default 7 hari).",
-          parameters: { type: "object", properties: {} },
+            "Laporan laba bersih harian. Gunakan days, startDate, atau endDate.",
+          parameters: {
+            type: "object",
+            properties: {
+              days: { type: "number", description: "Jumlah hari (default 7)" },
+              startDate: {
+                type: "string",
+                description: "Tanggal mulai (YYYY-MM-DD)",
+              },
+              endDate: {
+                type: "string",
+                description: "Tanggal akhir (YYYY-MM-DD)",
+              },
+            },
+          },
         },
       },
       getAdminTopSpareparts: {
         type: "function",
         function: {
           name: "getAdminTopSpareparts",
-          description:
-            "10 sparepart terlaris: jumlah terjual, revenue, profit (default 30 hari).",
-          parameters: { type: "object", properties: {} },
+          description: "10 sparepart terlaris. Gunakan days atau startDate.",
+          parameters: {
+            type: "object",
+            properties: {
+              days: { type: "number", description: "Jumlah hari (default 30)" },
+              startDate: {
+                type: "string",
+                description: "Tanggal mulai (YYYY-MM-DD)",
+              },
+              endDate: {
+                type: "string",
+                description: "Tanggal akhir (YYYY-MM-DD)",
+              },
+            },
+          },
         },
       },
       getAdminServicePopularity: {
         type: "function",
         function: {
           name: "getAdminServicePopularity",
-          description:
-            "10 service terpopuler: jumlah order, quantity, revenue (default 30 hari).",
-          parameters: { type: "object", properties: {} },
+          description: "10 service terpopuler. Gunakan days atau startDate.",
+          parameters: {
+            type: "object",
+            properties: {
+              days: { type: "number", description: "Jumlah hari (default 30)" },
+              startDate: {
+                type: "string",
+                description: "Tanggal mulai (YYYY-MM-DD)",
+              },
+              endDate: {
+                type: "string",
+                description: "Tanggal akhir (YYYY-MM-DD)",
+              },
+            },
+          },
         },
       },
       getAdminPeakHours: {
         type: "function",
         function: {
           name: "getAdminPeakHours",
-          description:
-            "Jam tersibuk bengkel: distribusi order & revenue per jam + jam puncak (default 30 hari).",
-          parameters: { type: "object", properties: {} },
+          description: "Jam tersibuk bengkel. Gunakan days atau startDate.",
+          parameters: {
+            type: "object",
+            properties: {
+              days: { type: "number", description: "Jumlah hari (default 30)" },
+              startDate: {
+                type: "string",
+                description: "Tanggal mulai (YYYY-MM-DD)",
+              },
+              endDate: {
+                type: "string",
+                description: "Tanggal akhir (YYYY-MM-DD)",
+              },
+            },
+          },
         },
       },
       getAdminVehicleDistribution: {
         type: "function",
         function: {
           name: "getAdminVehicleDistribution",
-          description:
-            "Distribusi tipe Vespa yang diservis di bengkel (berdasarkan brand).",
+          description: "Distribusi tipe Vespa yang diservis.",
           parameters: { type: "object", properties: {} },
         },
       },
@@ -727,8 +882,7 @@ Job aktif & antrian, performa pribadi, pendapatan pribadi, efisiensi & kecepatan
         type: "function",
         function: {
           name: "getAdminStockAlert",
-          description:
-            "Alert stok: sparepart habis (0), stok rendah (1-5), stok berlebih (50+).",
+          description: "Alert stok sparepart.",
           parameters: { type: "object", properties: {} },
         },
       },
@@ -736,17 +890,28 @@ Job aktif & antrian, performa pribadi, pendapatan pribadi, efisiensi & kecepatan
         type: "function",
         function: {
           name: "getAdminRefundStats",
-          description:
-            "Statistik refund: jumlah & total refund (default 30 hari).",
-          parameters: { type: "object", properties: {} },
+          description: "Statistik refund. Gunakan days atau startDate.",
+          parameters: {
+            type: "object",
+            properties: {
+              days: { type: "number", description: "Jumlah hari (default 30)" },
+              startDate: {
+                type: "string",
+                description: "Tanggal mulai (YYYY-MM-DD)",
+              },
+              endDate: {
+                type: "string",
+                description: "Tanggal akhir (YYYY-MM-DD)",
+              },
+            },
+          },
         },
       },
       getAdminRecentActivities: {
         type: "function",
         function: {
           name: "getAdminRecentActivities",
-          description:
-            "Aktivitas terbaru bengkel: order, expense, shift closing (default 20).",
+          description: "Aktivitas terbaru bengkel (default 20).",
           parameters: { type: "object", properties: {} },
         },
       },
@@ -754,7 +919,7 @@ Job aktif & antrian, performa pribadi, pendapatan pribadi, efisiensi & kecepatan
         type: "function",
         function: {
           name: "getAdminUnpaidOrders",
-          description: "Order COMPLETED/CLOSED yang belum dibayar.",
+          description: "Order selesai yang belum dibayar.",
           parameters: { type: "object", properties: {} },
         },
       },
@@ -762,8 +927,7 @@ Job aktif & antrian, performa pribadi, pendapatan pribadi, efisiensi & kecepatan
         type: "function",
         function: {
           name: "getAdminCustomerRetention",
-          description:
-            "Retensi pelanggan 3 bulan terakhir: pelanggan baru vs kembali per bulan + retention rate.",
+          description: "Retensi pelanggan 3 bulan terakhir.",
           parameters: { type: "object", properties: {} },
         },
       },
@@ -771,8 +935,7 @@ Job aktif & antrian, performa pribadi, pendapatan pribadi, efisiensi & kecepatan
         type: "function",
         function: {
           name: "getAdminRevenueVsTarget",
-          description:
-            "Revenue bulan ini vs target: persentase tercapai, sisa yang harus dicapai, hari tersisa.",
+          description: "Revenue vs target bulanan.",
           parameters: { type: "object", properties: {} },
         },
       },
@@ -780,8 +943,7 @@ Job aktif & antrian, performa pribadi, pendapatan pribadi, efisiensi & kecepatan
         type: "function",
         function: {
           name: "getAdminTopCustomersByVisit",
-          description:
-            "10 pelanggan paling sering berkunjung: total kunjungan, total belanja, kunjungan terakhir.",
+          description: "10 pelanggan paling sering berkunjung.",
           parameters: { type: "object", properties: {} },
         },
       },
@@ -789,9 +951,53 @@ Job aktif & antrian, performa pribadi, pendapatan pribadi, efisiensi & kecepatan
         type: "function",
         function: {
           name: "getAdminOrderCompletionTime",
-          description:
-            "Rata-rata waktu penyelesaian order: rata-rata, tercepat, terlama (dalam jam).",
+          description: "Rata-rata waktu penyelesaian order.",
           parameters: { type: "object", properties: {} },
+        },
+      },
+      getAdminPaymentMethodDistribution: {
+        type: "function",
+        function: {
+          name: "getAdminPaymentMethodDistribution",
+          description:
+            "Distribusi metode pembayaran. Gunakan days atau startDate.",
+          parameters: {
+            type: "object",
+            properties: {
+              days: { type: "number", description: "Jumlah hari (default 30)" },
+              startDate: {
+                type: "string",
+                description: "Tanggal mulai (YYYY-MM-DD)",
+              },
+              endDate: {
+                type: "string",
+                description: "Tanggal akhir (YYYY-MM-DD)",
+              },
+            },
+          },
+        },
+      },
+      getAdminMechanicAvailability: {
+        type: "function",
+        function: {
+          name: "getAdminMechanicAvailability",
+          description: "Ketersediaan mekanik (utilisasi).",
+          parameters: { type: "object", properties: {} },
+        },
+      },
+      getAdminMonthlyBusinessReview: {
+        type: "function",
+        function: {
+          name: "getAdminMonthlyBusinessReview",
+          description:
+            "Review performa bisnis bulanan. Gunakan month (1-12) dan year.",
+          parameters: {
+            type: "object",
+            properties: {
+              month: { type: "number", description: "Bulan (1-12)" },
+              year: { type: "number", description: "Tahun (2025, 2026, dst)" },
+            },
+          },
         },
       },
     };
@@ -807,6 +1013,10 @@ Job aktif & antrian, performa pribadi, pendapatan pribadi, efisiensi & kecepatan
 
   /**
    * Cek apakah tool diizinkan untuk role tertentu
+   * @param {string} toolName
+   * @param {string} role
+   * @returns {boolean}
+   * @private
    */
   #isToolAllowed(toolName, role) {
     const prefixMap = {
@@ -819,9 +1029,15 @@ Job aktif & antrian, performa pribadi, pendapatan pribadi, efisiensi & kecepatan
   }
 
   /**
-   * Eksekusi tool call dari AI - ID di-inject otomatis
+   * Eksekusi tool call dari AI dengan parameter yang sudah di-parse
+   * @param {string} name
+   * @param {Object} args - Arguments dari AI (mungkin berisi filter waktu)
+   * @param {string} userId
+   * @param {string} role
+   * @returns {Promise<any>}
+   * @private
    */
-  async #executeToolCall(name, userId, role) {
+  async #executeToolCall(name, args, userId, role) {
     if (!this.#isToolAllowed(name, role)) {
       logger.warn("[AGENT] Tool access denied", { name, role, userId });
       throw ApiError.forbidden({
@@ -829,7 +1045,37 @@ Job aktif & antrian, performa pribadi, pendapatan pribadi, efisiensi & kecepatan
       });
     }
 
-    logger.info("[AGENT] Executing tool call", { name, userId });
+    logger.info("[AGENT] Executing tool call", { name, userId, args });
+
+    const params = {};
+
+    // Parse time filter dari args
+    if (args) {
+      if (args.days) params.days = parseInt(args.days);
+      if (args.month) params.month = parseInt(args.month);
+      if (args.year) params.year = parseInt(args.year);
+
+      // Jika ada startDate/endDate langsung dari AI, gunakan
+      if (args.startDate) params.startDate = args.startDate;
+      if (args.endDate) params.endDate = args.endDate;
+
+      // Jika tidak ada startDate/endDate tapi ada input natural language dari user
+      if (
+        !params.startDate &&
+        !params.endDate &&
+        !params.days &&
+        !params.month
+      ) {
+        // Coba parse dari user message (disimpan di args._userMessage oleh chat method)
+        if (args._timeFilter) {
+          const parsed = this.#parseTimeFilter(args._timeFilter);
+          if (parsed.days) params.days = parsed.days;
+          if (parsed.startDate)
+            params.startDate = parsed.startDate.toISOString();
+          if (parsed.endDate) params.endDate = parsed.endDate.toISOString();
+        }
+      }
+    }
 
     const map = {
       getMechanicActiveJobs: () => this.insight.getMechanicActiveJobs(userId),
@@ -837,21 +1083,21 @@ Job aktif & antrian, performa pribadi, pendapatan pribadi, efisiensi & kecepatan
       getMechanicPerformanceSummary: () =>
         this.insight.getMechanicPerformanceSummary(userId),
       getMechanicDailyHistory: () =>
-        this.insight.getMechanicDailyHistory(userId, 7),
+        this.insight.getMechanicDailyHistory(userId, params.days || 7),
       getMechanicSpeedStats: () => this.insight.getMechanicSpeedStats(userId),
       getMechanicTopServices: () => this.insight.getMechanicTopServices(userId),
       getMechanicEarningsBreakdown: () =>
-        this.insight.getMechanicEarningsBreakdown(userId, 30),
+        this.insight.getMechanicEarningsBreakdown(userId, params.days || 30),
       getMechanicEfficiencyRank: () =>
         this.insight.getMechanicEfficiencyRank(userId),
       getMechanicWeeklyTrend: () =>
-        this.insight.getMechanicWeeklyTrend(userId, 30),
+        this.insight.getMechanicWeeklyTrend(userId, params.days || 30),
       getCashierTodaySummary: () => this.insight.getCashierTodaySummary(userId),
       getCashierActiveShift: () => this.insight.getCashierActiveShift(userId),
       getCashierPendingOrders: () =>
         this.insight.getCashierPendingOrders(userId),
       getCashierDailyHistory: () =>
-        this.insight.getCashierDailyHistory(userId, 7),
+        this.insight.getCashierDailyHistory(userId, params.days || 7),
       getCashierCustomerStats: () =>
         this.insight.getCashierCustomerStats(userId),
       getCashierShiftHistory: () => this.insight.getCashierShiftHistory(userId),
@@ -862,23 +1108,23 @@ Job aktif & antrian, performa pribadi, pendapatan pribadi, efisiensi & kecepatan
       getAdminDashboardSnapshot: () => this.insight.getAdminDashboardSnapshot(),
       getAdminTodaySummary: () => this.insight.getAdminTodaySummary(),
       getAdminCashierPerformance: () =>
-        this.insight.getAdminCashierPerformance(30),
+        this.insight.getAdminCashierPerformance(params),
       getAdminMechanicComparison: () =>
-        this.insight.getAdminMechanicComparison(30),
+        this.insight.getAdminMechanicComparison(params),
       getAdminExpenseOverview: () => this.insight.getAdminExpenseOverview(),
       getAdminOrderStatusDistribution: () =>
-        this.insight.getAdminOrderStatusDistribution(30),
+        this.insight.getAdminOrderStatusDistribution(params),
       getAdminInventoryHealth: () => this.insight.getAdminInventoryHealth(),
       getAdminBusinessGrowth: () => this.insight.getAdminBusinessGrowth(),
-      getAdminDailyNetReport: () => this.insight.getAdminDailyNetReport(7),
-      getAdminTopSpareparts: () => this.insight.getAdminTopSpareparts(30),
+      getAdminDailyNetReport: () => this.insight.getAdminDailyNetReport(params),
+      getAdminTopSpareparts: () => this.insight.getAdminTopSpareparts(params),
       getAdminServicePopularity: () =>
-        this.insight.getAdminServicePopularity(30),
-      getAdminPeakHours: () => this.insight.getAdminPeakHours(30),
+        this.insight.getAdminServicePopularity(params),
+      getAdminPeakHours: () => this.insight.getAdminPeakHours(params),
       getAdminVehicleDistribution: () =>
         this.insight.getAdminVehicleDistribution(),
       getAdminStockAlert: () => this.insight.getAdminStockAlert(),
-      getAdminRefundStats: () => this.insight.getAdminRefundStats(30),
+      getAdminRefundStats: () => this.insight.getAdminRefundStats(params),
       getAdminRecentActivities: () => this.insight.getAdminRecentActivities(20),
       getAdminUnpaidOrders: () => this.insight.getAdminUnpaidOrders(),
       getAdminCustomerRetention: () => this.insight.getAdminCustomerRetention(),
@@ -887,6 +1133,12 @@ Job aktif & antrian, performa pribadi, pendapatan pribadi, efisiensi & kecepatan
         this.insight.getAdminTopCustomersByVisit(),
       getAdminOrderCompletionTime: () =>
         this.insight.getAdminOrderCompletionTime(),
+      getAdminPaymentMethodDistribution: () =>
+        this.insight.getAdminPaymentMethodDistribution(params),
+      getAdminMechanicAvailability: () =>
+        this.insight.getAdminMechanicAvailability(),
+      getAdminMonthlyBusinessReview: () =>
+        this.insight.getAdminMonthlyBusinessReview(params),
     };
 
     const fn = map[name];
@@ -911,6 +1163,9 @@ Job aktif & antrian, performa pribadi, pendapatan pribadi, efisiensi & kecepatan
 
   /**
    * Hash pertanyaan untuk deduplikasi cache
+   * @param {string} message
+   * @returns {string}
+   * @private
    */
   #hashQuestion(message) {
     return crypto
@@ -922,6 +1177,9 @@ Job aktif & antrian, performa pribadi, pendapatan pribadi, efisiensi & kecepatan
 
   /**
    * Chat dengan AI agent
+   * @param {string} userId
+   * @param {string} message
+   * @returns {Promise<{reply: string, toolCalls: Array, cached: boolean}>}
    */
   async chat(userId, message) {
     logger.info("[AGENT] Chat started", {
@@ -941,7 +1199,6 @@ Job aktif & antrian, performa pribadi, pendapatan pribadi, efisiensi & kecepatan
       name: user.fullName,
     });
 
-
     const qHash = this.#hashQuestion(message);
     const cachedReply = await this.qaCache.get(`${userId}:${qHash}`);
     if (cachedReply) {
@@ -954,14 +1211,6 @@ Job aktif & antrian, performa pribadi, pendapatan pribadi, efisiensi & kecepatan
     const { max_tokens, temperature } = this.#getModelConfig(user.role);
     const cacheKey = `chat:${userId}`;
     let history = (await this.cache.get(cacheKey)) || [];
-
-    logger.info("[AGENT] Config loaded", {
-      role: user.role,
-      toolsCount: tools.length,
-      max_tokens,
-      temperature,
-      historyLength: history.length,
-    });
 
     history.push({ role: "user", content: message });
 
@@ -993,15 +1242,16 @@ Job aktif & antrian, performa pribadi, pendapatan pribadi, efisiensi & kecepatan
       const toolCalls = [];
 
       if (aiMessage.tool_calls?.length) {
-        logger.info("[AGENT] Processing tool calls", {
-          count: aiMessage.tool_calls.length,
-        });
         history.push(aiMessage);
 
         for (const tc of aiMessage.tool_calls) {
           try {
+            const args = tc.function.arguments
+              ? JSON.parse(tc.function.arguments)
+              : {};
             const result = await this.#executeToolCall(
               tc.function.name,
+              args,
               userId,
               user.role
             );
@@ -1028,7 +1278,6 @@ Job aktif & antrian, performa pribadi, pendapatan pribadi, efisiensi & kecepatan
           }
         }
 
-        logger.info("[AGENT] Sending final request to OpenRouter...");
         const finalResponse = await axios.post(
           "https://openrouter.ai/api/v1/chat/completions",
           {
@@ -1054,9 +1303,6 @@ Job aktif & antrian, performa pribadi, pendapatan pribadi, efisiensi & kecepatan
         await this.cache.set(cacheKey, history.slice(-25), 1800);
         await this.qaCache.set(`${userId}:${qHash}`, finalMessage.content, 600);
 
-        logger.info("[AGENT] Final response sent", {
-          replyPreview: finalMessage.content?.slice(0, 150),
-        });
         return { reply: finalMessage.content, toolCalls, cached: false };
       }
 
@@ -1064,9 +1310,6 @@ Job aktif & antrian, performa pribadi, pendapatan pribadi, efisiensi & kecepatan
       await this.cache.set(cacheKey, history.slice(-25), 1800);
       await this.qaCache.set(`${userId}:${qHash}`, aiMessage.content, 600);
 
-      logger.info("[AGENT] Response sent (no tool calls)", {
-        replyPreview: aiMessage.content?.slice(0, 150),
-      });
       return { reply: aiMessage.content, toolCalls: [], cached: false };
     } catch (err) {
       if (err instanceof ApiError) throw err;
