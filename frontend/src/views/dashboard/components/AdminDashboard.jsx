@@ -3,7 +3,7 @@ import PropTypes from "prop-types";
 import {
   Box,
   Card,
-  Chip,
+  
   Divider,
   IconButton,
   Skeleton,
@@ -142,7 +142,7 @@ const AdminDashboard = ({ data, isLoading, refetch }) => {
           sx={{
             p: 3,
             border: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
-            boxShadow: "none",
+           
             borderRadius: `${theme.shape.borderRadius}px`,
           }}
         >

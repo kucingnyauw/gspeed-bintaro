@@ -11,7 +11,8 @@
  * - Riwayat chat persisten selama sesi (tidak reset saat tutup)
  * - Scroll otomatis ke bawah saat ada pesan baru
  * - Send button dengan animasi hover
- * - Error state untuk pesan gagal (warna merah)
+ * - Error state untuk pesan gagal
+ * - Desain minimalis dengan spacing yang lega
  *
  * @param {Object} props
  * @param {boolean} props.open - Status dialog terbuka/tutup
@@ -29,8 +30,8 @@ import {
   Avatar,
   InputAdornment,
 } from "@mui/material";
-import { keyframes } from "@mui/material/styles";
-import { X, Send, Bot } from "lucide-react";
+import { alpha, keyframes } from "@mui/material/styles";
+import { X, Send, Bot, Sparkles } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
@@ -43,7 +44,7 @@ import { selectUser } from "@store/auth/authSelector.js";
  * @type {Object}
  */
 const fadeInUp = keyframes`
-  from { opacity: 0; transform: translateY(12px); }
+  from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 `;
 
@@ -54,7 +55,7 @@ const fadeInUp = keyframes`
  */
 const jumpDots = keyframes`
   0%, 80%, 100% { transform: translateY(0); }
-  40% { transform: translateY(-5px); }
+  40% { transform: translateY(-4px); }
 `;
 
 /**
@@ -65,17 +66,8 @@ const jumpDots = keyframes`
  * @returns {JSX.Element} Komponen typewriter
  */
 const TypewriterMessage = ({ content }) => {
-  /**
-   * Teks yang sudah ditampilkan sejauh ini.
-   *
-   * @type {[string, Function]}
-   */
   const [displayed, setDisplayed] = useState("");
 
-  /**
-   * Effect: Animasi ketik karakter per karakter.
-   * Reset jika konten berubah menjadi lebih pendek.
-   */
   useEffect(() => {
     if (!content || content.length < displayed.length) {
       setDisplayed("");
@@ -94,16 +86,7 @@ const TypewriterMessage = ({ content }) => {
 };
 
 /**
- * MarkdownContent - Render markdown dengan styling yang menyesuaikan theme.
- *
- * Mendukung:
- * - Paragraph, heading (h1-h6)
- * - List (ordered & unordered)
- * - Bold, italic, strikethrough
- * - Inline code & code blocks
- * - Table
- * - Blockquote
- * - Horizontal rule
+ * MarkdownContent - Render markdown dengan styling minimalis.
  *
  * @param {Object} props
  * @param {string} props.content - Konten markdown
@@ -112,26 +95,20 @@ const TypewriterMessage = ({ content }) => {
 const MarkdownContent = ({ content }) => {
   const theme = useTheme();
 
-  /**
-   * Style untuk elemen-elemen markdown.
-   *
-   * @type {Object}
-   */
   const markdownStyles = {
-    "& p": { m: 0, lineHeight: 1.7, color: "inherit" },
-    "& p:not(:last-child)": { mb: 1 },
-    "& ul, & ol": { m: 0, pl: 2.5, lineHeight: 1.7, color: "inherit" },
+    "& p": { m: 0, lineHeight: 1.65, color: "inherit", fontSize: "0.9375rem" },
+    "& p:not(:last-child)": { mb: 1.25 },
+    "& ul, & ol": { m: 0, pl: 2.5, lineHeight: 1.65, color: "inherit" },
     "& li:not(:last-child)": { mb: 0.25 },
-    "& strong": { fontWeight: theme.typography.fontWeightBold, color: "inherit" },
+    "& strong": { fontWeight: 600, color: "inherit" },
     "& em": { fontStyle: "italic" },
-    "& del": { textDecoration: "line-through", opacity: 0.7 },
     "& code": {
       px: 0.75,
       py: 0.25,
       borderRadius: 1,
       fontSize: "0.8125rem",
       fontFamily: "monospace",
-      bgcolor: "rgba(0,0,0,0.08)",
+      bgcolor: alpha(theme.palette.common.black, 0.06),
       color: "inherit",
     },
     "& pre": {
@@ -140,47 +117,27 @@ const MarkdownContent = ({ content }) => {
       borderRadius: 1.5,
       fontSize: "0.8125rem",
       fontFamily: "monospace",
-      bgcolor: "rgba(0,0,0,0.08)",
+      bgcolor: alpha(theme.palette.common.black, 0.06),
       overflow: "auto",
-    },
-    "& table": {
-      width: "100%",
-      borderCollapse: "collapse",
-      fontSize: theme.typography.body2.fontSize,
-    },
-    "& th, & td": {
-      px: 1.25,
-      py: 0.75,
-      textAlign: "left",
-      borderBottom: `1px solid rgba(0,0,0,0.1)`,
-    },
-    "& th": {
-      fontWeight: theme.typography.fontWeightMedium,
-      fontSize: theme.typography.caption.fontSize,
-      textTransform: "uppercase",
-      letterSpacing: "0.05em",
-      opacity: 0.7,
     },
     "& blockquote": {
       m: 0,
       pl: 2,
       py: 0.25,
-      borderLeft: `3px solid ${theme.palette.secondary.main}`,
-      opacity: 0.8,
+      borderLeft: `2px solid ${alpha(theme.palette.secondary.main, 0.5)}`,
+      opacity: 0.85,
       fontStyle: "italic",
     },
-    "& hr": { my: 1.5, border: "none", borderTop: `1px solid rgba(0,0,0,0.1)` },
+    "& hr": { my: 1.5, border: "none", borderTop: `1px solid ${theme.palette.divider}` },
     "& h1, & h2, & h3, & h4, & h5, & h6": {
       m: 0,
       mt: 1.25,
-      mb: 0.75,
-      fontWeight: theme.typography.fontWeightBold,
+      mb: 0.5,
+      fontWeight: 600,
       lineHeight: 1.3,
       color: "inherit",
       "&:first-of-type": { mt: 0 },
     },
-    "& h3": { fontSize: theme.typography.h6.fontSize },
-    "& h4": { fontSize: theme.typography.body1.fontSize },
   };
 
   return (
@@ -193,7 +150,7 @@ const MarkdownContent = ({ content }) => {
 };
 
 /**
- * Chat - Dialog chatbot fullscreen di mobile.
+ * Chat - Dialog chatbot fullscreen di mobile, minimalis di desktop.
  *
  * @param {Object} props
  * @param {boolean} props.open - Status dialog
@@ -202,17 +159,8 @@ const MarkdownContent = ({ content }) => {
  */
 const Chat = ({ open, onClose }) => {
   const theme = useTheme();
-
-  /**
-   * Data user dari Redux store.
-   *
-   * @type {Object}
-   */
   const user = useSelector(selectUser);
 
-  /**
-   * Hook chat yang menyediakan messages, input, dan handler.
-   */
   const {
     messages,
     input,
@@ -223,32 +171,11 @@ const Chat = ({ open, onClose }) => {
     scrollRef,
   } = useChat();
 
-  /**
-   * Ref untuk input field.
-   *
-   * @type {React.RefObject<HTMLInputElement>}
-   */
   const inputRef = useRef(null);
-
-  /**
-   * Flag untuk menandai apakah chat sudah pernah diinisialisasi.
-   * Hanya panggil initChat() sekali saat pertama kali komponen mount.
-   *
-   * @type {React.MutableRefObject<boolean>}
-   */
   const hasInitialized = useRef(false);
-
-  /**
-   * Nama depan user untuk sapaan personal.
-   *
-   * @type {string}
-   */
   const firstName = user?.fullName?.split(" ")[0] || "Sobat";
+  const borderRadius = `${theme.shape.borderRadius}px`;
 
-  /**
-   * Effect: Inisialisasi chat saat dialog pertama kali dibuka.
-   * Auto-focus input field setelah dialog terbuka.
-   */
   useEffect(() => {
     if (open && !hasInitialized.current) {
       initChat();
@@ -259,20 +186,12 @@ const Chat = ({ open, onClose }) => {
     }
   }, [open, initChat]);
 
-  /**
-   * Handler keyboard: Kirim pesan saat Enter (tanpa Shift).
-   *
-   * @param {React.KeyboardEvent} e - Event keyboard
-   */
   const handleKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
       sendMessage();
     }
   };
-
-  /** @type {string} Nilai border radius dari theme */
-  const borderRadius = `${theme.shape.borderRadius}px`;
 
   return (
     <Box
@@ -287,70 +206,61 @@ const Chat = ({ open, onClose }) => {
         display: open ? "flex" : "none",
         alignItems: "center",
         justifyContent: "center",
-        bgcolor: { xs: "background.paper", sm: "rgba(0,0,0,0.4)" },
-        backdropFilter: { xs: "none", sm: "blur(6px)" },
+        bgcolor: { xs: "background.paper", sm: alpha(theme.palette.common.black, 0.35) },
+        backdropFilter: { xs: "none", sm: "blur(4px)" },
       }}
     >
       <Box
         onClick={(e) => e.stopPropagation()}
         sx={{
-          width: { xs: "100%", sm: 460 },
-          maxWidth: { xs: "100%", sm: 460 },
-          height: { xs: "100%", sm: 620 },
-          maxHeight: { xs: "100%", sm: "92vh" },
+          width: { xs: "100%", sm: 520 },
+          maxWidth: { xs: "100%", sm: 520 },
+          height: { xs: "100%", sm: 640 },
+          maxHeight: { xs: "100%", sm: "90vh" },
           display: "flex",
           flexDirection: "column",
           borderRadius: { xs: 0, sm: borderRadius },
           bgcolor: "background.paper",
           border: { xs: "none", sm: `1px solid ${theme.palette.divider}` },
-          boxShadow: { xs: "none", sm: `0 16px 48px rgba(0,0,0,0.18)` },
+          boxShadow: { xs: "none", sm: `0 24px 64px ${alpha(theme.palette.common.black, 0.12)}` },
           overflow: "hidden",
-          animation: `${fadeInUp} 0.35s ${theme.transitions.easing.easeOut}`,
+          animation: `${fadeInUp} 0.3s ${theme.transitions.easing.easeOut}`,
         }}
       >
-        {/* HEADER */}
+        {/* HEADER - Minimalis */}
         <Stack
           direction="row"
           sx={{
             alignItems: "center",
             justifyContent: "space-between",
             px: 3,
-            py: 2.5,
-            borderBottom: `1px solid ${theme.palette.divider}`,
-            bgcolor: "background.default",
+            py: 2,
+            borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
             flexShrink: 0,
           }}
         >
-          <Stack direction="row" sx={{ gap: 2, alignItems: "center" }}>
-            <Avatar
+          <Stack direction="row" sx={{ gap: 1.5, alignItems: "center" }}>
+            <Box
               sx={{
-                width: 44,
-                height: 44,
-                bgcolor: "secondary.main",
-                color: "secondary.contrastText",
-                borderRadius: "50%",
+                width: 36,
+                height: 36,
+                borderRadius: borderRadius,
+                bgcolor: alpha(theme.palette.secondary.main, 0.08),
+                color: "secondary.main",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
               }}
             >
-              <Bot size={24} strokeWidth={1.5} />
-            </Avatar>
+              <Sparkles size={18} strokeWidth={1.5} />
+            </Box>
             <Box>
-              <Typography variant="subtitle2" sx={{ fontWeight: 700, lineHeight: 1.3 }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, lineHeight: 1.3, fontSize: "0.9375rem" }}>
                 G-Speed Copilot
               </Typography>
-              <Stack direction="row" sx={{ gap: 1, alignItems: "center", mt: 0.25 }}>
-                <Box
-                  sx={{
-                    width: 8,
-                    height: 8,
-                    borderRadius: "50%",
-                    bgcolor: "success.main",
-                    boxShadow: `0 0 0 3px rgba(46, 125, 50, 0.2)`,
-                  }}
-                />
-                <Typography variant="caption" color="text.secondary">
-                  Online &bull; Siap membantu
-                </Typography>
-              </Stack>
+              <Typography variant="caption" color="text.secondary">
+                AI Assistant
+              </Typography>
             </Box>
           </Stack>
           <IconButton
@@ -363,7 +273,7 @@ const Chat = ({ open, onClose }) => {
               "&:hover": { color: "text.primary", bgcolor: "action.hover" },
             }}
           >
-            <X size={20} strokeWidth={1.5} />
+            <X size={18} strokeWidth={1.5} />
           </IconButton>
         </Stack>
 
@@ -373,15 +283,15 @@ const Chat = ({ open, onClose }) => {
           sx={{
             flex: 1,
             overflowY: "auto",
-            px: { xs: 2, sm: 3 },
+            px: { xs: 2.5, sm: 3 },
             py: 3,
             display: "flex",
             flexDirection: "column",
-            gap: 3,
-            "&::-webkit-scrollbar": { width: 5 },
+            gap: 2.5,
+            "&::-webkit-scrollbar": { width: 4 },
             "&::-webkit-scrollbar-track": { bgcolor: "transparent" },
             "&::-webkit-scrollbar-thumb": {
-              bgcolor: "divider",
+              bgcolor: alpha(theme.palette.divider, 0.5),
               borderRadius: 10,
             },
           }}
@@ -393,30 +303,31 @@ const Chat = ({ open, onClose }) => {
                 flex: 1,
                 alignItems: "center",
                 justifyContent: "center",
-                gap: 3,
+                gap: 4,
                 py: 6,
                 textAlign: "center",
               }}
             >
-              <Avatar
+              <Box
                 sx={{
-                  width: 80,
-                  height: 80,
-                  bgcolor: "secondary.main",
-                  color: "secondary.contrastText",
+                  width: 64,
+                  height: 64,
                   borderRadius: "50%",
-                  boxShadow: `0 8px 24px rgba(0,0,0,0.12)`,
+                  bgcolor: alpha(theme.palette.secondary.main, 0.06),
+                  color: "secondary.main",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
                 }}
               >
-                <Bot size={40} strokeWidth={1.5} />
-              </Avatar>
-              <Box sx={{ maxWidth: 320 }}>
-                <Typography variant="h6" sx={{ fontWeight: 700, mb: 1 }}>
-                  Hai, {firstName}! 👋
+                <Sparkles size={28} strokeWidth={1.5} />
+              </Box>
+              <Box sx={{ maxWidth: 300 }}>
+                <Typography variant="h6" sx={{ fontWeight: 600, mb: 1, fontSize: "1.125rem" }}>
+                  Hai, {firstName}!
                 </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7 }}>
-                  Aku asisten AI-mu untuk operasional bengkel. Tanyakan apapun
-                  seputar performa, penjualan, stok, atau progress pekerjaan.
+                  Tanyakan apapun seputar performa, penjualan, stok, atau progress pekerjaan bengkel.
                 </Typography>
               </Box>
             </Stack>
@@ -434,42 +345,48 @@ const Chat = ({ open, onClose }) => {
                 sx={{
                   justifyContent: isAgent ? "flex-start" : "flex-end",
                   alignItems: "flex-end",
-                  gap: 1.5,
+                  gap: 1,
                   animation: `${fadeInUp} 0.25s ${theme.transitions.easing.easeOut}`,
                 }}
               >
                 {isAgent && (
-                  <Avatar
+                  <Box
                     sx={{
-                      width: 32,
-                      height: 32,
-                      bgcolor: "secondary.main",
-                      color: "secondary.contrastText",
+                      width: 28,
+                      height: 28,
+                      borderRadius: borderRadius,
+                      bgcolor: alpha(theme.palette.secondary.main, 0.08),
+                      color: "secondary.main",
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
                       flexShrink: 0,
-                      borderRadius: "50%",
                       mb: 0.25,
                     }}
                   >
-                    <Bot size={16} strokeWidth={1.5} />
-                  </Avatar>
+                    <Sparkles size={14} strokeWidth={1.5} />
+                  </Box>
                 )}
 
                 <Box
                   sx={{
-                    maxWidth: isAgent ? "82%" : "72%",
-                    px: 2.5,
-                    py: 2,
+                    maxWidth: isAgent ? "80%" : "70%",
+                    px: 2,
+                    py: 1.5,
                     borderRadius: isAgent
-                      ? `6px 20px 20px 6px`
-                      : `20px 6px 6px 20px`,
-                    bgcolor: isAgent ? "action.hover" : "secondary.main",
-                    color: isAgent ? "text.primary" : "secondary.contrastText",
-                    boxShadow: isAgent
-                      ? "none"
-                      : `0 4px 12px rgba(0,0,0,0.1)`,
+                      ? `${borderRadius} ${borderRadius} ${borderRadius} 4px`
+                      : `${borderRadius} ${borderRadius} 4px ${borderRadius}`,
+                    bgcolor: isAgent
+                      ? alpha(theme.palette.secondary.main, 0.04)
+                      : alpha(theme.palette.secondary.main, 0.1),
+                    color: "text.primary",
+                    border: isAgent
+                      ? `1px solid ${alpha(theme.palette.divider, 0.4)}`
+                      : "1px solid transparent",
                     ...(msg.isError && {
-                      bgcolor: "error.main",
-                      color: "error.contrastText",
+                      bgcolor: alpha(theme.palette.error.main, 0.08),
+                      borderColor: alpha(theme.palette.error.main, 0.2),
+                      color: "error.main",
                     }),
                   }}
                 >
@@ -493,29 +410,33 @@ const Chat = ({ open, onClose }) => {
               direction="row"
               sx={{
                 alignItems: "flex-end",
-                gap: 1.5,
+                gap: 1,
                 animation: `${fadeInUp} 0.25s ${theme.transitions.easing.easeOut}`,
               }}
             >
-              <Avatar
+              <Box
                 sx={{
-                  width: 32,
-                  height: 32,
-                  bgcolor: "secondary.main",
-                  color: "secondary.contrastText",
+                  width: 28,
+                  height: 28,
+                  borderRadius: borderRadius,
+                  bgcolor: alpha(theme.palette.secondary.main, 0.08),
+                  color: "secondary.main",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
                   flexShrink: 0,
-                  borderRadius: "50%",
                   mb: 0.25,
                 }}
               >
-                <Bot size={16} strokeWidth={1.5} />
-              </Avatar>
+                <Sparkles size={14} strokeWidth={1.5} />
+              </Box>
               <Box
                 sx={{
-                  px: 3,
-                  py: 2.5,
-                  borderRadius: `6px 20px 20px 6px`,
-                  bgcolor: "action.hover",
+                  px: 2.5,
+                  py: 2,
+                  borderRadius: `${borderRadius} ${borderRadius} ${borderRadius} 4px`,
+                  bgcolor: alpha(theme.palette.secondary.main, 0.04),
+                  border: `1px solid ${alpha(theme.palette.divider, 0.4)}`,
                   display: "flex",
                   alignItems: "center",
                   gap: 0.75,
@@ -525,13 +446,13 @@ const Chat = ({ open, onClose }) => {
                   <Box
                     key={`dot-${i}`}
                     sx={{
-                      width: 8,
-                      height: 8,
+                      width: 6,
+                      height: 6,
                       borderRadius: "50%",
-                      bgcolor: "secondary.main",
-                      opacity: 0.5,
+                      bgcolor: "text.secondary",
+                      opacity: 0.4,
                       animation: `${jumpDots} 1.4s ease-in-out infinite`,
-                      animationDelay: `${i * 0.18}s`,
+                      animationDelay: `${i * 0.16}s`,
                     }}
                   />
                 ))}
@@ -539,20 +460,18 @@ const Chat = ({ open, onClose }) => {
             </Stack>
           )}
 
-          {/* Bottom spacer */}
           <Box sx={{ height: 4, flexShrink: 0 }} />
         </Box>
 
-        {/* INPUT AREA */}
+        {/* INPUT AREA - Minimalis */}
         <Stack
           direction="row"
           sx={{
             alignItems: "flex-end",
             gap: 1.5,
-            px: { xs: 2, sm: 3 },
-            py: { xs: 2, sm: 3 },
-            borderTop: `1px solid ${theme.palette.divider}`,
-            bgcolor: "background.default",
+            px: { xs: 2.5, sm: 3 },
+            py: { xs: 2, sm: 2.5 },
+            borderTop: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
             flexShrink: 0,
           }}
         >
@@ -570,12 +489,20 @@ const Chat = ({ open, onClose }) => {
             sx={{
               "& .MuiOutlinedInput-root": {
                 borderRadius: borderRadius,
-                bgcolor: "background.paper",
-                "& fieldset": { borderColor: "divider" },
-                "&:hover fieldset": { borderColor: "secondary.main" },
+                bgcolor: alpha(theme.palette.secondary.main, 0.03),
+                fontSize: "0.9375rem",
+                "& fieldset": { borderColor: "transparent" },
+                "&:hover fieldset": { borderColor: alpha(theme.palette.secondary.main, 0.2) },
                 "&.Mui-focused fieldset": {
-                  borderColor: "secondary.main",
+                  borderColor: alpha(theme.palette.secondary.main, 0.3),
                   borderWidth: 1,
+                },
+              },
+              "& .MuiOutlinedInput-input": {
+                py: 1.25,
+                "&::placeholder": {
+                  color: "text.disabled",
+                  opacity: 0.7,
                 },
               },
             }}
@@ -590,28 +517,26 @@ const Chat = ({ open, onClose }) => {
                       size="small"
                       aria-label="Kirim pesan"
                       sx={{
-                        width: 40,
-                        height: 40,
-                        bgcolor: "secondary.main",
-                        color: "secondary.contrastText",
-                        borderRadius: "50%",
-                        boxShadow: `0 4px 12px rgba(0,0,0,0.15)`,
+                        width: 36,
+                        height: 36,
+                        bgcolor: input.trim() ? "secondary.main" : "transparent",
+                        color: input.trim() ? "secondary.contrastText" : "text.disabled",
+                        borderRadius: borderRadius,
                         transition: (t) =>
-                          t.transitions.create(["background-color", "transform"], {
+                          t.transitions.create(["background-color", "transform", "color"], {
                             duration: t.transitions.duration.shorter,
                           }),
                         "&:hover": {
-                          bgcolor: "secondary.dark",
-                          transform: "scale(1.05)",
+                          bgcolor: input.trim() ? "secondary.dark" : "action.hover",
+                          transform: input.trim() ? "scale(1.05)" : "none",
                         },
                         "&.Mui-disabled": {
-                          bgcolor: "action.disabledBackground",
-                          color: "action.disabled",
-                          boxShadow: "none",
+                          bgcolor: "transparent",
+                          color: "text.disabled",
                         },
                       }}
                     >
-                      <Send size={18} strokeWidth={2} />
+                      <Send size={16} strokeWidth={2} />
                     </IconButton>
                   </InputAdornment>
                 ),

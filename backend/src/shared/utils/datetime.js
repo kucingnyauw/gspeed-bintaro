@@ -1,6 +1,10 @@
+/**
+ * Utility class untuk formatting tanggal, waktu, dan durasi
+ * Semua output dalam bahasa Indonesia
+ */
 export default class DateTime {
   /**
-   * Format tanggal ke string lokal Indonesia (full)
+   * Format tanggal ke string lengkap (hari, tanggal, jam)
    * @param {Date|string} date
    * @returns {string}
    * @example "Senin, 24 Mei 2026, 14:30"
@@ -18,7 +22,7 @@ export default class DateTime {
   }
 
   /**
-   * Format tanggal ke string lokal Indonesia (tanggal saja)
+   * Format tanggal saja (tanpa hari dan jam)
    * @param {Date|string} date
    * @returns {string}
    * @example "24 Mei 2026"
@@ -33,7 +37,7 @@ export default class DateTime {
   }
 
   /**
-   * Format tanggal ke string lokal Indonesia (waktu saja)
+   * Format waktu saja
    * @param {Date|string} date
    * @returns {string}
    * @example "14:30"
@@ -47,7 +51,7 @@ export default class DateTime {
   }
 
   /**
-   * Format tanggal ke string lokal Indonesia (tanggal pendek)
+   * Format tanggal pendek (DD/MM/YYYY)
    * @param {Date|string} date
    * @returns {string}
    * @example "24/05/2026"
@@ -62,7 +66,7 @@ export default class DateTime {
   }
 
   /**
-   * Format tanggal ke string ISO (YYYY-MM-DD)
+   * Format tanggal ISO (YYYY-MM-DD)
    * @param {Date|string} date
    * @returns {string}
    * @example "2026-05-24"
@@ -77,7 +81,7 @@ export default class DateTime {
   }
 
   /**
-   * Format tanggal ke string ISO DateTime
+   * Format tanggal ISO DateTime (YYYY-MM-DD HH:MM:SS)
    * @param {Date|string} date
    * @returns {string}
    * @example "2026-05-24 14:30:00"
@@ -95,10 +99,10 @@ export default class DateTime {
   }
 
   /**
-   * Format tanggal relatif (berapa lama dari sekarang)
+   * Format tanggal relatif dari sekarang
    * @param {Date|string} date
    * @returns {string}
-   * @example "2 jam yang lalu", "3 hari yang lalu", "1 minggu yang lalu"
+   * @example "Baru saja", "2 jam yang lalu", "3 hari yang lalu"
    */
   static toRelative(date) {
     if (!date) return "-";
@@ -123,16 +127,15 @@ export default class DateTime {
   }
 
   /**
-   * Format durasi antara dua tanggal
+   * Format durasi antara dua tanggal (lengkap)
    * @param {Date|string} startDate
    * @param {Date|string} endDate
    * @returns {string}
-   * @example "2 jam 30 menit", "1 jam", "45 menit"
+   * @example "2 jam 30 menit", "45 menit", "30 detik"
    */
   static toDuration(startDate, endDate) {
     if (!startDate || !endDate) return "-";
     const diff = new Date(endDate) - new Date(startDate);
-    
     if (diff < 0) return "-";
 
     const hours = Math.floor(diff / 3600000);
@@ -152,12 +155,11 @@ export default class DateTime {
    * @param {Date|string} startDate
    * @param {Date|string} endDate
    * @returns {string}
-   * @example "2j 30m", "1j", "45m"
+   * @example "2j 30m", "45m"
    */
   static toShortDuration(startDate, endDate) {
     if (!startDate || !endDate) return "-";
     const diff = new Date(endDate) - new Date(startDate);
-    
     if (diff < 0) return "-";
 
     const hours = Math.floor(diff / 3600000);
@@ -172,10 +174,10 @@ export default class DateTime {
   }
 
   /**
-   * Mendapatkan nama hari dalam bahasa Indonesia
+   * Nama hari dalam bahasa Indonesia
    * @param {Date|string} date
    * @returns {string}
-   * @example "Senin", "Selasa"
+   * @example "Senin"
    */
   static getDayName(date) {
     if (!date) return "-";
@@ -184,17 +186,14 @@ export default class DateTime {
   }
 
   /**
-   * Mendapatkan nama bulan dalam bahasa Indonesia
+   * Nama bulan dalam bahasa Indonesia
    * @param {Date|string} date
    * @returns {string}
-   * @example "Januari", "Mei"
+   * @example "Januari"
    */
   static getMonthName(date) {
     if (!date) return "-";
-    const months = [
-      "Januari", "Februari", "Maret", "April", "Mei", "Juni",
-      "Juli", "Agustus", "September", "Oktober", "November", "Desember"
-    ];
+    const months = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
     return months[new Date(date).getMonth()];
   }
 
@@ -207,11 +206,7 @@ export default class DateTime {
     if (!date) return false;
     const now = new Date();
     const then = new Date(date);
-    return (
-      now.getFullYear() === then.getFullYear() &&
-      now.getMonth() === then.getMonth() &&
-      now.getDate() === then.getDate()
-    );
+    return now.getFullYear() === then.getFullYear() && now.getMonth() === then.getMonth() && now.getDate() === then.getDate();
   }
 
   /**
@@ -225,40 +220,25 @@ export default class DateTime {
     const yesterday = new Date(now);
     yesterday.setDate(yesterday.getDate() - 1);
     const then = new Date(date);
-    return (
-      yesterday.getFullYear() === then.getFullYear() &&
-      yesterday.getMonth() === then.getMonth() &&
-      yesterday.getDate() === then.getDate()
-    );
+    return yesterday.getFullYear() === then.getFullYear() && yesterday.getMonth() === then.getMonth() && yesterday.getDate() === then.getDate();
   }
 
   /**
-   * Format tanggal dengan label khusus (Hari ini, Kemarin, atau tanggal lengkap)
+   * Format tanggal cerdas (Hari ini/Kemarin/tanggal lengkap)
    * @param {Date|string} date
    * @returns {string}
    * @example "Hari ini, 14:30", "Kemarin, 14:30", "24 Mei 2026, 14:30"
    */
   static toSmartDate(date) {
     if (!date) return "-";
-    const d = new Date(date);
-    const time = d.toLocaleString("id-ID", {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
-
-    if (DateTime.isToday(date)) {
-      return `Hari ini, ${time}`;
-    }
-
-    if (DateTime.isYesterday(date)) {
-      return `Kemarin, ${time}`;
-    }
-
+    const time = DateTime.toTimeID(date);
+    if (DateTime.isToday(date)) return `Hari ini, ${time}`;
+    if (DateTime.isYesterday(date)) return `Kemarin, ${time}`;
     return `${DateTime.toDateID(date)}, ${time}`;
   }
 
   /**
-   * Format tanggal untuk nama file (aman untuk filesystem)
+   * Format tanggal untuk nama file
    * @param {Date|string} date
    * @returns {string}
    * @example "20260524_143000"
@@ -276,29 +256,24 @@ export default class DateTime {
   }
 
   /**
-   * Mendapatkan waktu kadaluarsa 15 menit dari sekarang
-   * @returns {Object} { iso: string, formatted: string }
+   * Waktu kadaluarsa (default +15 menit dari sekarang)
+   * @param {number} [minutes=15]
+   * @returns {{iso: string, formatted: string}}
    * @example { iso: "2026-06-01T13:15:00.000Z", formatted: "01/06/2026, 20:15:00 WIB" }
    */
-
   static getExpiryTime(minutes = 15) {
     const expiryTime = new Date();
     expiryTime.setMinutes(expiryTime.getMinutes() + minutes);
-    
-    const formatted = expiryTime.toLocaleString('id-ID', {
-      timeZone: 'Asia/Jakarta',
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
+    const formatted = expiryTime.toLocaleString("id-ID", {
+      timeZone: "Asia/Jakarta",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
       hour12: false,
     });
-
-    return {
-      iso: expiryTime.toISOString(),
-      formatted: `${formatted} WIB`,
-    };
+    return { iso: expiryTime.toISOString(), formatted: `${formatted} WIB` };
   }
 }

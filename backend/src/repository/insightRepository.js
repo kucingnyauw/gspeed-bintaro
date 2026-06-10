@@ -1,450 +1,632 @@
 import prisma from "#app/database.js";
-import CacheManager from "#shared/utils/cache.js";
-
-const shortCache = new CacheManager("insight:short");
-const mediumCache = new CacheManager("insight:medium");
-const longCache = new CacheManager("insight:long");
-
-const TTL = {
-  SHORT: 5 * 60,
-  MEDIUM: 10 * 60,
-  LONG: 30 * 60,
-};
-
-/**
- * Helper: ambil setting dari database
- * @param {string} key
- * @param {string} [defaultValue]
- * @returns {Promise<string>}
- */
-async function getSetting(key, defaultValue = null) {
-  const setting = await prisma.setting.findUnique({
-    where: { key },
-    select: { value: true },
-  });
-  return setting?.value || defaultValue;
-}
-
-/**
- * Helper: cache wrapper
- * @param {CacheManager} cacheInstance
- * @param {string} key
- * @param {number} ttl
- * @param {Function} fetcher
- * @returns {Promise<any>}
- */
-async function cached(cacheInstance, key, ttl, fetcher) {
-  const cachedData = await cacheInstance.get(key);
-  if (cachedData !== null) return cachedData;
-  const data = await fetcher();
-  await cacheInstance.set(key, data, ttl);
-  return data;
-}
 
 class InsightRepository {
+  /**
+   * Ambil setting dari database
+   * @param {string} key
+   * @param {string} [defaultValue]
+   * @returns {Promise<string>}
+   * @private
+   */
+  async #getSetting(key, defaultValue = null) {
+    const setting = await prisma.setting.findUnique({
+      where: { key },
+      select: { value: true },
+    });
+    return setting?.value || defaultValue;
+  }
+
+  /**
+   * Ambil tanggal 1 tahun yang lalu
+   * @returns {Date}
+   * @private
+   */
+  #getOneYearAgo() {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() - 1);
+    return d;
+  }
+
+  /**
+   * Ambil tanggal awal bulan ini
+   * @returns {Date}
+   * @private
+   */
+  #getStartOfMonth() {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  }
+
+  /**
+   * Ambil tanggal awal minggu ini
+   * @returns {Date}
+   * @private
+   */
+  #getStartOfWeek() {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate() - d.getDay());
+  }
+
+  /**
+   * Ambil tanggal hari ini jam 00:00
+   * @returns {Date}
+   * @private
+   */
+  #getStartOfDay() {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+  }
+
   // ============================================================================
-  // MEKANIK (10 methods)
+  // MEKANIK (9 functions)
   // ============================================================================
 
   /**
    * Job aktif yang sedang dikerjakan mekanik (IN_PROGRESS)
    * @param {string} mechanicId
-   * @returns {Promise<Array<{orderNumber: string, service: string, status: string, plateNumber: string, vehicle: string, customer: string, startAt: Date, createdAt: Date}>>}
+   * @returns {Promise<{jobs: Array, count: number}>}
    */
   async getMechanicActiveJobs(mechanicId) {
-    return prisma.mechanicAssignment
-      .findMany({
-        where: {
-          mechanicId,
-          endAt: null,
-          orderItem: {
-            order: {
-              status: { in: ["QUEUED", "IN_PROGRESS"] },
-              deletedAt: null,
-            },
-          },
+    const jobs = await prisma.mechanicAssignment.findMany({
+      where: {
+        mechanicId,
+        endAt: null,
+        orderItem: {
+          order: { status: { in: ["QUEUED", "IN_PROGRESS"] }, deletedAt: null },
         },
-        select: {
-          startAt: true,
-          orderItem: {
-            select: {
-              productNameSnapshot: true,
-              order: {
-                select: {
-                  orderNumber: true,
-                  status: true,
-                  createdAt: true,
-                  vehicle: { select: { plateNumber: true, model: true } },
-                  customer: { select: { name: true } },
-                },
+      },
+      select: {
+        startAt: true,
+        orderItem: {
+          select: {
+            productNameSnapshot: true,
+            order: {
+              select: {
+                orderNumber: true,
+                status: true,
+                createdAt: true,
+                vehicle: { select: { plateNumber: true, model: true } },
+                customer: { select: { name: true } },
               },
             },
           },
         },
-        orderBy: { createdAt: "asc" },
-      })
-      .then((r) =>
-        r.map((i) => ({
-          orderNumber: i.orderItem.order.orderNumber,
-          service: i.orderItem.productNameSnapshot,
-          status: i.orderItem.order.status,
-          plateNumber: i.orderItem.order.vehicle?.plateNumber || "-",
-          vehicle: i.orderItem.order.vehicle?.model || "-",
-          customer: i.orderItem.order.customer?.name || "Umum",
-          startAt: i.startAt,
-          createdAt: i.orderItem.order.createdAt,
-        }))
-      );
+      },
+      orderBy: { createdAt: "asc" },
+    });
+
+    return {
+      jobs: jobs.map((i) => ({
+        orderNumber: i.orderItem.order.orderNumber,
+        service: i.orderItem.productNameSnapshot,
+        status: i.orderItem.order.status,
+        plateNumber: i.orderItem.order.vehicle?.plateNumber || "-",
+        vehicle: i.orderItem.order.vehicle?.model || "-",
+        customer: i.orderItem.order.customer?.name || "Umum",
+        startAt: i.startAt,
+        createdAt: i.orderItem.order.createdAt,
+      })),
+      count: jobs.length,
+    };
   }
 
   /**
    * Job antrian yang menunggu dikerjakan mekanik (QUEUED)
    * @param {string} mechanicId
-   * @returns {Promise<Array<{orderNumber: string, service: string, plateNumber: string, customer: string, createdAt: Date}>>}
+   * @returns {Promise<{jobs: Array, count: number}>}
    */
   async getMechanicPendingJobs(mechanicId) {
-    return prisma.mechanicAssignment
-      .findMany({
+    const jobs = await prisma.mechanicAssignment.findMany({
+      where: {
+        mechanicId,
+        endAt: null,
+        orderItem: { order: { status: "QUEUED", deletedAt: null } },
+      },
+      select: {
+        orderItem: {
+          select: {
+            productNameSnapshot: true,
+            order: {
+              select: {
+                orderNumber: true,
+                createdAt: true,
+                vehicle: { select: { plateNumber: true, model: true } },
+                customer: { select: { name: true } },
+              },
+            },
+          },
+        },
+      },
+      orderBy: { createdAt: "asc" },
+    });
+
+    return {
+      jobs: jobs.map((i) => ({
+        orderNumber: i.orderItem.order.orderNumber,
+        service: i.orderItem.productNameSnapshot,
+        plateNumber: i.orderItem.order.vehicle?.plateNumber || "-",
+        customer: i.orderItem.order.customer?.name || "Umum",
+        createdAt: i.orderItem.order.createdAt,
+      })),
+      count: jobs.length,
+    };
+  }
+
+  /**
+   * Performa mekanik: ringkasan + detail job per periode
+   * @param {string} mechanicId
+   * @returns {Promise<Object>}
+   */
+  async getMechanicPerformanceSummary(mechanicId) {
+    const startDay = this.#getStartOfDay();
+    const startWeek = this.#getStartOfWeek();
+    const startMonth = this.#getStartOfMonth();
+    const startYear = this.#getOneYearAgo();
+
+    const maxTasks = parseInt(
+      await this.#getSetting("mechanic_max_tasks", "5"),
+      10
+    );
+
+    const [daily, weekly, monthly, yearly, activeCount, recentJobs] =
+      await Promise.all([
+        prisma.$queryRaw`SELECT COUNT(ma."id")::int as completed, COALESCE(SUM(oi."subtotal"), 0)::bigint as earnings FROM "MechanicAssignment" ma INNER JOIN "OrderItem" oi ON ma."orderItemId" = oi."id" INNER JOIN "Order" o ON oi."orderId" = o."id" WHERE ma."mechanicId" = ${mechanicId} AND ma."endAt" >= ${startDay} AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL`,
+        prisma.$queryRaw`SELECT COUNT(ma."id")::int as completed, COALESCE(SUM(oi."subtotal"), 0)::bigint as earnings FROM "MechanicAssignment" ma INNER JOIN "OrderItem" oi ON ma."orderItemId" = oi."id" INNER JOIN "Order" o ON oi."orderId" = o."id" WHERE ma."mechanicId" = ${mechanicId} AND ma."endAt" >= ${startWeek} AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL`,
+        prisma.$queryRaw`SELECT COUNT(ma."id")::int as completed, COALESCE(SUM(oi."subtotal"), 0)::bigint as earnings FROM "MechanicAssignment" ma INNER JOIN "OrderItem" oi ON ma."orderItemId" = oi."id" INNER JOIN "Order" o ON oi."orderId" = o."id" WHERE ma."mechanicId" = ${mechanicId} AND ma."endAt" >= ${startMonth} AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL`,
+        prisma.$queryRaw`SELECT COUNT(ma."id")::int as completed, COALESCE(SUM(oi."subtotal"), 0)::bigint as earnings FROM "MechanicAssignment" ma INNER JOIN "OrderItem" oi ON ma."orderItemId" = oi."id" INNER JOIN "Order" o ON oi."orderId" = o."id" WHERE ma."mechanicId" = ${mechanicId} AND ma."endAt" >= ${startYear} AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL`,
+        prisma.mechanicAssignment.count({
+          where: {
+            mechanicId,
+            endAt: null,
+            orderItem: {
+              order: {
+                status: { in: ["QUEUED", "IN_PROGRESS"] },
+                deletedAt: null,
+              },
+            },
+          },
+        }),
+        prisma.mechanicAssignment.findMany({
+          where: {
+            mechanicId,
+            endAt: { not: null },
+            orderItem: {
+              order: {
+                status: { in: ["COMPLETED", "CLOSED"] },
+                deletedAt: null,
+              },
+            },
+          },
+          select: {
+            startAt: true,
+            endAt: true,
+            orderItem: {
+              select: {
+                productNameSnapshot: true,
+                subtotal: true,
+                order: {
+                  select: {
+                    orderNumber: true,
+                    vehicle: { select: { plateNumber: true } },
+                  },
+                },
+              },
+            },
+          },
+          orderBy: { endAt: "desc" },
+          take: 20,
+        }),
+      ]);
+
+    return {
+      summary: {
+        daily: {
+          completed: Number(daily[0].completed),
+          earnings: Number(daily[0].earnings),
+        },
+        weekly: {
+          completed: Number(weekly[0].completed),
+          earnings: Number(weekly[0].earnings),
+        },
+        monthly: {
+          completed: Number(monthly[0].completed),
+          earnings: Number(monthly[0].earnings),
+        },
+        yearly: {
+          completed: Number(yearly[0].completed),
+          earnings: Number(yearly[0].earnings),
+        },
+        activeJobs: activeCount,
+        maxTasks,
+        utilizationPct:
+          maxTasks > 0 ? Math.round((activeCount / maxTasks) * 100) : 0,
+      },
+      recentJobs: recentJobs.map((j) => ({
+        orderNumber: j.orderItem.order.orderNumber,
+        service: j.orderItem.productNameSnapshot,
+        plateNumber: j.orderItem.order.vehicle?.plateNumber || "-",
+        earnings: Number(j.orderItem.subtotal),
+        startAt: j.startAt,
+        endAt: j.endAt,
+        duration:
+          j.startAt && j.endAt
+            ? Math.round((new Date(j.endAt) - new Date(j.startAt)) / 60000)
+            : null,
+      })),
+    };
+  }
+
+  /**
+   * Kecepatan kerja mekanik: ringkasan + detail job
+   * @param {string} mechanicId
+   * @returns {Promise<Object>}
+   */
+  async getMechanicSpeedStats(mechanicId) {
+    const startWeek = this.#getStartOfWeek();
+    const startMonth = this.#getStartOfMonth();
+    const startYear = this.#getOneYearAgo();
+
+    const [weekly, monthly, yearly, slowestJobs, fastestJobs] =
+      await Promise.all([
+        prisma.$queryRaw`SELECT COUNT(ma."id")::int as total, ROUND(AVG(EXTRACT(EPOCH FROM (ma."endAt" - ma."startAt")) / 60))::int as avg, ROUND(MIN(EXTRACT(EPOCH FROM (ma."endAt" - ma."startAt")) / 60))::int as min, ROUND(MAX(EXTRACT(EPOCH FROM (ma."endAt" - ma."startAt")) / 60))::int as max FROM "MechanicAssignment" ma WHERE ma."mechanicId" = ${mechanicId} AND ma."endAt" >= ${startWeek} AND ma."endAt" IS NOT NULL AND ma."startAt" IS NOT NULL`,
+        prisma.$queryRaw`SELECT COUNT(ma."id")::int as total, ROUND(AVG(EXTRACT(EPOCH FROM (ma."endAt" - ma."startAt")) / 60))::int as avg FROM "MechanicAssignment" ma WHERE ma."mechanicId" = ${mechanicId} AND ma."endAt" >= ${startMonth} AND ma."endAt" IS NOT NULL AND ma."startAt" IS NOT NULL`,
+        prisma.$queryRaw`SELECT COUNT(ma."id")::int as total, ROUND(AVG(EXTRACT(EPOCH FROM (ma."endAt" - ma."startAt")) / 60))::int as avg FROM "MechanicAssignment" ma WHERE ma."mechanicId" = ${mechanicId} AND ma."endAt" >= ${startYear} AND ma."endAt" IS NOT NULL AND ma."startAt" IS NOT NULL`,
+        prisma.mechanicAssignment.findMany({
+          where: { mechanicId, endAt: { not: null }, startAt: { not: null } },
+          select: {
+            startAt: true,
+            endAt: true,
+            orderItem: {
+              select: {
+                productNameSnapshot: true,
+                order: { select: { orderNumber: true } },
+              },
+            },
+          },
+          orderBy: [{ endAt: "desc" }, { startAt: "asc" }],
+          take: 5,
+        }),
+        prisma.mechanicAssignment.findMany({
+          where: { mechanicId, endAt: { not: null }, startAt: { not: null } },
+          select: {
+            startAt: true,
+            endAt: true,
+            orderItem: {
+              select: {
+                productNameSnapshot: true,
+                order: { select: { orderNumber: true } },
+              },
+            },
+          },
+          orderBy: [{ endAt: "asc" }, { startAt: "desc" }],
+          take: 5,
+        }),
+      ]);
+
+    return {
+      summary: {
+        weekly: {
+          totalJobs: Number(weekly[0].total),
+          avgMinutes: Number(weekly[0].avg) || 0,
+          fastestMinutes: Number(weekly[0].min) || 0,
+          slowestMinutes: Number(weekly[0].max) || 0,
+        },
+        monthly: {
+          totalJobs: Number(monthly[0].total),
+          avgMinutes: Number(monthly[0].avg) || 0,
+        },
+        yearly: {
+          totalJobs: Number(yearly[0].total),
+          avgMinutes: Number(yearly[0].avg) || 0,
+        },
+      },
+      slowestJobs: slowestJobs.map((j) => ({
+        orderNumber: j.orderItem.order.orderNumber,
+        service: j.orderItem.productNameSnapshot,
+        durationMinutes: Math.round(
+          (new Date(j.endAt) - new Date(j.startAt)) / 60000
+        ),
+      })),
+      fastestJobs: fastestJobs.map((j) => ({
+        orderNumber: j.orderItem.order.orderNumber,
+        service: j.orderItem.productNameSnapshot,
+        durationMinutes: Math.round(
+          (new Date(j.endAt) - new Date(j.startAt)) / 60000
+        ),
+      })),
+    };
+  }
+
+  /**
+   * Service yang paling sering dikerjakan mekanik
+   * @param {string} mechanicId
+   * @returns {Promise<Object>}
+   */
+  async getMechanicTopServices(mechanicId) {
+    const startMonth = this.#getStartOfMonth();
+    const startYear = this.#getOneYearAgo();
+
+    const [monthly, yearly] = await Promise.all([
+      prisma.$queryRaw`SELECT oi."productNameSnapshot" as "serviceName", COUNT(ma."id")::int as count, COALESCE(SUM(oi."subtotal"), 0)::bigint as earnings FROM "MechanicAssignment" ma INNER JOIN "OrderItem" oi ON ma."orderItemId" = oi."id" WHERE ma."mechanicId" = ${mechanicId} AND ma."endAt" >= ${startMonth} GROUP BY oi."productNameSnapshot" ORDER BY count DESC LIMIT 5`,
+      prisma.$queryRaw`SELECT oi."productNameSnapshot" as "serviceName", COUNT(ma."id")::int as count, COALESCE(SUM(oi."subtotal"), 0)::bigint as earnings FROM "MechanicAssignment" ma INNER JOIN "OrderItem" oi ON ma."orderItemId" = oi."id" WHERE ma."mechanicId" = ${mechanicId} AND ma."endAt" >= ${startYear} GROUP BY oi."productNameSnapshot" ORDER BY count DESC LIMIT 5`,
+    ]);
+
+    return {
+      monthly: monthly.map((r) => ({
+        serviceName: r.serviceName,
+        count: Number(r.count),
+        earnings: Number(r.earnings),
+      })),
+      yearly: yearly.map((r) => ({
+        serviceName: r.serviceName,
+        count: Number(r.count),
+        earnings: Number(r.earnings),
+      })),
+    };
+  }
+
+  /**
+   * Pendapatan mekanik: ringkasan + detail job
+   * @param {string} mechanicId
+   * @returns {Promise<Object>}
+   */
+  async getMechanicEarningsBreakdown(mechanicId) {
+    const startMonth = this.#getStartOfMonth();
+    const startYear = this.#getOneYearAgo();
+
+    const [monthly, yearly, topEarningJobs] = await Promise.all([
+      prisma.$queryRaw`SELECT COUNT(ma."id")::int as jobs, COALESCE(SUM(oi."subtotal"), 0)::bigint as earnings, ROUND(AVG(oi."subtotal"))::int as avgPerJob FROM "MechanicAssignment" ma INNER JOIN "OrderItem" oi ON ma."orderItemId" = oi."id" INNER JOIN "Order" o ON oi."orderId" = o."id" WHERE ma."mechanicId" = ${mechanicId} AND ma."endAt" >= ${startMonth} AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL`,
+      prisma.$queryRaw`SELECT COUNT(ma."id")::int as jobs, COALESCE(SUM(oi."subtotal"), 0)::bigint as earnings, ROUND(AVG(oi."subtotal"))::int as avgPerJob FROM "MechanicAssignment" ma INNER JOIN "OrderItem" oi ON ma."orderItemId" = oi."id" INNER JOIN "Order" o ON oi."orderId" = o."id" WHERE ma."mechanicId" = ${mechanicId} AND ma."endAt" >= ${startYear} AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL`,
+      prisma.mechanicAssignment.findMany({
         where: {
           mechanicId,
-          endAt: null,
-          orderItem: { order: { status: "QUEUED", deletedAt: null } },
+          endAt: { not: null },
+          orderItem: {
+            order: { status: { in: ["COMPLETED", "CLOSED"] }, deletedAt: null },
+          },
         },
         select: {
+          endAt: true,
           orderItem: {
             select: {
               productNameSnapshot: true,
+              subtotal: true,
               order: {
                 select: {
                   orderNumber: true,
-                  createdAt: true,
-                  vehicle: { select: { plateNumber: true, model: true } },
-                  customer: { select: { name: true } },
+                  vehicle: { select: { plateNumber: true } },
                 },
               },
             },
           },
         },
-        orderBy: { createdAt: "asc" },
-      })
-      .then((r) =>
-        r.map((i) => ({
-          orderNumber: i.orderItem.order.orderNumber,
-          service: i.orderItem.productNameSnapshot,
-          plateNumber: i.orderItem.order.vehicle?.plateNumber || "-",
-          customer: i.orderItem.order.customer?.name || "Umum",
-          createdAt: i.orderItem.order.createdAt,
-        }))
-      );
+        orderBy: { orderItem: { subtotal: "desc" } },
+        take: 10,
+      }),
+    ]);
+
+    return {
+      summary: {
+        monthly: {
+          jobs: Number(monthly[0].jobs),
+          earnings: Number(monthly[0].earnings),
+          avgPerJob: Number(monthly[0].avgPerJob) || 0,
+        },
+        yearly: {
+          jobs: Number(yearly[0].jobs),
+          earnings: Number(yearly[0].earnings),
+          avgPerJob: Number(yearly[0].avgPerJob) || 0,
+        },
+      },
+      topEarningJobs: topEarningJobs.map((j) => ({
+        orderNumber: j.orderItem.order.orderNumber,
+        service: j.orderItem.productNameSnapshot,
+        plateNumber: j.orderItem.order.vehicle?.plateNumber || "-",
+        earnings: Number(j.orderItem.subtotal),
+        completedAt: j.endAt,
+      })),
+    };
   }
 
   /**
-   * Ringkasan performa mekanik: job selesai + pendapatan + utilisasi
+   * Ranking efisiensi mekanik + detail top performers
    * @param {string} mechanicId
-   * @returns {Promise<{todayCompleted: number, weekCompleted: number, monthCompleted: number, monthEarnings: number, activeJobs: number, maxTasks: number, utilizationPct: number}>}
-   */
-  async getMechanicPerformanceSummary(mechanicId) {
-    return cached(
-      shortCache,
-      `mechanic:perf:${mechanicId}`,
-      TTL.SHORT,
-      async () => {
-        const now = new Date();
-        const startDay = new Date(
-          now.getFullYear(),
-          now.getMonth(),
-          now.getDate()
-        );
-        const startWeek = new Date(
-          now.getFullYear(),
-          now.getMonth(),
-          now.getDate() - now.getDay()
-        );
-        const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-        const maxTasks = parseInt(
-          await getSetting("mechanic_max_tasks", "5"),
-          10
-        );
-
-        const [today, week, month, activeCount] = await Promise.all([
-          prisma.mechanicAssignment.count({
-            where: {
-              mechanicId,
-              endAt: { gte: startDay, not: null },
-              orderItem: {
-                order: {
-                  status: { in: ["COMPLETED", "CLOSED"] },
-                  deletedAt: null,
-                },
-              },
-            },
-          }),
-          prisma.mechanicAssignment.count({
-            where: {
-              mechanicId,
-              endAt: { gte: startWeek, not: null },
-              orderItem: {
-                order: {
-                  status: { in: ["COMPLETED", "CLOSED"] },
-                  deletedAt: null,
-                },
-              },
-            },
-          }),
-          prisma.$queryRaw`SELECT COUNT(ma."id")::int as count, COALESCE(SUM(oi."subtotal"), 0)::bigint as earnings FROM "MechanicAssignment" ma INNER JOIN "OrderItem" oi ON ma."orderItemId" = oi."id" INNER JOIN "Order" o ON oi."orderId" = o."id" WHERE ma."mechanicId" = ${mechanicId} AND ma."endAt" >= ${startMonth} AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL`,
-          prisma.mechanicAssignment.count({
-            where: {
-              mechanicId,
-              endAt: null,
-              orderItem: {
-                order: {
-                  status: { in: ["QUEUED", "IN_PROGRESS"] },
-                  deletedAt: null,
-                },
-              },
-            },
-          }),
-        ]);
-
-        return {
-          todayCompleted: today,
-          weekCompleted: week,
-          monthCompleted: Number(month[0].count),
-          monthEarnings: Number(month[0].earnings),
-          activeJobs: activeCount,
-          maxTasks,
-          utilizationPct:
-            maxTasks > 0 ? Math.round((activeCount / maxTasks) * 100) : 0,
-        };
-      }
-    );
-  }
-
-  /**
-   * Riwayat kerja harian mekanik
-   * @param {string} mechanicId
-   * @param {number} [days=7]
-   * @returns {Promise<Array<{date: string, completed: number, earnings: number}>>}
-   */
-  async getMechanicDailyHistory(mechanicId, days = 7) {
-    return cached(
-      mediumCache,
-      `mechanic:daily:${mechanicId}:${days}`,
-      TTL.MEDIUM,
-      async () => {
-        const since = new Date(Date.now() - days * 86400000);
-        const raw =
-          await prisma.$queryRaw`SELECT DATE(ma."endAt") as date, COUNT(ma."id")::int as completed, COALESCE(SUM(oi."subtotal"), 0)::bigint as earnings FROM "MechanicAssignment" ma INNER JOIN "OrderItem" oi ON ma."orderItemId" = oi."id" INNER JOIN "Order" o ON oi."orderId" = o."id" WHERE ma."mechanicId" = ${mechanicId} AND ma."endAt" >= ${since} AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL GROUP BY DATE(ma."endAt") ORDER BY date ASC`;
-        return raw.map((r) => ({
-          date: r.date,
-          completed: Number(r.completed),
-          earnings: Number(r.earnings),
-        }));
-      }
-    );
-  }
-
-  /**
-   * Statistik kecepatan kerja mekanik
-   * @param {string} mechanicId
-   * @returns {Promise<{totalJobs: number, avgTimeMinutes: number, fastestMinutes: number, slowestMinutes: number}>}
-   */
-  async getMechanicSpeedStats(mechanicId) {
-    return cached(
-      mediumCache,
-      `mechanic:speed:${mechanicId}`,
-      TTL.MEDIUM,
-      async () => {
-        const raw =
-          await prisma.$queryRaw`SELECT COUNT(ma."id")::int as total, ROUND(AVG(EXTRACT(EPOCH FROM (ma."endAt" - ma."startAt")) / 60))::int as avg, ROUND(MIN(EXTRACT(EPOCH FROM (ma."endAt" - ma."startAt")) / 60))::int as min, ROUND(MAX(EXTRACT(EPOCH FROM (ma."endAt" - ma."startAt")) / 60))::int as max FROM "MechanicAssignment" ma WHERE ma."mechanicId" = ${mechanicId} AND ma."endAt" IS NOT NULL AND ma."startAt" IS NOT NULL`;
-        return {
-          totalJobs: Number(raw[0].total),
-          avgTimeMinutes: Number(raw[0].avg) || 0,
-          fastestMinutes: Number(raw[0].min) || 0,
-          slowestMinutes: Number(raw[0].max) || 0,
-        };
-      }
-    );
-  }
-
-  /**
-   * 5 service yang paling sering dikerjakan mekanik
-   * @param {string} mechanicId
-   * @returns {Promise<Array<{serviceName: string, count: number}>>}
-   */
-  async getMechanicTopServices(mechanicId) {
-    return cached(
-      mediumCache,
-      `mechanic:topservices:${mechanicId}`,
-      TTL.MEDIUM,
-      async () => {
-        const raw =
-          await prisma.$queryRaw`SELECT oi."productNameSnapshot" as "serviceName", COUNT(ma."id")::int as count FROM "MechanicAssignment" ma INNER JOIN "OrderItem" oi ON ma."orderItemId" = oi."id" WHERE ma."mechanicId" = ${mechanicId} GROUP BY oi."productNameSnapshot" ORDER BY count DESC LIMIT 5`;
-        return raw.map((r) => ({
-          serviceName: r.serviceName,
-          count: Number(r.count),
-        }));
-      }
-    );
-  }
-
-  /**
-   * Breakdown pendapatan mekanik per hari
-   * @param {string} mechanicId
-   * @param {number} [days=30]
-   * @returns {Promise<{totalEarnings: number, avgPerDay: number, jobCount: number, daily: Array}>}
-   */
-  async getMechanicEarningsBreakdown(mechanicId, days = 30) {
-    return cached(
-      mediumCache,
-      `mechanic:earnings:${mechanicId}:${days}`,
-      TTL.MEDIUM,
-      async () => {
-        const since = new Date(Date.now() - days * 86400000);
-        const raw =
-          await prisma.$queryRaw`SELECT DATE(ma."endAt") as date, COUNT(ma."id")::int as jobs, COALESCE(SUM(oi."subtotal"), 0)::bigint as earnings FROM "MechanicAssignment" ma INNER JOIN "OrderItem" oi ON ma."orderItemId" = oi."id" INNER JOIN "Order" o ON oi."orderId" = o."id" WHERE ma."mechanicId" = ${mechanicId} AND ma."endAt" >= ${since} AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL GROUP BY DATE(ma."endAt") ORDER BY date DESC`;
-        const totalEarnings = raw.reduce((s, r) => s + Number(r.earnings), 0);
-        return {
-          totalEarnings,
-          avgPerDay: raw.length ? Math.round(totalEarnings / raw.length) : 0,
-          jobCount: raw.reduce((s, r) => s + Number(r.jobs), 0),
-          daily: raw.map((r) => ({
-            date: r.date,
-            jobs: Number(r.jobs),
-            earnings: Number(r.earnings),
-          })),
-        };
-      }
-    );
-  }
-
-  /**
-   * Ranking efisiensi mekanik vs mekanik lain
-   * @param {string} mechanicId
-   * @returns {Promise<{rank: number|null, totalMechanics: number, avgMinutes: number, totalJobs: number, mechanicName: string, betterThan: number}>}
+   * @returns {Promise<Object>}
    */
   async getMechanicEfficiencyRank(mechanicId) {
-    return cached(
-      mediumCache,
-      `mechanic:rank:${mechanicId}`,
-      TTL.MEDIUM,
-      async () => {
-        const raw =
-          await prisma.$queryRaw`WITH mech_stats AS (SELECT ma."mechanicId", COUNT(ma."id")::int as total_jobs, ROUND(AVG(EXTRACT(EPOCH FROM (ma."endAt" - ma."startAt")) / 60))::int as avg_minutes FROM "MechanicAssignment" ma WHERE ma."endAt" IS NOT NULL AND ma."startAt" IS NOT NULL GROUP BY ma."mechanicId" HAVING COUNT(ma."id") >= 5), ranked AS (SELECT ms.*, u."fullName", RANK() OVER (ORDER BY ms.avg_minutes ASC) as "rank", COUNT(*) OVER ()::int as "totalMechanics" FROM mech_stats ms INNER JOIN "User" u ON ms."mechanicId" = u."id") SELECT * FROM ranked WHERE "mechanicId" = ${mechanicId}`;
-        if (!raw.length)
-          return { rank: null, totalMechanics: 0, avgMinutes: 0, totalJobs: 0 };
-        return {
-          rank: Number(raw[0].rank),
-          totalMechanics: Number(raw[0].totalMechanics),
-          avgMinutes: Number(raw[0].avg_minutes),
-          totalJobs: Number(raw[0].total_jobs),
-          mechanicName: raw[0].fullName,
-          betterThan:
-            raw[0].totalMechanics > 0
-              ? Math.round(
-                  (1 - Number(raw[0].rank) / Number(raw[0].totalMechanics)) *
-                    100
-                )
-              : 0,
-        };
-      }
-    );
-  }
+    const raw =
+      await prisma.$queryRaw`WITH mech_stats AS (SELECT ma."mechanicId", COUNT(ma."id")::int as total_jobs, ROUND(AVG(EXTRACT(EPOCH FROM (ma."endAt" - ma."startAt")) / 60))::int as avg_minutes FROM "MechanicAssignment" ma WHERE ma."endAt" IS NOT NULL AND ma."startAt" IS NOT NULL GROUP BY ma."mechanicId" HAVING COUNT(ma."id") >= 5), ranked AS (SELECT ms.*, u."fullName", RANK() OVER (ORDER BY ms.avg_minutes ASC) as "rank", COUNT(*) OVER ()::int as "totalMechanics" FROM mech_stats ms INNER JOIN "User" u ON ms."mechanicId" = u."id") SELECT * FROM ranked`;
 
-  /**
-   * Tren performa mingguan mekanik
-   * @param {string} mechanicId
-   * @param {number} [days=30]
-   * @returns {Promise<{trend: number, direction: string, weekly: Array}>}
-   */
-  async getMechanicWeeklyTrend(mechanicId, days = 30) {
-    return cached(
-      mediumCache,
-      `mechanic:trend:${mechanicId}:${days}`,
-      TTL.MEDIUM,
-      async () => {
-        const since = new Date(Date.now() - days * 86400000);
-        const raw =
-          await prisma.$queryRaw`SELECT DATE_TRUNC('week', ma."endAt")::date as week_start, COUNT(ma."id")::int as jobs, COALESCE(SUM(oi."subtotal"), 0)::bigint as earnings FROM "MechanicAssignment" ma INNER JOIN "OrderItem" oi ON ma."orderItemId" = oi."id" INNER JOIN "Order" o ON oi."orderId" = o."id" WHERE ma."mechanicId" = ${mechanicId} AND ma."endAt" >= ${since} AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL GROUP BY week_start ORDER BY week_start ASC`;
-        const jobs = raw.map((r) => Number(r.jobs));
-        const trend =
-          jobs.length >= 2
-            ? Math.round(
-                ((jobs[jobs.length - 1] - jobs[0]) / Math.max(jobs[0], 1)) * 100
-              )
-            : 0;
-        return {
-          trend,
-          direction: trend > 0 ? "up" : trend < 0 ? "down" : "stable",
-          weekly: raw.map((r) => ({
-            weekStart: r.week_start,
-            jobs: Number(r.jobs),
-            earnings: Number(r.earnings),
-          })),
-        };
-      }
-    );
+    const me = raw.find((r) => r.mechanicId === mechanicId);
+    const top3 = raw.slice(0, 3);
+    const bottom3 = raw.slice(-3).reverse();
+
+    if (!me)
+      return {
+        rank: null,
+        totalMechanics: raw.length,
+        avgMinutes: 0,
+        totalJobs: 0,
+        betterThan: 0,
+        topPerformers: [],
+        bottomPerformers: [],
+        allRankings: [],
+      };
+
+    return {
+      rank: Number(me.rank),
+      totalMechanics: Number(me.totalMechanics),
+      avgMinutes: Number(me.avg_minutes),
+      totalJobs: Number(me.total_jobs),
+      mechanicName: me.fullName,
+      betterThan:
+        me.totalMechanics > 0
+          ? Math.round((1 - Number(me.rank) / Number(me.totalMechanics)) * 100)
+          : 0,
+      topPerformers: top3.map((r) => ({
+        name: r.fullName,
+        avgMinutes: Number(r.avg_minutes),
+        totalJobs: Number(r.total_jobs),
+      })),
+      bottomPerformers: bottom3.map((r) => ({
+        name: r.fullName,
+        avgMinutes: Number(r.avg_minutes),
+        totalJobs: Number(r.total_jobs),
+      })),
+      allRankings: raw.map((r) => ({
+        name: r.fullName,
+        rank: Number(r.rank),
+        avgMinutes: Number(r.avg_minutes),
+        totalJobs: Number(r.total_jobs),
+      })),
+    };
   }
 
   // ============================================================================
-  // KASIR (9 methods)
+  // KASIR (7 functions)
   // ============================================================================
 
   /**
-   * Ringkasan penjualan kasir hari ini
+   * Ringkasan penjualan kasir: ringkasan + top transactions
    * @param {string} cashierId
-   * @returns {Promise<{todaySales: number, todayOrders: number, todayCashAmount: number, todayQrisAmount: number, pendingOrders: number, minStartingCash: number}>}
+   * @returns {Promise<Object>}
    */
   async getCashierTodaySummary(cashierId) {
-    return cached(
-      shortCache,
-      `cashier:today:${cashierId}`,
-      TTL.SHORT,
-      async () => {
-        const start = new Date();
-        start.setHours(0, 0, 0, 0);
-        const end = new Date();
-        end.setHours(23, 59, 59, 999);
-        const minStartingCash = parseInt(
-          await getSetting("shift_min_starting_cash", "1000000"),
-          10
-        );
-        const [orderAgg, paymentAgg, pendingCount] = await Promise.all([
-          prisma.order.aggregate({
-            where: {
-              cashierId,
-              createdAt: { gte: start, lte: end },
-              status: { in: ["COMPLETED", "CLOSED"] },
-              deletedAt: null,
-            },
-            _sum: { total: true },
-            _count: true,
-          }),
-          prisma.$queryRaw`SELECT COALESCE(SUM(CASE WHEN p."method" = 'CASH' THEN p."amountPaid" ELSE 0 END), 0)::bigint as cash, COALESCE(SUM(CASE WHEN p."method" = 'QRIS' THEN p."amountPaid" ELSE 0 END), 0)::bigint as qris FROM "Payment" p INNER JOIN "Order" o ON p."orderId" = o."id" WHERE o."cashierId" = ${cashierId} AND o."createdAt" >= ${start} AND o."createdAt" <= ${end} AND o."deletedAt" IS NULL`,
-          prisma.order.count({
-            where: {
-              cashierId,
-              status: { in: ["DRAFT", "QUEUED", "IN_PROGRESS"] },
-              deletedAt: null,
-            },
-          }),
-        ]);
-        return {
-          todaySales: Number(orderAgg._sum.total || 0),
-          todayOrders: orderAgg._count,
-          todayCashAmount: Number(paymentAgg[0].cash),
-          todayQrisAmount: Number(paymentAgg[0].qris),
-          pendingOrders: pendingCount,
-          minStartingCash,
-        };
-      }
+    const startDay = this.#getStartOfDay();
+    const endDay = new Date();
+    endDay.setHours(23, 59, 59, 999);
+    const yesterday = new Date(startDay.getTime() - 86400000);
+    const startMonth = this.#getStartOfMonth();
+    const startYear = this.#getOneYearAgo();
+
+    const minStartingCash = parseInt(
+      await this.#getSetting("shift_min_starting_cash", "1000000"),
+      10
     );
+
+    const [
+      todayData,
+      yesterdayData,
+      monthlyData,
+      yearlyData,
+      pendingCount,
+      paymentData,
+      topTransactions,
+    ] = await Promise.all([
+      prisma.order.aggregate({
+        where: {
+          cashierId,
+          createdAt: { gte: startDay, lte: endDay },
+          status: { in: ["COMPLETED", "CLOSED"] },
+          deletedAt: null,
+        },
+        _sum: { total: true },
+        _count: true,
+        _avg: { total: true },
+      }),
+      prisma.order.aggregate({
+        where: {
+          cashierId,
+          createdAt: { gte: yesterday, lt: startDay },
+          status: { in: ["COMPLETED", "CLOSED"] },
+          deletedAt: null,
+        },
+        _sum: { total: true },
+        _count: true,
+      }),
+      prisma.order.aggregate({
+        where: {
+          cashierId,
+          createdAt: { gte: startMonth },
+          status: { in: ["COMPLETED", "CLOSED"] },
+          deletedAt: null,
+        },
+        _sum: { total: true },
+        _count: true,
+      }),
+      prisma.order.aggregate({
+        where: {
+          cashierId,
+          createdAt: { gte: startYear },
+          status: { in: ["COMPLETED", "CLOSED"] },
+          deletedAt: null,
+        },
+        _sum: { total: true },
+        _count: true,
+      }),
+      prisma.order.count({
+        where: {
+          cashierId,
+          status: { in: ["DRAFT", "QUEUED", "IN_PROGRESS"] },
+          deletedAt: null,
+        },
+      }),
+      prisma.$queryRaw`SELECT COALESCE(SUM(CASE WHEN p."method" = 'CASH' THEN p."amountPaid" ELSE 0 END), 0)::bigint as cash, COALESCE(SUM(CASE WHEN p."method" = 'QRIS' THEN p."amountPaid" ELSE 0 END), 0)::bigint as qris FROM "Payment" p INNER JOIN "Order" o ON p."orderId" = o."id" WHERE o."cashierId" = ${cashierId} AND o."createdAt" >= ${startDay} AND o."createdAt" <= ${endDay} AND o."deletedAt" IS NULL`,
+      prisma.order.findMany({
+        where: {
+          cashierId,
+          createdAt: { gte: startDay, lte: endDay },
+          status: { in: ["COMPLETED", "CLOSED"] },
+          deletedAt: null,
+        },
+        select: {
+          orderNumber: true,
+          total: true,
+          createdAt: true,
+          customer: { select: { name: true } },
+          payment: { select: { method: true } },
+        },
+        orderBy: { total: "desc" },
+        take: 5,
+      }),
+    ]);
+
+    const todaySales = Number(todayData._sum.total || 0);
+    const yesterdaySales = Number(yesterdayData._sum.total || 0);
+    const salesChange = yesterdaySales
+      ? Math.round(((todaySales - yesterdaySales) / yesterdaySales) * 100)
+      : 0;
+
+    return {
+      summary: {
+        today: {
+          sales: todaySales,
+          orders: todayData._count,
+          avgOrderValue: Math.round(todayData._avg.total || 0),
+          cashAmount: Number(paymentData[0].cash),
+          qrisAmount: Number(paymentData[0].qris),
+        },
+        yesterday: { sales: yesterdaySales, orders: yesterdayData._count },
+        monthly: {
+          sales: Number(monthlyData._sum.total || 0),
+          orders: monthlyData._count,
+        },
+        yearly: {
+          sales: Number(yearlyData._sum.total || 0),
+          orders: yearlyData._count,
+        },
+        comparison: {
+          salesChange,
+          direction:
+            salesChange > 0 ? "up" : salesChange < 0 ? "down" : "stable",
+        },
+        pendingOrders: pendingCount,
+        minStartingCash,
+      },
+      topTransactions: topTransactions.map((t) => ({
+        orderNumber: t.orderNumber,
+        customer: t.customer?.name || "Umum",
+        total: t.total,
+        method: t.payment?.method || null,
+        createdAt: t.createdAt,
+      })),
+    };
   }
 
   /**
-   * Shift aktif kasir saat ini
+   * Shift aktif kasir + detail pembayaran & expenses
    * @param {string} cashierId
-   * @returns {Promise<{activeShift: Object|null, shiftSales: number, shiftExpenses: number, shiftNetCash: number|null, paymentBreakdown: Array}>}
+   * @returns {Promise<Object>}
    */
   async getCashierActiveShift(cashierId) {
     const shift = await prisma.shift.findFirst({
@@ -459,1031 +641,1644 @@ class InsightRepository {
         _count: { select: { orders: true } },
       },
     });
+
     if (!shift)
       return {
-        activeShift: null,
-        shiftSales: 0,
-        shiftExpenses: 0,
-        shiftNetCash: null,
-      };
-    const [expenses, paymentBreakdown] = await Promise.all([
-      prisma.expense.aggregate({
-        where: { shiftId: shift.id },
-        _sum: { amount: true },
-      }),
-      prisma.payment.groupBy({
-        by: ["method"],
-        where: {
-          order: {
-            shiftId: shift.id,
-            deletedAt: null,
-            status: { in: ["COMPLETED", "CLOSED"] },
-          },
-          status: "PAID",
+        shift: null,
+        sales: { total: 0, expenses: 0, net: 0 },
+        payments: {
+          cash: { total: 0, count: 0 },
+          qris: { total: 0, count: 0 },
         },
-        _sum: { amountPaid: true },
-        _count: { method: true },
-      }),
-    ]);
+        recentExpenses: [],
+        recentOrders: [],
+      };
+
+    const [expenses, paymentBreakdown, recentExpenses, recentOrders] =
+      await Promise.all([
+        prisma.expense.aggregate({
+          where: { shiftId: shift.id },
+          _sum: { amount: true },
+        }),
+        prisma.payment.groupBy({
+          by: ["method"],
+          where: {
+            order: {
+              shiftId: shift.id,
+              deletedAt: null,
+              status: { in: ["COMPLETED", "CLOSED"] },
+            },
+            status: "PAID",
+          },
+          _sum: { amountPaid: true },
+          _count: { method: true },
+        }),
+        prisma.expense.findMany({
+          where: { shiftId: shift.id },
+          select: { title: true, amount: true, category: true, date: true },
+          orderBy: { date: "desc" },
+          take: 10,
+        }),
+        prisma.order.findMany({
+          where: { shiftId: shift.id, deletedAt: null },
+          select: {
+            orderNumber: true,
+            total: true,
+            status: true,
+            createdAt: true,
+            customer: { select: { name: true } },
+            payment: { select: { method: true } },
+          },
+          orderBy: { createdAt: "desc" },
+          take: 10,
+        }),
+      ]);
+
+    const cashPayments = paymentBreakdown.find((p) => p.method === "CASH");
+    const qrisPayments = paymentBreakdown.find((p) => p.method === "QRIS");
+
     return {
-      activeShift: shift,
-      shiftSales: shift.cashSales,
-      shiftExpenses: Number(expenses._sum.amount || 0),
-      shiftNetCash: shift.cashSales - Number(expenses._sum.amount || 0),
-      paymentBreakdown: paymentBreakdown.map((p) => ({
-        method: p.method,
-        total: p._sum.amountPaid || 0,
-        count: p._count.method,
+      shift,
+      sales: {
+        total: shift.cashSales,
+        expenses: Number(expenses._sum.amount || 0),
+        net: shift.cashSales - Number(expenses._sum.amount || 0),
+      },
+      payments: {
+        cash: {
+          total: cashPayments?._sum.amountPaid || 0,
+          count: cashPayments?._count.method || 0,
+        },
+        qris: {
+          total: qrisPayments?._sum.amountPaid || 0,
+          count: qrisPayments?._count.method || 0,
+        },
+      },
+      recentExpenses: recentExpenses.map((e) => ({
+        title: e.title,
+        amount: e.amount,
+        category: e.category,
+        date: e.date,
+      })),
+      recentOrders: recentOrders.map((o) => ({
+        orderNumber: o.orderNumber,
+        total: o.total,
+        status: o.status,
+        customer: o.customer?.name || "Umum",
+        method: o.payment?.method || null,
+        createdAt: o.createdAt,
       })),
     };
   }
 
   /**
-   * Order pending kasir per status
+   * Order pending kasir
    * @param {string} cashierId
-   * @returns {Promise<Array<{status: string, count: number}>>}
+   * @returns {Promise<Object>}
    */
   async getCashierPendingOrders(cashierId) {
-    return cached(
-      shortCache,
-      `cashier:pending:${cashierId}`,
-      TTL.SHORT,
-      async () => {
-        return prisma.order
-          .groupBy({
-            by: ["status"],
-            where: {
-              cashierId,
-              status: { in: ["DRAFT", "QUEUED", "IN_PROGRESS"] },
-              deletedAt: null,
-            },
-            _count: { id: true },
-          })
-          .then((r) =>
-            r.map((i) => ({ status: i.status, count: i._count.id }))
-          );
-      }
-    );
-  }
-
-  /**
-   * Riwayat penjualan harian kasir
-   * @param {string} cashierId
-   * @param {number} [days=7]
-   * @returns {Promise<Array<{date: string, orders: number, sales: number}>>}
-   */
-  async getCashierDailyHistory(cashierId, days = 7) {
-    return cached(
-      mediumCache,
-      `cashier:daily:${cashierId}:${days}`,
-      TTL.MEDIUM,
-      async () => {
-        const since = new Date(Date.now() - days * 86400000);
-        const raw =
-          await prisma.$queryRaw`SELECT DATE("createdAt") as date, COUNT("id")::int as orders, COALESCE(SUM("total"), 0)::bigint as sales FROM "Order" WHERE "cashierId" = ${cashierId} AND "createdAt" >= ${since} AND "status" IN ('COMPLETED','CLOSED') AND "deletedAt" IS NULL GROUP BY DATE("createdAt") ORDER BY date ASC`;
-        return raw.map((r) => ({
-          date: r.date,
-          orders: Number(r.orders),
-          sales: Number(r.sales),
-        }));
-      }
-    );
+    const raw = await prisma.order.groupBy({
+      by: ["status"],
+      where: {
+        cashierId,
+        status: { in: ["DRAFT", "QUEUED", "IN_PROGRESS"] },
+        deletedAt: null,
+      },
+      _count: { id: true },
+    });
+    const totalPending = raw.reduce((s, r) => s + r._count.id, 0);
+    return {
+      byStatus: raw.map((i) => ({ status: i.status, count: i._count.id })),
+      totalPending,
+    };
   }
 
   /**
    * Statistik pelanggan kasir
    * @param {string} cashierId
-   * @returns {Promise<{totalCustomers: number, newToday: number, topCustomer: Object|null}>}
+   * @returns {Promise<Object>}
    */
   async getCashierCustomerStats(cashierId) {
-    return cached(
-      shortCache,
-      `cashier:customer:${cashierId}`,
-      TTL.SHORT,
-      async () => {
-        const start = new Date();
-        start.setHours(0, 0, 0, 0);
-        const [total, newToday, top] = await Promise.all([
-          prisma.$queryRaw`SELECT COUNT(DISTINCT "customerId")::int as count FROM "Order" WHERE "cashierId" = ${cashierId} AND "deletedAt" IS NULL AND "customerId" IS NOT NULL`,
-          prisma.$queryRaw`SELECT COUNT(DISTINCT "customerId")::int as count FROM "Order" WHERE "cashierId" = ${cashierId} AND "createdAt" >= ${start} AND "deletedAt" IS NULL AND "customerId" IS NOT NULL`,
-          prisma.order.groupBy({
-            by: ["customerId"],
-            where: {
-              cashierId,
-              status: { in: ["COMPLETED", "CLOSED"] },
-              deletedAt: null,
-            },
-            _sum: { total: true },
-            orderBy: { _sum: { total: "desc" } },
-            take: 1,
-          }),
-        ]);
-        let topCustomer = null;
-        if (top.length && top[0].customerId) {
-          const cust = await prisma.customer.findUnique({
-            where: { id: top[0].customerId },
-            select: { name: true, phone: true },
-          });
-          topCustomer = {
-            name: cust?.name || "Unknown",
-            total: Number(top[0]._sum.total || 0),
-          };
-        }
-        return {
-          totalCustomers: Number(total[0].count),
-          newToday: Number(newToday[0].count),
-          topCustomer,
-        };
-      }
-    );
+    const startDay = this.#getStartOfDay();
+    const startMonth = this.#getStartOfMonth();
+    const startYear = this.#getOneYearAgo();
+
+    const [total, newToday, monthly, yearly, top] = await Promise.all([
+      prisma.$queryRaw`SELECT COUNT(DISTINCT "customerId")::int as count FROM "Order" WHERE "cashierId" = ${cashierId} AND "deletedAt" IS NULL AND "customerId" IS NOT NULL`,
+      prisma.$queryRaw`SELECT COUNT(DISTINCT "customerId")::int as count FROM "Order" WHERE "cashierId" = ${cashierId} AND "createdAt" >= ${startDay} AND "deletedAt" IS NULL AND "customerId" IS NOT NULL`,
+      prisma.$queryRaw`SELECT COUNT(DISTINCT "customerId")::int as count FROM "Order" WHERE "cashierId" = ${cashierId} AND "createdAt" >= ${startMonth} AND "deletedAt" IS NULL AND "customerId" IS NOT NULL`,
+      prisma.$queryRaw`SELECT COUNT(DISTINCT "customerId")::int as count FROM "Order" WHERE "cashierId" = ${cashierId} AND "createdAt" >= ${startYear} AND "deletedAt" IS NULL AND "customerId" IS NOT NULL`,
+      prisma.order.groupBy({
+        by: ["customerId"],
+        where: {
+          cashierId,
+          status: { in: ["COMPLETED", "CLOSED"] },
+          deletedAt: null,
+        },
+        _sum: { total: true },
+        orderBy: { _sum: { total: "desc" } },
+        take: 1,
+      }),
+    ]);
+
+    let topCustomer = null;
+    if (top.length && top[0].customerId) {
+      const cust = await prisma.customer.findUnique({
+        where: { id: top[0].customerId },
+        select: { name: true },
+      });
+      topCustomer = {
+        name: cust?.name || "Unknown",
+        total: Number(top[0]._sum.total || 0),
+      };
+    }
+
+    return {
+      total: Number(total[0].count),
+      newToday: Number(newToday[0].count),
+      monthly: Number(monthly[0].count),
+      yearly: Number(yearly[0].count),
+      top: topCustomer,
+    };
   }
 
   /**
-   * Riwayat 10 shift terakhir kasir
+   * Riwayat shift kasir + detail
    * @param {string} cashierId
-   * @returns {Promise<{totalShifts: number, avgDiscrepancy: number, lastShifts: Array}>}
+   * @returns {Promise<Object>}
    */
   async getCashierShiftHistory(cashierId) {
-    return cached(
-      mediumCache,
-      `cashier:shifts:${cashierId}`,
-      TTL.MEDIUM,
-      async () => {
-        const shifts = await prisma.shift.findMany({
-          where: { cashierId, status: "CLOSED" },
-          select: {
-            openedAt: true,
-            closedAt: true,
-            startingCash: true,
-            endingCash: true,
-            cashSales: true,
-            discrepancy: true,
-          },
-          orderBy: { closedAt: "desc" },
-          take: 10,
-        });
-        const avgDiscrepancy = shifts.length
-          ? Math.round(
-              shifts.reduce((s, sh) => s + sh.discrepancy, 0) / shifts.length
-            )
-          : 0;
-        return {
-          totalShifts: shifts.length,
-          avgDiscrepancy,
-          lastShifts: shifts,
-        };
-      }
-    );
+    const [shifts, allTime] = await Promise.all([
+      prisma.shift.findMany({
+        where: { cashierId, status: "CLOSED" },
+        select: {
+          id: true,
+          openedAt: true,
+          closedAt: true,
+          startingCash: true,
+          endingCash: true,
+          cashSales: true,
+          discrepancy: true,
+          _count: { select: { orders: true, expenses: true } },
+        },
+        orderBy: { closedAt: "desc" },
+        take: 10,
+      }),
+      prisma.shift.aggregate({
+        where: { cashierId, status: "CLOSED" },
+        _count: true,
+        _avg: { discrepancy: true, cashSales: true },
+        _sum: { cashSales: true },
+      }),
+    ]);
+
+    return {
+      shifts: shifts.map((s) => ({
+        id: s.id,
+        openedAt: s.openedAt,
+        closedAt: s.closedAt,
+        startingCash: s.startingCash,
+        endingCash: s.endingCash,
+        cashSales: s.cashSales,
+        discrepancy: s.discrepancy,
+        orderCount: s._count.orders,
+        expenseCount: s._count.expenses,
+      })),
+      summary: {
+        totalShifts: allTime._count,
+        avgDiscrepancy: Math.round(allTime._avg.discrepancy || 0),
+        avgCashSales: Math.round(allTime._avg.cashSales || 0),
+        totalCashSales: Number(allTime._sum.cashSales || 0),
+      },
+    };
   }
 
   /**
-   * 20 transaksi terbaru kasir
+   * Transaksi terbaru kasir
    * @param {string} cashierId
-   * @returns {Promise<Array<{orderNumber: string, total: number, status: string, customer: string, method: string|null, createdAt: Date}>>}
+   * @returns {Promise<Array>}
    */
   async getCashierRecentTransactions(cashierId) {
-    return cached(
-      shortCache,
-      `cashier:recent:${cashierId}`,
-      TTL.SHORT,
-      async () => {
-        return prisma.order
-          .findMany({
-            where: { cashierId, deletedAt: null },
-            select: {
-              orderNumber: true,
-              total: true,
-              status: true,
-              createdAt: true,
-              customer: { select: { name: true } },
-              payment: { select: { method: true } },
-            },
-            orderBy: { createdAt: "desc" },
-            take: 20,
-          })
-          .then((r) =>
-            r.map((i) => ({
-              orderNumber: i.orderNumber,
-              total: i.total,
-              status: i.status,
-              customer: i.customer?.name || "Umum",
-              method: i.payment?.method || null,
-              createdAt: i.createdAt,
-            }))
-          );
-      }
-    );
+    return prisma.order
+      .findMany({
+        where: { cashierId, deletedAt: null },
+        select: {
+          orderNumber: true,
+          total: true,
+          status: true,
+          createdAt: true,
+          customer: { select: { name: true } },
+          payment: { select: { method: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 20,
+      })
+      .then((r) =>
+        r.map((i) => ({
+          orderNumber: i.orderNumber,
+          total: i.total,
+          status: i.status,
+          customer: i.customer?.name || "Umum",
+          method: i.payment?.method || null,
+          createdAt: i.createdAt,
+        }))
+      );
   }
 
   /**
-   * Perbandingan penjualan kasir hari ini vs kemarin + ranking
+   * Perbandingan performa kasir + ranking
    * @param {string} cashierId
-   * @returns {Promise<{todaySales: number, todayOrders: number, yesterdaySales: number, yesterdayOrders: number, salesChange: number, rank: number|null}>}
+   * @returns {Promise<Object>}
    */
   async getCashierComparisonStats(cashierId) {
-    return cached(
-      shortCache,
-      `cashier:compare:${cashierId}`,
-      TTL.SHORT,
-      async () => {
-        const now = new Date();
-        const startDay = new Date(
-          now.getFullYear(),
-          now.getMonth(),
-          now.getDate()
-        );
-        const yesterday = new Date(startDay.getTime() - 86400000);
-        const [todayAgg, yesterdayAgg, rankRaw] = await Promise.all([
-          prisma.order.aggregate({
-            where: {
-              cashierId,
-              createdAt: { gte: startDay },
-              status: { in: ["COMPLETED", "CLOSED"] },
-              deletedAt: null,
-            },
-            _sum: { total: true },
-            _count: true,
-          }),
-          prisma.order.aggregate({
-            where: {
-              cashierId,
-              createdAt: { gte: yesterday, lt: startDay },
-              status: { in: ["COMPLETED", "CLOSED"] },
-              deletedAt: null,
-            },
-            _sum: { total: true },
-            _count: true,
-          }),
-          prisma.$queryRaw`WITH today_ranks AS (SELECT o."cashierId", SUM(o."total")::bigint as sales, RANK() OVER (ORDER BY SUM(o."total") DESC) as "rank" FROM "Order" o WHERE o."createdAt" >= ${startDay} AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL AND o."cashierId" IS NOT NULL GROUP BY o."cashierId") SELECT "rank" FROM today_ranks WHERE "cashierId" = ${cashierId}`,
-        ]);
-        const todaySales = Number(todayAgg._sum.total || 0);
-        const yesterdaySales = Number(yesterdayAgg._sum.total || 0);
-        return {
-          todaySales,
-          todayOrders: todayAgg._count,
-          yesterdaySales,
-          yesterdayOrders: yesterdayAgg._count,
-          salesChange: yesterdaySales
-            ? Math.round(((todaySales - yesterdaySales) / yesterdaySales) * 100)
-            : 0,
-          rank: rankRaw.length ? Number(rankRaw[0].rank) : null,
-        };
-      }
-    );
+    const startDay = this.#getStartOfDay();
+    const yesterday = new Date(startDay.getTime() - 86400000);
+
+    const [todayAgg, yesterdayAgg, rankRaw] = await Promise.all([
+      prisma.order.aggregate({
+        where: {
+          cashierId,
+          createdAt: { gte: startDay },
+          status: { in: ["COMPLETED", "CLOSED"] },
+          deletedAt: null,
+        },
+        _sum: { total: true },
+        _count: true,
+      }),
+      prisma.order.aggregate({
+        where: {
+          cashierId,
+          createdAt: { gte: yesterday, lt: startDay },
+          status: { in: ["COMPLETED", "CLOSED"] },
+          deletedAt: null,
+        },
+        _sum: { total: true },
+        _count: true,
+      }),
+      prisma.$queryRaw`WITH today_ranks AS (SELECT o."cashierId", SUM(o."total")::bigint as sales, RANK() OVER (ORDER BY SUM(o."total") DESC) as "rank" FROM "Order" o WHERE o."createdAt" >= ${startDay} AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL AND o."cashierId" IS NOT NULL GROUP BY o."cashierId") SELECT "rank" FROM today_ranks WHERE "cashierId" = ${cashierId}`,
+    ]);
+
+    const todaySales = Number(todayAgg._sum.total || 0);
+    const yesterdaySales = Number(yesterdayAgg._sum.total || 0);
+    const salesChange = yesterdaySales
+      ? Math.round(((todaySales - yesterdaySales) / yesterdaySales) * 100)
+      : 0;
+
+    return {
+      today: { sales: todaySales, orders: todayAgg._count },
+      yesterday: { sales: yesterdaySales, orders: yesterdayAgg._count },
+      comparison: {
+        salesChange,
+        direction: salesChange > 0 ? "up" : salesChange < 0 ? "down" : "stable",
+      },
+      rank: rankRaw.length ? Number(rankRaw[0].rank) : null,
+    };
   }
 
   // ============================================================================
-  // ADMIN - DASHBOARD (6 methods)
+  // ADMIN - DASHBOARD & OVERVIEW (10 functions)
   // ============================================================================
 
   /**
-   * Dashboard snapshot bengkel
-   * @returns {Promise<{dailyRevenue: number, monthlyRevenue: number, activeMechanics: number, openShifts: number, lowStockItems: number, lowStockThreshold: number, mechanicMaxTasks: number}>}
+   * Dashboard bengkel: ringkasan + recent orders + top mechanics
+   * @returns {Promise<Object>}
    */
   async getAdminDashboardSnapshot() {
-    return cached(shortCache, "admin:dashboard", TTL.SHORT, async () => {
-      const now = new Date();
-      const startDay = new Date(
-        now.getFullYear(),
-        now.getMonth(),
-        now.getDate()
-      );
-      const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const lowThreshold = parseInt(
-        await getSetting("stock_low_threshold", "5"),
-        10
-      );
-      const maxTasks = parseInt(
-        await getSetting("mechanic_max_tasks", "5"),
-        10
-      );
-      const [daily, monthly, mechanics, shifts, lowStock] = await Promise.all([
-        prisma.order.aggregate({
-          where: {
-            createdAt: { gte: startDay },
-            status: { in: ["COMPLETED", "CLOSED"] },
-            deletedAt: null,
-          },
-          _sum: { total: true },
-        }),
-        prisma.order.aggregate({
-          where: {
-            createdAt: { gte: startMonth },
-            status: { in: ["COMPLETED", "CLOSED"] },
-            deletedAt: null,
-          },
-          _sum: { total: true },
-        }),
-        prisma.mechanicAssignment
-          .groupBy({ by: ["mechanicId"], where: { endAt: null }, _count: true })
-          .then((r) => r.length),
-        prisma.shift.count({ where: { status: "OPEN" } }),
-        prisma.product.count({
-          where: {
-            type: "SPAREPART",
-            isActive: true,
-            stock: { lte: lowThreshold },
-          },
-        }),
-      ]);
-      return {
-        dailyRevenue: Number(daily._sum.total || 0),
-        monthlyRevenue: Number(monthly._sum.total || 0),
+    const startDay = this.#getStartOfDay();
+    const startMonth = this.#getStartOfMonth();
+    const startYear = this.#getOneYearAgo();
+
+    const [lowThreshold, maxTasks] = await Promise.all([
+      this.#getSetting("stock_low_threshold", "5"),
+      this.#getSetting("mechanic_max_tasks", "5"),
+    ]);
+
+    const [
+      daily,
+      monthly,
+      yearly,
+      mechanics,
+      shifts,
+      lowStock,
+      recentOrders,
+      topMechanics,
+    ] = await Promise.all([
+      prisma.order.aggregate({
+        where: {
+          createdAt: { gte: startDay },
+          status: { in: ["COMPLETED", "CLOSED"] },
+          deletedAt: null,
+        },
+        _sum: { total: true },
+        _count: true,
+      }),
+      prisma.order.aggregate({
+        where: {
+          createdAt: { gte: startMonth },
+          status: { in: ["COMPLETED", "CLOSED"] },
+          deletedAt: null,
+        },
+        _sum: { total: true },
+        _count: true,
+      }),
+      prisma.order.aggregate({
+        where: {
+          createdAt: { gte: startYear },
+          status: { in: ["COMPLETED", "CLOSED"] },
+          deletedAt: null,
+        },
+        _sum: { total: true },
+        _count: true,
+      }),
+      prisma.mechanicAssignment
+        .groupBy({ by: ["mechanicId"], where: { endAt: null }, _count: true })
+        .then((r) => r.length),
+      prisma.shift.count({ where: { status: "OPEN" } }),
+      prisma.product.count({
+        where: {
+          type: "SPAREPART",
+          isActive: true,
+          stock: { lte: parseInt(lowThreshold, 10) },
+        },
+      }),
+      prisma.order.findMany({
+        where: {
+          createdAt: { gte: startDay },
+          status: { in: ["COMPLETED", "CLOSED"] },
+          deletedAt: null,
+        },
+        select: {
+          orderNumber: true,
+          total: true,
+          createdAt: true,
+          customer: { select: { name: true } },
+          payment: { select: { method: true } },
+        },
+        orderBy: { total: "desc" },
+        take: 5,
+      }),
+      prisma.$queryRaw`SELECT u."fullName", COUNT(ma."id")::int as jobs, COALESCE(SUM(oi."subtotal"), 0)::bigint as earnings FROM "User" u LEFT JOIN "MechanicAssignment" ma ON u."id" = ma."mechanicId" LEFT JOIN "OrderItem" oi ON ma."orderItemId" = oi."id" LEFT JOIN "Order" o ON oi."orderId" = o."id" WHERE u."role" = 'MECHANIC' AND ma."endAt" >= ${startMonth} AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL GROUP BY u."fullName" ORDER BY earnings DESC LIMIT 5`,
+    ]);
+
+    return {
+      revenue: {
+        daily: Number(daily._sum.total || 0),
+        monthly: Number(monthly._sum.total || 0),
+        yearly: Number(yearly._sum.total || 0),
+      },
+      orders: {
+        daily: daily._count,
+        monthly: monthly._count,
+        yearly: yearly._count,
+      },
+      operational: {
         activeMechanics: mechanics,
         openShifts: shifts,
         lowStockItems: lowStock,
-        lowStockThreshold: lowThreshold,
-        mechanicMaxTasks: maxTasks,
-      };
-    });
+      },
+      settings: {
+        lowStockThreshold: parseInt(lowThreshold, 10),
+        mechanicMaxTasks: parseInt(maxTasks, 10),
+      },
+      recentOrders: recentOrders.map((o) => ({
+        orderNumber: o.orderNumber,
+        customer: o.customer?.name || "Umum",
+        total: o.total,
+        method: o.payment?.method || null,
+        createdAt: o.createdAt,
+      })),
+      topMechanics: topMechanics.map((m) => ({
+        name: m.fullName,
+        jobs: Number(m.jobs),
+        earnings: Number(m.earnings),
+      })),
+    };
   }
 
   /**
-   * Ringkasan bisnis hari ini
-   * @returns {Promise<{totalRevenue: number, totalOrders: number, avgOrderValue: number, topProduct: string|null, paymentBreakdown: Array}>}
+   * Ringkasan bisnis hari ini + perbandingan kemarin
+   * @returns {Promise<Object>}
    */
   async getAdminTodaySummary() {
-    return cached(shortCache, "admin:today", TTL.SHORT, async () => {
-      const start = new Date();
-      start.setHours(0, 0, 0, 0);
-      const end = new Date();
-      end.setHours(23, 59, 59, 999);
-      const [agg, top, paymentBreakdown] = await Promise.all([
-        prisma.order.aggregate({
-          where: {
-            createdAt: { gte: start, lte: end },
-            status: { in: ["COMPLETED", "CLOSED"] },
-            deletedAt: null,
-          },
-          _sum: { total: true },
-          _count: true,
-          _avg: { total: true },
-        }),
-        prisma.$queryRaw`SELECT oi."productNameSnapshot" as name, SUM(oi."quantity")::int as qty FROM "OrderItem" oi INNER JOIN "Order" o ON oi."orderId" = o."id" WHERE o."createdAt" >= ${start} AND o."createdAt" <= ${end} AND o."deletedAt" IS NULL GROUP BY oi."productNameSnapshot" ORDER BY qty DESC LIMIT 1`,
-        prisma.payment.groupBy({
-          by: ["method"],
-          where: {
-            order: { createdAt: { gte: start, lte: end }, deletedAt: null },
-          },
-          _sum: { amountPaid: true },
-          _count: { method: true },
-        }),
-      ]);
-      return {
-        totalRevenue: Number(agg._sum.total || 0),
-        totalOrders: agg._count,
+    const startDay = this.#getStartOfDay();
+    const endDay = new Date();
+    endDay.setHours(23, 59, 59, 999);
+    const yesterday = new Date(startDay.getTime() - 86400000);
+
+    const [agg, yesterdayAgg, top, paymentBreakdown] = await Promise.all([
+      prisma.order.aggregate({
+        where: {
+          createdAt: { gte: startDay, lte: endDay },
+          status: { in: ["COMPLETED", "CLOSED"] },
+          deletedAt: null,
+        },
+        _sum: { total: true },
+        _count: true,
+        _avg: { total: true },
+      }),
+      prisma.order.aggregate({
+        where: {
+          createdAt: { gte: yesterday, lt: startDay },
+          status: { in: ["COMPLETED", "CLOSED"] },
+          deletedAt: null,
+        },
+        _sum: { total: true },
+        _count: true,
+      }),
+      prisma.$queryRaw`SELECT oi."productNameSnapshot" as name, SUM(oi."quantity")::int as qty FROM "OrderItem" oi INNER JOIN "Order" o ON oi."orderId" = o."id" WHERE o."createdAt" >= ${startDay} AND o."createdAt" <= ${endDay} AND o."deletedAt" IS NULL GROUP BY oi."productNameSnapshot" ORDER BY qty DESC LIMIT 1`,
+      prisma.payment.groupBy({
+        by: ["method"],
+        where: {
+          order: { createdAt: { gte: startDay, lte: endDay }, deletedAt: null },
+        },
+        _sum: { amountPaid: true },
+        _count: { method: true },
+      }),
+    ]);
+
+    const todayRevenue = Number(agg._sum.total || 0);
+    const yesterdayRevenue = Number(yesterdayAgg._sum.total || 0);
+    const change = yesterdayRevenue
+      ? Math.round(((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100)
+      : 0;
+
+    const cashPayments = paymentBreakdown.find((p) => p.method === "CASH");
+    const qrisPayments = paymentBreakdown.find((p) => p.method === "QRIS");
+
+    return {
+      today: {
+        revenue: todayRevenue,
+        orders: agg._count,
         avgOrderValue: Math.round(agg._avg.total || 0),
-        topProduct: top[0]?.name || null,
-        paymentBreakdown: paymentBreakdown.map((p) => ({
-          method: p.method,
-          total: p._sum.amountPaid || 0,
-          count: p._count.method,
-        })),
-      };
-    });
+      },
+      yesterday: { revenue: yesterdayRevenue, orders: yesterdayAgg._count },
+      comparison: {
+        change,
+        direction: change > 0 ? "up" : change < 0 ? "down" : "stable",
+      },
+      topProduct: top[0]?.name || null,
+      payments: {
+        cash: {
+          total: cashPayments?._sum.amountPaid || 0,
+          count: cashPayments?._count.method || 0,
+        },
+        qris: {
+          total: qrisPayments?._sum.amountPaid || 0,
+          count: qrisPayments?._count.method || 0,
+        },
+      },
+    };
   }
 
   /**
-   * Performa semua kasir
-   * @param {Object} [params] - { days, startDate }
-   * @returns {Promise<Array<{cashierName: string, shiftCount: number, totalSales: number, avgDiscrepancy: number}>>}
+   * Performa semua kasir: bulan ini, tahun ini
+   * @returns {Promise<Object>}
    */
-  async getAdminCashierPerformance(params = {}) {
-    const days = params.days || 30;
-    return cached(
-      mediumCache,
-      `admin:cashiers:${days}`,
-      TTL.MEDIUM,
-      async () => {
-        const since = params.startDate
-          ? new Date(params.startDate)
-          : new Date(Date.now() - days * 86400000);
-        const raw =
-          await prisma.$queryRaw`SELECT u."fullName" as "cashierName", COUNT(s."id")::int as "shiftCount", COALESCE(SUM(s."cashSales"), 0)::bigint as "totalSales", ROUND(AVG(s."discrepancy"))::int as "avgDiscrepancy" FROM "Shift" s INNER JOIN "User" u ON s."cashierId" = u."id" WHERE s."openedAt" >= ${since} GROUP BY u."fullName" ORDER BY "totalSales" DESC`;
-        return raw.map((r) => ({
-          cashierName: r.cashierName,
-          shiftCount: Number(r.shiftCount),
-          totalSales: Number(r.totalSales),
-          avgDiscrepancy: Number(r.avgDiscrepancy) || 0,
-        }));
-      }
-    );
+  async getAdminCashierPerformance() {
+    const startMonth = this.#getStartOfMonth();
+    const startYear = this.#getOneYearAgo();
+
+    const [monthly, yearly] = await Promise.all([
+      prisma.$queryRaw`SELECT u."fullName" as "cashierName", COUNT(s."id")::int as "shiftCount", COALESCE(SUM(s."cashSales"), 0)::bigint as "totalSales", ROUND(AVG(s."discrepancy"))::int as "avgDiscrepancy" FROM "Shift" s INNER JOIN "User" u ON s."cashierId" = u."id" WHERE s."openedAt" >= ${startMonth} GROUP BY u."fullName" ORDER BY "totalSales" DESC`,
+      prisma.$queryRaw`SELECT u."fullName" as "cashierName", COUNT(s."id")::int as "shiftCount", COALESCE(SUM(s."cashSales"), 0)::bigint as "totalSales", ROUND(AVG(s."discrepancy"))::int as "avgDiscrepancy" FROM "Shift" s INNER JOIN "User" u ON s."cashierId" = u."id" WHERE s."openedAt" >= ${startYear} GROUP BY u."fullName" ORDER BY "totalSales" DESC`,
+    ]);
+
+    return {
+      monthly: monthly.map((r) => ({
+        cashierName: r.cashierName,
+        shiftCount: Number(r.shiftCount),
+        totalSales: Number(r.totalSales),
+        avgDiscrepancy: Number(r.avgDiscrepancy) || 0,
+      })),
+      yearly: yearly.map((r) => ({
+        cashierName: r.cashierName,
+        shiftCount: Number(r.shiftCount),
+        totalSales: Number(r.totalSales),
+        avgDiscrepancy: Number(r.avgDiscrepancy) || 0,
+      })),
+    };
   }
 
   /**
-   * Perbandingan performa semua mekanik
-   * @param {Object} [params] - { days, startDate }
-   * @returns {Promise<Array<{mechanicName: string, totalJobs: number, completedJobs: number, completionRate: number, totalEarnings: number}>>}
+   * Perbandingan semua mekanik: bulan ini, tahun ini
+   * @returns {Promise<Object>}
    */
-  async getAdminMechanicComparison(params = {}) {
-    const days = params.days || 30;
-    return cached(
-      mediumCache,
-      `admin:mechanics:${days}`,
-      TTL.MEDIUM,
-      async () => {
-        const since = params.startDate
-          ? new Date(params.startDate)
-          : new Date(Date.now() - days * 86400000);
-        const raw =
-          await prisma.$queryRaw`SELECT u."fullName" as "mechanicName", COUNT(ma."id")::int as "totalJobs", COUNT(CASE WHEN ma."endAt" IS NOT NULL AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL THEN 1 END)::int as "completedJobs", CASE WHEN COUNT(ma."id") > 0 THEN ROUND((COUNT(CASE WHEN ma."endAt" IS NOT NULL AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL THEN 1 END)::float / COUNT(ma."id") * 100)) ELSE 0 END as "completionRate", COALESCE(SUM(CASE WHEN ma."endAt" IS NOT NULL AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL THEN oi."subtotal" ELSE 0 END), 0)::bigint as "totalEarnings" FROM "User" u LEFT JOIN "MechanicAssignment" ma ON u."id" = ma."mechanicId" LEFT JOIN "OrderItem" oi ON ma."orderItemId" = oi."id" LEFT JOIN "Order" o ON oi."orderId" = o."id" WHERE u."role" = 'MECHANIC' AND ma."createdAt" >= ${since} GROUP BY u."fullName" ORDER BY "totalEarnings" DESC`;
-        return raw.map((r) => ({
-          mechanicName: r.mechanicName,
-          totalJobs: Number(r.totalJobs),
-          completedJobs: Number(r.completedJobs),
-          completionRate: Number(r.completionRate) || 0,
-          totalEarnings: Number(r.totalEarnings),
-        }));
-      }
-    );
+  async getAdminMechanicComparison() {
+    const startMonth = this.#getStartOfMonth();
+    const startYear = this.#getOneYearAgo();
+
+    const [monthly, yearly] = await Promise.all([
+      prisma.$queryRaw`SELECT u."fullName" as "mechanicName", COUNT(ma."id")::int as "totalJobs", COUNT(CASE WHEN ma."endAt" IS NOT NULL AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL THEN 1 END)::int as "completedJobs", CASE WHEN COUNT(ma."id") > 0 THEN ROUND((COUNT(CASE WHEN ma."endAt" IS NOT NULL AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL THEN 1 END)::float / COUNT(ma."id") * 100)) ELSE 0 END as "completionRate", COALESCE(SUM(CASE WHEN ma."endAt" IS NOT NULL AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL THEN oi."subtotal" ELSE 0 END), 0)::bigint as "totalEarnings" FROM "User" u LEFT JOIN "MechanicAssignment" ma ON u."id" = ma."mechanicId" LEFT JOIN "OrderItem" oi ON ma."orderItemId" = oi."id" LEFT JOIN "Order" o ON oi."orderId" = o."id" WHERE u."role" = 'MECHANIC' AND ma."createdAt" >= ${startMonth} GROUP BY u."fullName" ORDER BY "totalEarnings" DESC`,
+      prisma.$queryRaw`SELECT u."fullName" as "mechanicName", COUNT(ma."id")::int as "totalJobs", COUNT(CASE WHEN ma."endAt" IS NOT NULL AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL THEN 1 END)::int as "completedJobs", CASE WHEN COUNT(ma."id") > 0 THEN ROUND((COUNT(CASE WHEN ma."endAt" IS NOT NULL AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL THEN 1 END)::float / COUNT(ma."id") * 100)) ELSE 0 END as "completionRate", COALESCE(SUM(CASE WHEN ma."endAt" IS NOT NULL AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL THEN oi."subtotal" ELSE 0 END), 0)::bigint as "totalEarnings" FROM "User" u LEFT JOIN "MechanicAssignment" ma ON u."id" = ma."mechanicId" LEFT JOIN "OrderItem" oi ON ma."orderItemId" = oi."id" LEFT JOIN "Order" o ON oi."orderId" = o."id" WHERE u."role" = 'MECHANIC' AND ma."createdAt" >= ${startYear} GROUP BY u."fullName" ORDER BY "totalEarnings" DESC`,
+    ]);
+
+    return {
+      monthly: monthly.map((r) => ({
+        mechanicName: r.mechanicName,
+        totalJobs: Number(r.totalJobs),
+        completedJobs: Number(r.completedJobs),
+        completionRate: Number(r.completionRate) || 0,
+        totalEarnings: Number(r.totalEarnings),
+      })),
+      yearly: yearly.map((r) => ({
+        mechanicName: r.mechanicName,
+        totalJobs: Number(r.totalJobs),
+        completedJobs: Number(r.completedJobs),
+        completionRate: Number(r.completionRate) || 0,
+        totalEarnings: Number(r.totalEarnings),
+      })),
+    };
   }
 
   /**
-   * Overview pengeluaran bulan ini
-   * @returns {Promise<{totalExpenses: number, topCategory: string|null, expenseGrowth: number, byCategory: Array}>}
+   * Overview pengeluaran: bulan ini, tahun ini + detail kategori
+   * @returns {Promise<Object>}
    */
   async getAdminExpenseOverview() {
-    return cached(mediumCache, "admin:expenses", TTL.MEDIUM, async () => {
-      const now = new Date();
-      const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-      const [thisExp, lastExp, top, allCategories] = await Promise.all([
-        prisma.expense.aggregate({
-          where: { date: { gte: thisMonth, lt: nextMonth } },
-          _sum: { amount: true },
-        }),
-        prisma.expense.aggregate({
-          where: { date: { gte: lastMonth, lt: thisMonth } },
-          _sum: { amount: true },
-        }),
-        prisma.expense.groupBy({
-          by: ["category"],
-          where: { date: { gte: thisMonth, lt: nextMonth } },
-          _sum: { amount: true },
-          orderBy: { _sum: { amount: "desc" } },
-          take: 1,
-        }),
-        prisma.expense.groupBy({
-          by: ["category"],
-          where: { date: { gte: thisMonth, lt: nextMonth } },
-          _sum: { amount: true },
-          orderBy: { _sum: { amount: "desc" } },
-        }),
-      ]);
-      const thisAmount = Number(thisExp._sum.amount || 0);
-      const lastAmount = Number(lastExp._sum.amount || 0);
-      return {
-        totalExpenses: thisAmount,
-        topCategory: top[0]?.category || null,
-        expenseGrowth: lastAmount
-          ? Math.round(((thisAmount - lastAmount) / lastAmount) * 10000) / 100
-          : 0,
-        byCategory: allCategories.map((c) => ({
-          category: c.category,
-          total: Number(c._sum.amount || 0),
-        })),
-      };
-    });
+    const startMonth = this.#getStartOfMonth();
+    const startYear = this.#getOneYearAgo();
+
+    const [monthly, yearly, byCategory, recentExpenses] = await Promise.all([
+      prisma.expense.aggregate({
+        where: { date: { gte: startMonth } },
+        _sum: { amount: true },
+        _count: true,
+      }),
+      prisma.expense.aggregate({
+        where: { date: { gte: startYear } },
+        _sum: { amount: true },
+        _count: true,
+      }),
+      prisma.expense.groupBy({
+        by: ["category"],
+        where: { date: { gte: startYear } },
+        _sum: { amount: true },
+        orderBy: { _sum: { amount: "desc" } },
+      }),
+      prisma.expense.findMany({
+        select: { title: true, amount: true, category: true, date: true },
+        orderBy: { date: "desc" },
+        take: 20,
+      }),
+    ]);
+
+    return {
+      summary: {
+        monthly: {
+          total: Number(monthly._sum.amount || 0),
+          count: monthly._count,
+        },
+        yearly: {
+          total: Number(yearly._sum.amount || 0),
+          count: yearly._count,
+        },
+      },
+      byCategory: byCategory.map((c) => ({
+        category: c.category,
+        total: Number(c._sum.amount || 0),
+      })),
+      recentExpenses: recentExpenses.map((e) => ({
+        title: e.title,
+        amount: e.amount,
+        category: e.category,
+        date: e.date,
+      })),
+    };
   }
 
   /**
-   * Distribusi status order
-   * @param {Object} [params] - { days, startDate }
-   * @returns {Promise<Array<{status: string, count: number, pct: number}>>}
-   */
-  async getAdminOrderStatusDistribution(params = {}) {
-    const days = params.days || 30;
-    return cached(
-      mediumCache,
-      `admin:orderstatus:${days}`,
-      TTL.MEDIUM,
-      async () => {
-        const since = params.startDate
-          ? new Date(params.startDate)
-          : new Date(Date.now() - days * 86400000);
-        const raw =
-          await prisma.$queryRaw`SELECT "status", COUNT("id")::int as count FROM "Order" WHERE "createdAt" >= ${since} AND "deletedAt" IS NULL GROUP BY "status" ORDER BY count DESC`;
-        const total = raw.reduce((s, r) => s + Number(r.count), 0);
-        return raw.map((r) => ({
-          status: r.status,
-          count: Number(r.count),
-          pct: total ? Math.round((Number(r.count) / total) * 10000) / 100 : 0,
-        }));
-      }
-    );
-  }
-
-  // ============================================================================
-  // ADMIN - INVENTORY & GROWTH (5 methods)
-  // ============================================================================
-
-  /**
-   * Kesehatan inventori bengkel
-   * @returns {Promise<{totalStockValue: number, deadStockValue: number, turnoverRate: number, mostProfitable: string|null, outOfStock: number, lowStock: number, healthy: number, lowThreshold: number}>}
+   * Kesehatan inventori: ringkasan + detail stok
+   * @returns {Promise<Object>}
    */
   async getAdminInventoryHealth() {
-    return cached(mediumCache, "admin:inventory", TTL.MEDIUM, async () => {
-      const since90 = new Date(Date.now() - 90 * 86400000);
-      const lowThreshold = parseInt(
-        await getSetting("stock_low_threshold", "5"),
-        10
-      );
-      const [stockValue, dead, turnover, top, stockDistribution] =
-        await Promise.all([
-          prisma.$queryRaw`SELECT COALESCE(SUM("stock" * "cost"), 0)::bigint as val FROM "Product" WHERE "type" = 'SPAREPART' AND "isActive" = true`,
-          prisma.$queryRaw`SELECT COALESCE(SUM(p."stock" * p."cost"), 0)::bigint as val FROM "Product" p WHERE p."type" = 'SPAREPART' AND p."isActive" = true AND p."stock" > 0 AND NOT EXISTS (SELECT 1 FROM "StockMovement" sm WHERE sm."productId" = p."id" AND sm."type" = 'OUT' AND sm."createdAt" >= ${since90})`,
-          prisma.$queryRaw`SELECT ROUND(COALESCE(SUM(sm."quantity"), 0) / NULLIF(SUM(p."stock"), 0) * 100) / 100 as rate FROM "Product" p LEFT JOIN "StockMovement" sm ON p."id" = sm."productId" AND sm."type" = 'OUT' AND sm."createdAt" >= ${since90} WHERE p."type" = 'SPAREPART' AND p."isActive" = true`,
-          prisma.$queryRaw`SELECT oi."productNameSnapshot" as name, SUM(oi."subtotal" - (oi."unitCostSnapshot" * oi."quantity"))::bigint as profit FROM "OrderItem" oi INNER JOIN "Order" o ON oi."orderId" = o."id" WHERE o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL GROUP BY oi."productNameSnapshot" ORDER BY profit DESC LIMIT 1`,
-          prisma.$queryRaw`SELECT COUNT(*)::int as "outOfStock", COUNT(*) FILTER (WHERE "stock" > 0 AND "stock" <= ${lowThreshold})::int as "lowStock", COUNT(*) FILTER (WHERE "stock" > ${lowThreshold})::int as "healthy" FROM "Product" WHERE "type" = 'SPAREPART' AND "isActive" = true`,
-        ]);
-      return {
-        totalStockValue: Number(stockValue[0].val),
-        deadStockValue: Number(dead[0].val),
-        turnoverRate: Number(turnover[0].rate),
+    const since90 = new Date(Date.now() - 90 * 86400000);
+    const lowThreshold = parseInt(
+      await this.#getSetting("stock_low_threshold", "5"),
+      10
+    );
+
+    const [
+      stockValue,
+      dead,
+      turnover,
+      top,
+      stockDistribution,
+      outOfStockItems,
+      lowStockItems,
+      overStockItems,
+    ] = await Promise.all([
+      prisma.$queryRaw`SELECT COALESCE(SUM("stock" * "cost"), 0)::bigint as val FROM "Product" WHERE "type" = 'SPAREPART' AND "isActive" = true`,
+      prisma.$queryRaw`SELECT COALESCE(SUM(p."stock" * p."cost"), 0)::bigint as val FROM "Product" p WHERE p."type" = 'SPAREPART' AND p."isActive" = true AND p."stock" > 0 AND NOT EXISTS (SELECT 1 FROM "StockMovement" sm WHERE sm."productId" = p."id" AND sm."type" = 'OUT' AND sm."createdAt" >= ${since90})`,
+      prisma.$queryRaw`SELECT ROUND(COALESCE(SUM(sm."quantity"), 0) / NULLIF(SUM(p."stock"), 0) * 100) / 100 as rate FROM "Product" p LEFT JOIN "StockMovement" sm ON p."id" = sm."productId" AND sm."type" = 'OUT' AND sm."createdAt" >= ${since90} WHERE p."type" = 'SPAREPART' AND p."isActive" = true`,
+      prisma.$queryRaw`SELECT oi."productNameSnapshot" as name, SUM(oi."subtotal" - (oi."unitCostSnapshot" * oi."quantity"))::bigint as profit FROM "OrderItem" oi INNER JOIN "Order" o ON oi."orderId" = o."id" WHERE o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL GROUP BY oi."productNameSnapshot" ORDER BY profit DESC LIMIT 1`,
+      prisma.$queryRaw`SELECT COUNT(*)::int as "outOfStock", COUNT(*) FILTER (WHERE "stock" > 0 AND "stock" <= ${lowThreshold})::int as "lowStock", COUNT(*) FILTER (WHERE "stock" > ${lowThreshold})::int as "healthy" FROM "Product" WHERE "type" = 'SPAREPART' AND "isActive" = true`,
+      prisma.product.findMany({
+        where: { type: "SPAREPART", isActive: true, stock: 0 },
+        select: { id: true, sku: true, name: true, cost: true, price: true },
+        take: 20,
+      }),
+      prisma.product.findMany({
+        where: {
+          type: "SPAREPART",
+          isActive: true,
+          stock: { gt: 0, lte: lowThreshold },
+        },
+        select: {
+          id: true,
+          sku: true,
+          name: true,
+          stock: true,
+          cost: true,
+          price: true,
+        },
+        orderBy: { stock: "asc" },
+        take: 20,
+      }),
+      prisma.product.findMany({
+        where: { type: "SPAREPART", isActive: true, stock: { gte: 200 } },
+        select: {
+          id: true,
+          sku: true,
+          name: true,
+          stock: true,
+          cost: true,
+          price: true,
+        },
+        orderBy: { stock: "desc" },
+        take: 20,
+      }),
+    ]);
+
+    return {
+      summary: {
+        stock: {
+          totalValue: Number(stockValue[0].val),
+          deadValue: Number(dead[0].val),
+          turnoverRate: Number(turnover[0].rate),
+        },
+        distribution: {
+          outOfStock: Number(stockDistribution[0].outOfStock),
+          lowStock: Number(stockDistribution[0].lowStock),
+          healthy: Number(stockDistribution[0].healthy),
+        },
         mostProfitable: top[0]?.name || null,
-        outOfStock: Number(stockDistribution[0].outOfStock),
-        lowStock: Number(stockDistribution[0].lowStock),
-        healthy: Number(stockDistribution[0].healthy),
         lowThreshold,
-      };
-    });
+      },
+      outOfStockItems: outOfStockItems.map((p) => ({
+        id: p.id,
+        sku: p.sku,
+        name: p.name,
+        cost: p.cost,
+        price: p.price,
+        potentialLoss: p.price - p.cost,
+      })),
+      lowStockItems: lowStockItems.map((p) => ({
+        id: p.id,
+        sku: p.sku,
+        name: p.name,
+        stock: p.stock,
+        cost: p.cost,
+        price: p.price,
+      })),
+      overStockItems: overStockItems.map((p) => ({
+        id: p.id,
+        sku: p.sku,
+        name: p.name,
+        stock: p.stock,
+        cost: p.cost,
+        price: p.price,
+      })),
+    };
   }
 
   /**
-   * Pertumbuhan bisnis bulan ini vs bulan lalu
-   * @returns {Promise<{revenueGrowth: number, customerGrowth: number, orderGrowth: number}>}
+   * Pertumbuhan bisnis: bulanan, tahunan
+   * @returns {Promise<Object>}
    */
   async getAdminBusinessGrowth() {
-    return cached(mediumCache, "admin:growth", TTL.MEDIUM, async () => {
-      const now = new Date();
-      const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-      const [thisRev, lastRev, thisCust, lastCust, thisOrd, lastOrd] =
-        await Promise.all([
-          prisma.order.aggregate({
-            where: {
-              createdAt: { gte: thisMonth, lt: nextMonth },
-              status: { in: ["COMPLETED", "CLOSED"] },
-              deletedAt: null,
-            },
-            _sum: { total: true },
-          }),
-          prisma.order.aggregate({
-            where: {
-              createdAt: { gte: lastMonth, lt: thisMonth },
-              status: { in: ["COMPLETED", "CLOSED"] },
-              deletedAt: null,
-            },
-            _sum: { total: true },
-          }),
-          prisma.customer.count({
-            where: { createdAt: { gte: thisMonth, lt: nextMonth } },
-          }),
-          prisma.customer.count({
-            where: { createdAt: { gte: lastMonth, lt: thisMonth } },
-          }),
-          prisma.order.count({
-            where: {
-              createdAt: { gte: thisMonth, lt: nextMonth },
-              deletedAt: null,
-            },
-          }),
-          prisma.order.count({
-            where: {
-              createdAt: { gte: lastMonth, lt: thisMonth },
-              deletedAt: null,
-            },
-          }),
-        ]);
-      const calc = (curr, prev) =>
-        prev ? Math.round(((curr - prev) / prev) * 10000) / 100 : 0;
-      return {
+    const now = new Date();
+    const thisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const thisYear = new Date(now.getFullYear(), 0, 1);
+    const lastYear = new Date(now.getFullYear() - 1, 0, 1);
+
+    const [
+      thisMonthRev,
+      lastMonthRev,
+      thisYearRev,
+      lastYearRev,
+      thisMonthCust,
+      lastMonthCust,
+      thisYearCust,
+      lastYearCust,
+      thisMonthOrd,
+      lastMonthOrd,
+      thisYearOrd,
+      lastYearOrd,
+    ] = await Promise.all([
+      prisma.order.aggregate({
+        where: {
+          createdAt: { gte: thisMonth, lt: nextMonth },
+          status: { in: ["COMPLETED", "CLOSED"] },
+          deletedAt: null,
+        },
+        _sum: { total: true },
+      }),
+      prisma.order.aggregate({
+        where: {
+          createdAt: { gte: lastMonth, lt: thisMonth },
+          status: { in: ["COMPLETED", "CLOSED"] },
+          deletedAt: null,
+        },
+        _sum: { total: true },
+      }),
+      prisma.order.aggregate({
+        where: {
+          createdAt: { gte: thisYear },
+          status: { in: ["COMPLETED", "CLOSED"] },
+          deletedAt: null,
+        },
+        _sum: { total: true },
+      }),
+      prisma.order.aggregate({
+        where: {
+          createdAt: { gte: lastYear, lt: thisYear },
+          status: { in: ["COMPLETED", "CLOSED"] },
+          deletedAt: null,
+        },
+        _sum: { total: true },
+      }),
+      prisma.customer.count({
+        where: { createdAt: { gte: thisMonth, lt: nextMonth } },
+      }),
+      prisma.customer.count({
+        where: { createdAt: { gte: lastMonth, lt: thisMonth } },
+      }),
+      prisma.customer.count({ where: { createdAt: { gte: thisYear } } }),
+      prisma.customer.count({
+        where: { createdAt: { gte: lastYear, lt: thisYear } },
+      }),
+      prisma.order.count({
+        where: {
+          createdAt: { gte: thisMonth, lt: nextMonth },
+          deletedAt: null,
+        },
+      }),
+      prisma.order.count({
+        where: {
+          createdAt: { gte: lastMonth, lt: thisMonth },
+          deletedAt: null,
+        },
+      }),
+      prisma.order.count({
+        where: { createdAt: { gte: thisYear }, deletedAt: null },
+      }),
+      prisma.order.count({
+        where: { createdAt: { gte: lastYear, lt: thisYear }, deletedAt: null },
+      }),
+    ]);
+
+    const calc = (curr, prev) =>
+      prev ? Math.round(((curr - prev) / prev) * 10000) / 100 : 0;
+
+    return {
+      monthly: {
         revenueGrowth: calc(
-          Number(thisRev._sum.total || 0),
-          Number(lastRev._sum.total || 0)
+          Number(thisMonthRev._sum.total || 0),
+          Number(lastMonthRev._sum.total || 0)
         ),
-        customerGrowth: calc(thisCust, lastCust),
-        orderGrowth: calc(thisOrd, lastOrd),
-      };
-    });
+        customerGrowth: calc(thisMonthCust, lastMonthCust),
+        orderGrowth: calc(thisMonthOrd, lastMonthOrd),
+      },
+      yearly: {
+        revenueGrowth: calc(
+          Number(thisYearRev._sum.total || 0),
+          Number(lastYearRev._sum.total || 0)
+        ),
+        customerGrowth: calc(thisYearCust, lastYearCust),
+        orderGrowth: calc(thisYearOrd, lastYearOrd),
+      },
+    };
   }
 
   /**
-   * Laporan laba bersih harian
-   * @param {Object} [params] - { days, startDate }
-   * @returns {Promise<Array<{date: string, revenue: number, expenses: number, net: number}>>}
+   * Top sparepart & service + slow moving products
+   * @returns {Promise<Object>}
    */
-  async getAdminDailyNetReport(params = {}) {
-    const days = params.days || 7;
-    return cached(
-      mediumCache,
-      `admin:dailyreport:${days}`,
-      TTL.MEDIUM,
-      async () => {
-        const since = params.startDate
-          ? new Date(params.startDate)
-          : new Date(Date.now() - days * 86400000);
-        const raw =
-          await prisma.$queryRaw`WITH rev AS (SELECT DATE("createdAt") as date, SUM("total")::bigint as revenue FROM "Order" WHERE "createdAt" >= ${since} AND "status" IN ('COMPLETED','CLOSED') AND "deletedAt" IS NULL GROUP BY date), exp AS (SELECT DATE("date") as date, SUM("amount")::bigint as expenses FROM "Expense" WHERE "date" >= ${since} GROUP BY date) SELECT COALESCE(r.date, e.date) as date, COALESCE(r.revenue, 0) as revenue, COALESCE(e.expenses, 0) as expenses, COALESCE(r.revenue, 0) - COALESCE(e.expenses, 0) as net FROM rev r FULL OUTER JOIN exp e ON r.date = e.date ORDER BY date ASC`;
-        return raw.map((r) => ({
-          date: r.date,
-          revenue: Number(r.revenue),
-          expenses: Number(r.expenses),
-          net: Number(r.net),
-        }));
-      }
-    );
-  }
+  async getAdminTopProducts() {
+    const startMonth = this.#getStartOfMonth();
+    const startYear = this.#getOneYearAgo();
 
-  /**
-   * 10 sparepart terlaris
-   * @param {Object} [params] - { days, startDate }
-   * @returns {Promise<Array<{name: string, sold: number, revenue: number, profit: number}>>}
-   */
-  async getAdminTopSpareparts(params = {}) {
-    const days = params.days || 30;
-    return cached(
-      mediumCache,
-      `admin:topspareparts:${days}`,
-      TTL.MEDIUM,
-      async () => {
-        const since = params.startDate
-          ? new Date(params.startDate)
-          : new Date(Date.now() - days * 86400000);
-        const raw =
-          await prisma.$queryRaw`SELECT oi."productNameSnapshot" as name, SUM(oi."quantity")::int as sold, SUM(oi."subtotal")::bigint as revenue, SUM(oi."subtotal" - (oi."unitCostSnapshot" * oi."quantity"))::bigint as profit FROM "OrderItem" oi INNER JOIN "Product" p ON oi."productId" = p."id" INNER JOIN "Order" o ON oi."orderId" = o."id" WHERE p."type" = 'SPAREPART' AND o."createdAt" >= ${since} AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL GROUP BY oi."productNameSnapshot" ORDER BY sold DESC LIMIT 10`;
-        return raw.map((r) => ({
+    const [
+      sparepartsMonthly,
+      sparepartsYearly,
+      servicesMonthly,
+      servicesYearly,
+      slowMoving,
+    ] = await Promise.all([
+      prisma.$queryRaw`SELECT oi."productNameSnapshot" as name, SUM(oi."quantity")::int as sold, SUM(oi."subtotal")::bigint as revenue, SUM(oi."subtotal" - (oi."unitCostSnapshot" * oi."quantity"))::bigint as profit FROM "OrderItem" oi INNER JOIN "Product" p ON oi."productId" = p."id" INNER JOIN "Order" o ON oi."orderId" = o."id" WHERE p."type" = 'SPAREPART' AND o."createdAt" >= ${startMonth} AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL GROUP BY oi."productNameSnapshot" ORDER BY sold DESC LIMIT 10`,
+      prisma.$queryRaw`SELECT oi."productNameSnapshot" as name, SUM(oi."quantity")::int as sold, SUM(oi."subtotal")::bigint as revenue, SUM(oi."subtotal" - (oi."unitCostSnapshot" * oi."quantity"))::bigint as profit FROM "OrderItem" oi INNER JOIN "Product" p ON oi."productId" = p."id" INNER JOIN "Order" o ON oi."orderId" = o."id" WHERE p."type" = 'SPAREPART' AND o."createdAt" >= ${startYear} AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL GROUP BY oi."productNameSnapshot" ORDER BY sold DESC LIMIT 10`,
+      prisma.$queryRaw`SELECT oi."productNameSnapshot" as name, COUNT(DISTINCT o."id")::int as orders, SUM(oi."subtotal")::bigint as revenue FROM "OrderItem" oi INNER JOIN "Product" p ON oi."productId" = p."id" INNER JOIN "Order" o ON oi."orderId" = o."id" WHERE p."type" = 'SERVICE' AND o."createdAt" >= ${startMonth} AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL GROUP BY oi."productNameSnapshot" ORDER BY orders DESC LIMIT 10`,
+      prisma.$queryRaw`SELECT oi."productNameSnapshot" as name, COUNT(DISTINCT o."id")::int as orders, SUM(oi."subtotal")::bigint as revenue FROM "OrderItem" oi INNER JOIN "Product" p ON oi."productId" = p."id" INNER JOIN "Order" o ON oi."orderId" = o."id" WHERE p."type" = 'SERVICE' AND o."createdAt" >= ${startYear} AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL GROUP BY oi."productNameSnapshot" ORDER BY orders DESC LIMIT 10`,
+      prisma.$queryRaw`SELECT p."name", p."sku", p."stock", COALESCE(SUM(oi."quantity"), 0)::int as sold_90d FROM "Product" p LEFT JOIN "OrderItem" oi ON p."id" = oi."productId" LEFT JOIN "Order" o ON oi."orderId" = o."id" AND o."createdAt" >= ${new Date(
+        Date.now() - 90 * 86400000
+      )} AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL WHERE p."type" = 'SPAREPART' AND p."isActive" = true AND p."stock" > 0 GROUP BY p."id", p."name", p."sku", p."stock" HAVING COALESCE(SUM(oi."quantity"), 0) = 0 ORDER BY p."stock" DESC LIMIT 10`,
+    ]);
+
+    return {
+      spareparts: {
+        monthly: sparepartsMonthly.map((r) => ({
           name: r.name,
           sold: Number(r.sold),
           revenue: Number(r.revenue),
           profit: Number(r.profit),
-        }));
-      }
-    );
-  }
-
-  /**
-   * 10 service terpopuler
-   * @param {Object} [params] - { days, startDate }
-   * @returns {Promise<Array<{name: string, orders: number, qty: number, revenue: number}>>}
-   */
-  async getAdminServicePopularity(params = {}) {
-    const days = params.days || 30;
-    return cached(
-      mediumCache,
-      `admin:services:${days}`,
-      TTL.MEDIUM,
-      async () => {
-        const since = params.startDate
-          ? new Date(params.startDate)
-          : new Date(Date.now() - days * 86400000);
-        const raw =
-          await prisma.$queryRaw`SELECT oi."productNameSnapshot" as name, COUNT(DISTINCT o."id")::int as orders, SUM(oi."quantity")::int as qty, SUM(oi."subtotal")::bigint as revenue FROM "OrderItem" oi INNER JOIN "Product" p ON oi."productId" = p."id" INNER JOIN "Order" o ON oi."orderId" = o."id" WHERE p."type" = 'SERVICE' AND o."createdAt" >= ${since} AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL GROUP BY oi."productNameSnapshot" ORDER BY orders DESC LIMIT 10`;
-        return raw.map((r) => ({
+        })),
+        yearly: sparepartsYearly.map((r) => ({
+          name: r.name,
+          sold: Number(r.sold),
+          revenue: Number(r.revenue),
+          profit: Number(r.profit),
+        })),
+      },
+      services: {
+        monthly: servicesMonthly.map((r) => ({
           name: r.name,
           orders: Number(r.orders),
-          qty: Number(r.qty),
           revenue: Number(r.revenue),
-        }));
-      }
-    );
+        })),
+        yearly: servicesYearly.map((r) => ({
+          name: r.name,
+          orders: Number(r.orders),
+          revenue: Number(r.revenue),
+        })),
+      },
+      slowMoving: slowMoving.map((r) => ({
+        name: r.name,
+        sku: r.sku,
+        stock: Number(r.stock),
+        sold90Days: Number(r.sold_90d),
+      })),
+    };
+  }
+
+  /**
+   * Jam tersibuk: bulan ini, tahun ini
+   * @returns {Promise<Object>}
+   */
+  async getAdminPeakHours() {
+    const startMonth = this.#getStartOfMonth();
+    const startYear = this.#getOneYearAgo();
+
+    const [monthly, yearly] = await Promise.all([
+      prisma.$queryRaw`SELECT EXTRACT(HOUR FROM "createdAt")::int as hour, COUNT("id")::int as orders, COALESCE(SUM("total"), 0)::bigint as revenue FROM "Order" WHERE "createdAt" >= ${startMonth} AND "deletedAt" IS NULL GROUP BY hour ORDER BY orders DESC LIMIT 1`,
+      prisma.$queryRaw`SELECT EXTRACT(HOUR FROM "createdAt")::int as hour, COUNT("id")::int as orders, COALESCE(SUM("total"), 0)::bigint as revenue FROM "Order" WHERE "createdAt" >= ${startYear} AND "deletedAt" IS NULL GROUP BY hour ORDER BY orders DESC LIMIT 1`,
+    ]);
+
+    return {
+      monthly: {
+        peakHour: Number(monthly[0]?.hour || 0),
+        peakOrders: Number(monthly[0]?.orders || 0),
+        peakRevenue: Number(monthly[0]?.revenue || 0),
+      },
+      yearly: {
+        peakHour: Number(yearly[0]?.hour || 0),
+        peakOrders: Number(yearly[0]?.orders || 0),
+        peakRevenue: Number(yearly[0]?.revenue || 0),
+      },
+    };
   }
 
   // ============================================================================
-  // ADMIN - OPERATIONAL (8 methods)
+  // P1 - CRITICAL: Attention Needed & Restock (2 functions)
   // ============================================================================
 
   /**
-   * Jam tersibuk bengkel
-   * @param {Object} [params] - { days, startDate }
-   * @returns {Promise<{peakHour: number, peakOrders: number, hourly: Array}>}
+   * Order yang perlu perhatian: stuck, overdue, unpaid
+   * @returns {Promise<Object>}
    */
-  async getAdminPeakHours(params = {}) {
-    const days = params.days || 30;
-    return cached(
-      mediumCache,
-      `admin:peakhours:${days}`,
-      TTL.MEDIUM,
-      async () => {
-        const since = params.startDate
-          ? new Date(params.startDate)
-          : new Date(Date.now() - days * 86400000);
-        const raw =
-          await prisma.$queryRaw`SELECT EXTRACT(HOUR FROM "createdAt")::int as hour, COUNT("id")::int as orders, COALESCE(SUM("total"), 0)::bigint as revenue FROM "Order" WHERE "createdAt" >= ${since} AND "deletedAt" IS NULL GROUP BY hour ORDER BY orders DESC`;
-        const peak = raw[0] || { hour: 0, orders: 0 };
-        return {
-          peakHour: Number(peak.hour),
-          peakOrders: Number(peak.orders),
-          hourly: raw.map((r) => ({
-            hour: Number(r.hour),
-            orders: Number(r.orders),
-            revenue: Number(r.revenue),
-          })),
-        };
-      }
-    );
-  }
+  async getAdminAttentionNeeded() {
+    const threeHoursAgo = new Date(Date.now() - 3 * 3600000);
+    const oneDayAgo = new Date(Date.now() - 86400000);
 
-  /**
-   * Distribusi tipe Vespa yang diservis
-   * @returns {Promise<Array<{brand: string, count: number}>>}
-   */
-  async getAdminVehicleDistribution() {
-    return cached(mediumCache, "admin:vehicles", TTL.MEDIUM, async () => {
-      const raw =
-        await prisma.$queryRaw`SELECT COALESCE(v."brand", 'Unknown') as brand, COUNT(DISTINCT v."id")::int as count FROM "Vehicle" v INNER JOIN "Order" o ON v."id" = o."vehicleId" WHERE o."deletedAt" IS NULL GROUP BY v."brand" ORDER BY count DESC LIMIT 10`;
-      return raw.map((r) => ({ brand: r.brand, count: Number(r.count) }));
-    });
-  }
-
-  /**
-   * Alert stok sparepart
-   * @returns {Promise<{outOfStock: Array, lowStock: Array, overStock: Array, lowThreshold: number}>}
-   */
-  async getAdminStockAlert() {
-    return cached(shortCache, "admin:stockalert", TTL.SHORT, async () => {
-      const lowThreshold = parseInt(
-        await getSetting("stock_low_threshold", "5"),
-        10
-      );
-      const [outOfStock, lowStock, overStock] = await Promise.all([
-        prisma.product.findMany({
-          where: { type: "SPAREPART", isActive: true, stock: 0 },
-          select: { id: true, sku: true, name: true, cost: true },
-          take: 10,
-        }),
-        prisma.product.findMany({
+    const [stuckOrders, overduePayments, unpaidOrders, draftOrders] =
+      await Promise.all([
+        prisma.order.findMany({
           where: {
-            type: "SPAREPART",
-            isActive: true,
-            stock: { gt: 0, lte: lowThreshold },
+            status: "IN_PROGRESS",
+            deletedAt: null,
+            startedAt: { lte: threeHoursAgo },
           },
-          select: { id: true, sku: true, name: true, stock: true, cost: true },
+          select: {
+            id: true,
+            orderNumber: true,
+            total: true,
+            startedAt: true,
+            createdAt: true,
+            vehicle: { select: { plateNumber: true } },
+            customer: { select: { name: true } },
+            items: {
+              select: {
+                productNameSnapshot: true,
+                assignments: {
+                  select: { mechanic: { select: { fullName: true } } },
+                },
+              },
+            },
+          },
+          orderBy: { startedAt: "asc" },
           take: 10,
         }),
-        prisma.product.findMany({
-          where: { type: "SPAREPART", isActive: true, stock: { gte: 100 } },
-          select: { id: true, sku: true, name: true, stock: true, cost: true },
+        prisma.order.findMany({
+          where: {
+            status: "COMPLETED",
+            deletedAt: null,
+            payment: { is: null },
+            completedAt: { lte: oneDayAgo },
+          },
+          select: {
+            id: true,
+            orderNumber: true,
+            total: true,
+            completedAt: true,
+            customer: { select: { name: true, phone: true } },
+          },
+          orderBy: { completedAt: "asc" },
           take: 10,
         }),
+        prisma.order.findMany({
+          where: {
+            status: "COMPLETED",
+            deletedAt: null,
+            payment: { is: null },
+          },
+          select: {
+            id: true,
+            orderNumber: true,
+            total: true,
+            completedAt: true,
+            customer: { select: { name: true, phone: true } },
+          },
+          orderBy: { completedAt: "desc" },
+          take: 10,
+        }),
+        prisma.order.count({ where: { status: "DRAFT", deletedAt: null } }),
       ]);
-      return { outOfStock, lowStock, overStock, lowThreshold };
-    });
+
+    return {
+      stuckOrders: stuckOrders.map((o) => ({
+        orderNumber: o.orderNumber,
+        total: o.total,
+        service: o.items[0]?.productNameSnapshot || "-",
+        mechanic:
+          o.items[0]?.assignments[0]?.mechanic?.fullName || "Belum di-assign",
+        plateNumber: o.vehicle?.plateNumber || "-",
+        customer: o.customer?.name || "Umum",
+        startedAt: o.startedAt,
+        stuckHours: o.startedAt
+          ? Math.round((Date.now() - new Date(o.startedAt).getTime()) / 3600000)
+          : 0,
+      })),
+      overduePayments: overduePayments.map((o) => ({
+        orderNumber: o.orderNumber,
+        total: o.total,
+        customer: o.customer?.name || "Umum",
+        phone: o.customer?.phone || "-",
+        completedAt: o.completedAt,
+        overdueHours: o.completedAt
+          ? Math.round(
+              (Date.now() - new Date(o.completedAt).getTime()) / 3600000
+            )
+          : 0,
+      })),
+      unpaidOrders: unpaidOrders.map((o) => ({
+        orderNumber: o.orderNumber,
+        total: o.total,
+        customer: o.customer?.name || "Umum",
+        completedAt: o.completedAt,
+      })),
+      summary: {
+        stuckCount: stuckOrders.length,
+        overduePaymentCount: overduePayments.length,
+        unpaidCount: unpaidOrders.length,
+        draftCount: draftOrders,
+        totalAttentionNeeded:
+          stuckOrders.length + overduePayments.length + unpaidOrders.length,
+      },
+    };
   }
 
   /**
-   * Statistik refund
-   * @param {Object} [params] - { days, startDate }
-   * @returns {Promise<{totalRefunds: number, totalAmount: number}>}
+   * Rekomendasi restock: produk urgent yang perlu dibeli
+   * @returns {Promise<Object>}
    */
-  async getAdminRefundStats(params = {}) {
-    const days = params.days || 30;
-    return cached(
-      mediumCache,
-      `admin:refunds:${days}`,
-      TTL.MEDIUM,
-      async () => {
-        const since = params.startDate
-          ? new Date(params.startDate)
-          : new Date(Date.now() - days * 86400000);
-        const raw =
-          await prisma.$queryRaw`SELECT COUNT(p."id")::int as refunds, COALESCE(SUM(p."amountPaid"), 0)::bigint as amount FROM "Payment" p INNER JOIN "Order" o ON p."orderId" = o."id" WHERE p."status" = 'REFUNDED' AND p."paidAt" >= ${since}`;
-        return {
-          totalRefunds: Number(raw[0].refunds),
-          totalAmount: Number(raw[0].amount),
-        };
-      }
+  async getAdminRestockRecommendations() {
+    const lowThreshold = parseInt(
+      await this.#getSetting("stock_low_threshold", "5"),
+      10
     );
-  }
+    const since90 = new Date(Date.now() - 90 * 86400000);
 
-  /**
-   * Order selesai yang belum dibayar
-   * @returns {Promise<Array<{id: string, orderNumber: string, total: number, createdAt: Date, customer: Object}>>}
-   */
-  async getAdminUnpaidOrders() {
-    return cached(shortCache, "admin:unpaid", TTL.SHORT, async () => {
-      return prisma.order.findMany({
+    const [outOfStock, lowStock, topSellingLowStock] = await Promise.all([
+      prisma.product.findMany({
+        where: { type: "SPAREPART", isActive: true, stock: 0 },
+        select: { id: true, sku: true, name: true, cost: true, price: true },
+        take: 20,
+      }),
+      prisma.product.findMany({
         where: {
-          status: { in: ["COMPLETED", "CLOSED"] },
-          deletedAt: null,
-          payment: { is: null },
+          type: "SPAREPART",
+          isActive: true,
+          stock: { gt: 0, lte: lowThreshold },
         },
         select: {
           id: true,
-          orderNumber: true,
-          total: true,
-          createdAt: true,
-          customer: { select: { name: true, phone: true } },
+          sku: true,
+          name: true,
+          stock: true,
+          cost: true,
+          price: true,
         },
-        orderBy: { createdAt: "desc" },
-      });
-    });
-  }
+        orderBy: { stock: "asc" },
+        take: 20,
+      }),
+      prisma.$queryRaw`
+        SELECT p."id", p."sku", p."name", p."stock", p."cost", p."price",
+          COALESCE(SUM(oi."quantity"), 0)::int as sold_90d,
+          ROUND(COALESCE(SUM(oi."quantity"), 0) / 90.0, 1) as avg_daily_sales
+        FROM "Product" p
+        LEFT JOIN "OrderItem" oi ON p."id" = oi."productId"
+        LEFT JOIN "Order" o ON oi."orderId" = o."id"
+          AND o."createdAt" >= ${since90}
+          AND o."status" IN ('COMPLETED','CLOSED')
+          AND o."deletedAt" IS NULL
+        WHERE p."type" = 'SPAREPART' AND p."isActive" = true
+          AND p."stock" <= ${lowThreshold}
+        GROUP BY p."id", p."sku", p."name", p."stock", p."cost", p."price"
+        HAVING COALESCE(SUM(oi."quantity"), 0) > 0
+        ORDER BY avg_daily_sales DESC
+        LIMIT 20
+      `,
+    ]);
 
-  /**
-   * Aktivitas terbaru bengkel (order, expense, shift)
-   * @param {number} [limit=20]
-   * @returns {Promise<Array<{type: string, desc: string, amount: number, date: Date}>>}
-   */
-  async getAdminRecentActivities(limit = 20) {
-    return cached(
-      shortCache,
-      `admin:activities:${limit}`,
-      TTL.SHORT,
-      async () => {
-        const [orders, expenses, shifts] = await Promise.all([
-          prisma.order.findMany({
-            where: { deletedAt: null },
-            select: {
-              orderNumber: true,
-              status: true,
-              total: true,
-              updatedAt: true,
-            },
-            orderBy: { updatedAt: "desc" },
-            take: limit,
-          }),
-          prisma.expense.findMany({
-            select: { title: true, amount: true, category: true, date: true },
-            orderBy: { createdAt: "desc" },
-            take: limit,
-          }),
-          prisma.shift.findMany({
-            where: { status: "CLOSED" },
-            select: {
-              cashier: { select: { fullName: true } },
-              closedAt: true,
-              cashSales: true,
-            },
-            orderBy: { closedAt: "desc" },
-            take: limit,
-          }),
-        ]);
-        return [
-          ...orders.map((o) => ({
-            type: "order",
-            desc: `${o.orderNumber} → ${o.status}`,
-            amount: o.total,
-            date: o.updatedAt,
-          })),
-          ...expenses.map((e) => ({
-            type: "expense",
-            desc: e.title,
-            amount: e.amount,
-            date: e.date,
-          })),
-          ...shifts.map((s) => ({
-            type: "shift",
-            desc: `Shift ${s.cashier.fullName} ditutup`,
-            amount: s.cashSales,
-            date: s.closedAt,
-          })),
-        ]
-          .sort((a, b) => b.date - a.date)
-          .slice(0, limit);
-      }
+    const totalRestockCost = [...outOfStock, ...lowStock].reduce(
+      (sum, p) => sum + p.cost * Math.max(lowThreshold - (p.stock || 0), 0),
+      0
     );
+
+    return {
+      outOfStock: outOfStock.map((p) => ({
+        sku: p.sku,
+        name: p.name,
+        cost: p.cost,
+        price: p.price,
+        suggestedRestock: lowThreshold,
+        estimatedCost: p.cost * lowThreshold,
+      })),
+      lowStock: lowStock.map((p) => ({
+        sku: p.sku,
+        name: p.name,
+        stock: p.stock,
+        cost: p.cost,
+        price: p.price,
+        suggestedRestock: lowThreshold - p.stock,
+        estimatedCost: p.cost * (lowThreshold - p.stock),
+      })),
+      topSellingLowStock: topSellingLowStock.map((p) => ({
+        sku: p.sku,
+        name: p.name,
+        stock: Number(p.stock),
+        cost: Number(p.cost),
+        price: Number(p.price),
+        sold90Days: Number(p.sold_90d),
+        avgDailySales: Number(p.avg_daily_sales),
+        daysUntilOutOfStock:
+          Number(p.avg_daily_sales) > 0
+            ? Math.floor(Number(p.stock) / Number(p.avg_daily_sales))
+            : 999,
+        suggestedRestock: Math.max(
+          lowThreshold - Number(p.stock),
+          Math.ceil(Number(p.avg_daily_sales) * 30)
+        ),
+        estimatedCost:
+          Number(p.cost) *
+          Math.max(
+            lowThreshold - Number(p.stock),
+            Math.ceil(Number(p.avg_daily_sales) * 30)
+          ),
+      })),
+      summary: {
+        outOfStockCount: outOfStock.length,
+        lowStockCount: lowStock.length,
+        totalItemsToRestock: outOfStock.length + lowStock.length,
+        estimatedTotalCost: totalRestockCost,
+        lowThreshold,
+      },
+    };
+  }
+
+  // ============================================================================
+  // P2 - HIGH VALUE: Order Trend, Revenue by Day, Customer Segmentation (3 functions)
+  // ============================================================================
+
+  /**
+   * Tren order harian untuk 4 minggu terakhir
+   * @returns {Promise<Object>}
+   */
+  async getAdminOrderTrend() {
+    const fourWeeksAgo = new Date(Date.now() - 28 * 86400000);
+
+    const raw = await prisma.$queryRaw`
+      SELECT DATE("createdAt") as date, COUNT("id")::int as orders, COALESCE(SUM("total"), 0)::bigint as revenue
+      FROM "Order"
+      WHERE "createdAt" >= ${fourWeeksAgo} AND "deletedAt" IS NULL
+      GROUP BY DATE("createdAt")
+      ORDER BY date ASC
+    `;
+
+    const daily = raw.map((r) => ({
+      date: r.date,
+      orders: Number(r.orders),
+      revenue: Number(r.revenue),
+    }));
+
+    const firstWeek = daily.slice(0, 7).reduce((s, d) => s + d.orders, 0);
+    const lastWeek = daily.slice(-7).reduce((s, d) => s + d.orders, 0);
+    const trend =
+      firstWeek > 0
+        ? Math.round(((lastWeek - firstWeek) / firstWeek) * 100)
+        : 0;
+
+    return {
+      daily,
+      summary: {
+        totalOrders: daily.reduce((s, d) => s + d.orders, 0),
+        totalRevenue: daily.reduce((s, d) => s + d.revenue, 0),
+        avgDailyOrders: Math.round(
+          daily.reduce((s, d) => s + d.orders, 0) / Math.max(daily.length, 1)
+        ),
+        firstWeekOrders: firstWeek,
+        lastWeekOrders: lastWeek,
+        trend,
+        direction: trend > 0 ? "up" : trend < 0 ? "down" : "stable",
+      },
+    };
   }
 
   /**
-   * Retensi pelanggan 3 bulan terakhir
-   * @returns {Promise<Array<{month: string, totalCustomers: number, returningCustomers: number, retentionRate: number}>>}
+   * Revenue per hari dalam seminggu
+   * @returns {Promise<Object>}
    */
-  async getAdminCustomerRetention() {
-    return cached(mediumCache, "admin:retention", TTL.MEDIUM, async () => {
-      const threeMonthsAgo = new Date();
-      threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-      const raw =
-        await prisma.$queryRaw`WITH customer_months AS (SELECT DISTINCT c."id", DATE_TRUNC('month', o."createdAt")::date as month FROM "Customer" c INNER JOIN "Order" o ON c."id" = o."customerId" WHERE o."createdAt" >= ${threeMonthsAgo} AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL), first_month AS (SELECT "id", MIN(month) as first_month FROM customer_months GROUP BY "id"), retention_data AS (SELECT cm.month, COUNT(DISTINCT cm."id") as total_customers, COUNT(DISTINCT CASE WHEN fm.first_month < cm.month THEN cm."id" END) as returning_customers FROM customer_months cm INNER JOIN first_month fm ON cm."id" = fm."id" GROUP BY cm.month ORDER BY cm.month) SELECT month, total_customers, returning_customers, CASE WHEN total_customers > 0 THEN ROUND((returning_customers::float / total_customers * 100)::numeric, 1) ELSE 0 END as retention_rate FROM retention_data`;
-      return raw.map((r) => ({
-        month: r.month,
-        totalCustomers: Number(r.total_customers),
-        returningCustomers: Number(r.returning_customers),
-        retentionRate: Number(r.retention_rate),
-      }));
-    });
+  async getAdminRevenueByDayOfWeek() {
+    const startYear = this.#getOneYearAgo();
+
+    const raw = await prisma.$queryRaw`
+      SELECT EXTRACT(DOW FROM "createdAt")::int as day_of_week, COUNT("id")::int as orders, COALESCE(SUM("total"), 0)::bigint as revenue, ROUND(AVG("total"))::int as avg_order_value
+      FROM "Order"
+      WHERE "createdAt" >= ${startYear} AND "status" IN ('COMPLETED','CLOSED') AND "deletedAt" IS NULL
+      GROUP BY day_of_week
+      ORDER BY day_of_week ASC
+    `;
+
+    const dayNames = [
+      "Minggu",
+      "Senin",
+      "Selasa",
+      "Rabu",
+      "Kamis",
+      "Jumat",
+      "Sabtu",
+    ];
+
+    const daily = raw.map((r) => ({
+      day: dayNames[Number(r.day_of_week)],
+      dayIndex: Number(r.day_of_week),
+      orders: Number(r.orders),
+      revenue: Number(r.revenue),
+      avgOrderValue: Number(r.avg_order_value),
+    }));
+
+    const bestDay = [...daily].sort((a, b) => b.revenue - a.revenue)[0];
+    const worstDay = [...daily].sort((a, b) => a.revenue - b.revenue)[0];
+
+    return {
+      daily,
+      summary: {
+        bestDay: bestDay
+          ? {
+              day: bestDay.day,
+              revenue: bestDay.revenue,
+              orders: bestDay.orders,
+            }
+          : null,
+        worstDay: worstDay
+          ? {
+              day: worstDay.day,
+              revenue: worstDay.revenue,
+              orders: worstDay.orders,
+            }
+          : null,
+      },
+    };
   }
 
   /**
-   * Revenue vs target bulanan + proyeksi
-   * @returns {Promise<{currentRevenue: number, target: number, percentage: number, remaining: number, daysInMonth: number, daysPassed: number, projectedRevenue: number}>}
+   * Segmentasi pelanggan
+   * @returns {Promise<Object>}
    */
+  async getAdminCustomerSegmentation() {
+    const twoVisitsThreshold = 2;
+    const fiveVisitsThreshold = 5;
+    const dormantDays = 90;
+    const dormantDate = new Date(Date.now() - dormantDays * 86400000);
+
+    const raw = await prisma.$queryRaw`
+      WITH customer_stats AS (
+        SELECT c."id", c."name", c."phone",
+          COUNT(DISTINCT o."id")::int as total_visits,
+          COALESCE(SUM(o."total"), 0)::bigint as total_spent,
+          MAX(o."createdAt") as last_visit,
+          MIN(o."createdAt") as first_visit
+        FROM "Customer" c
+        LEFT JOIN "Order" o ON c."id" = o."customerId"
+          AND o."status" IN ('COMPLETED','CLOSED')
+          AND o."deletedAt" IS NULL
+        GROUP BY c."id", c."name", c."phone"
+      )
+      SELECT 
+        COUNT(*)::int as total_customers,
+        COUNT(*) FILTER (WHERE total_visits = 1)::int as new_customers,
+        COUNT(*) FILTER (WHERE total_visits >= ${twoVisitsThreshold} AND total_visits <= ${fiveVisitsThreshold})::int as regular_customers,
+        COUNT(*) FILTER (WHERE total_visits > ${fiveVisitsThreshold})::int as vip_customers,
+        COUNT(*) FILTER (WHERE total_visits > 0 AND last_visit < ${dormantDate})::int as dormant_customers,
+        COUNT(*) FILTER (WHERE total_visits = 0)::int as no_order_customers,
+        COALESCE(SUM(total_spent), 0)::bigint as total_revenue
+      FROM customer_stats
+    `;
+
+    const topVIP = await prisma.$queryRaw`
+      WITH customer_stats AS (
+        SELECT c."id", c."name", c."phone",
+          COUNT(DISTINCT o."id")::int as total_visits,
+          COALESCE(SUM(o."total"), 0)::bigint as total_spent,
+          MAX(o."createdAt") as last_visit
+        FROM "Customer" c
+        INNER JOIN "Order" o ON c."id" = o."customerId"
+          AND o."status" IN ('COMPLETED','CLOSED')
+          AND o."deletedAt" IS NULL
+        GROUP BY c."id", c."name", c."phone"
+        HAVING COUNT(DISTINCT o."id") > ${fiveVisitsThreshold}
+      )
+      SELECT * FROM customer_stats ORDER BY total_spent DESC LIMIT 10
+    `;
+
+    const r = raw[0];
+    const total = Number(r.total_customers);
+
+    return {
+      summary: {
+        totalCustomers: total,
+        new: {
+          count: Number(r.new_customers),
+          pct:
+            total > 0 ? Math.round((Number(r.new_customers) / total) * 100) : 0,
+        },
+        regular: {
+          count: Number(r.regular_customers),
+          pct:
+            total > 0
+              ? Math.round((Number(r.regular_customers) / total) * 100)
+              : 0,
+        },
+        vip: {
+          count: Number(r.vip_customers),
+          pct:
+            total > 0 ? Math.round((Number(r.vip_customers) / total) * 100) : 0,
+        },
+        dormant: {
+          count: Number(r.dormant_customers),
+          pct:
+            total > 0
+              ? Math.round((Number(r.dormant_customers) / total) * 100)
+              : 0,
+        },
+        noOrder: {
+          count: Number(r.no_order_customers),
+          pct:
+            total > 0
+              ? Math.round((Number(r.no_order_customers) / total) * 100)
+              : 0,
+        },
+      },
+      topVIP: topVIP.map((c) => ({
+        name: c.name,
+        phone: c.phone,
+        visits: Number(c.total_visits),
+        totalSpent: Number(c.total_spent),
+        lastVisit: c.last_visit,
+      })),
+    };
+  }
+
+  // ============================================================================
+  // P3 - GROWTH: Profitable Services, Service Bundles, Revenue Forecast (3 functions)
+  // ============================================================================
+
+  /**
+   * Service yang paling menguntungkan (profit margin)
+   * @returns {Promise<Object>}
+   */
+  async getAdminMostProfitableServices() {
+    const startYear = this.#getOneYearAgo();
+
+    const raw = await prisma.$queryRaw`
+      SELECT oi."productNameSnapshot" as name,
+        COUNT(DISTINCT o."id")::int as orders,
+        SUM(oi."quantity")::int as quantity,
+        SUM(oi."subtotal")::bigint as revenue,
+        SUM(oi."unitCostSnapshot" * oi."quantity")::bigint as cost,
+        SUM(oi."subtotal" - (oi."unitCostSnapshot" * oi."quantity"))::bigint as profit,
+        CASE WHEN SUM(oi."subtotal") > 0 THEN ROUND((SUM(oi."subtotal" - (oi."unitCostSnapshot" * oi."quantity"))::float / SUM(oi."subtotal") * 100)::numeric, 1) ELSE 0 END as margin_pct
+      FROM "OrderItem" oi
+      INNER JOIN "Product" p ON oi."productId" = p."id"
+      INNER JOIN "Order" o ON oi."orderId" = o."id"
+      WHERE p."type" = 'SERVICE' AND o."createdAt" >= ${startYear} AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL
+      GROUP BY oi."productNameSnapshot"
+      ORDER BY margin_pct DESC
+      LIMIT 15
+    `;
+
+    const services = raw.map((r) => ({
+      name: r.name,
+      orders: Number(r.orders),
+      quantity: Number(r.quantity),
+      revenue: Number(r.revenue),
+      cost: Number(r.cost),
+      profit: Number(r.profit),
+      marginPct: Number(r.margin_pct),
+    }));
+
+    const avgMargin =
+      services.length > 0
+        ? Math.round(
+            services.reduce((s, r) => s + r.marginPct, 0) / services.length
+          )
+        : 0;
+
+    return {
+      services,
+      summary: {
+        totalServices: services.length,
+        avgMargin,
+        highestMargin: services[0] || null,
+        lowestMargin: services[services.length - 1] || null,
+      },
+    };
+  }
+
+  /**
+   * Service bundles (kombinasi yang sering dijual bersama)
+   * @returns {Promise<Object>}
+   */
+  async getAdminServiceBundles() {
+    const startYear = this.#getOneYearAgo();
+
+    const raw = await prisma.$queryRaw`
+      WITH order_services AS (
+        SELECT oi."orderId", oi."productNameSnapshot" as service_name
+        FROM "OrderItem" oi
+        INNER JOIN "Product" p ON oi."productId" = p."id"
+        INNER JOIN "Order" o ON oi."orderId" = o."id"
+        WHERE p."type" = 'SERVICE' AND o."createdAt" >= ${startYear} AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL
+      ),
+      bundles AS (
+        SELECT os1.service_name as service_a, os2.service_name as service_b, COUNT(DISTINCT os1."orderId")::int as frequency
+        FROM order_services os1
+        INNER JOIN order_services os2 ON os1."orderId" = os2."orderId" AND os1.service_name < os2.service_name
+        GROUP BY os1.service_name, os2.service_name
+        HAVING COUNT(DISTINCT os1."orderId") >= 2
+      )
+      SELECT * FROM bundles ORDER BY frequency DESC LIMIT 15
+    `;
+
+    return {
+      bundles: raw.map((r) => ({
+        serviceA: r.service_a,
+        serviceB: r.service_b,
+        frequency: Number(r.frequency),
+      })),
+      summary: {
+        totalBundles: raw.length,
+        topBundle: raw[0] ? `${raw[0].service_a} + ${raw[0].service_b}` : null,
+      },
+    };
+  }
+
+  /**
+   * Forecast revenue bulan depan berdasarkan tren 3 bulan terakhir
+   * @returns {Promise<Object>}
+   */
+  async getAdminRevenueForecast() {
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+
+    const raw = await prisma.$queryRaw`
+      SELECT DATE_TRUNC('month', "createdAt")::date as month, COALESCE(SUM("total"), 0)::bigint as revenue, COUNT("id")::int as orders
+      FROM "Order"
+      WHERE "createdAt" >= ${threeMonthsAgo} AND "status" IN ('COMPLETED','CLOSED') AND "deletedAt" IS NULL
+      GROUP BY month
+      ORDER BY month ASC
+    `;
+
+    const months = raw.map((r) => ({
+      month: r.month,
+      revenue: Number(r.revenue),
+      orders: Number(r.orders),
+    }));
+
+    const avgRevenue =
+      months.length > 0
+        ? Math.round(months.reduce((s, m) => s + m.revenue, 0) / months.length)
+        : 0;
+    const avgOrders =
+      months.length > 0
+        ? Math.round(months.reduce((s, m) => s + m.orders, 0) / months.length)
+        : 0;
+
+    const growthRate =
+      months.length >= 2
+        ? (months[months.length - 1].revenue - months[0].revenue) /
+          Math.max(months[0].revenue, 1)
+        : 0;
+
+    const forecastRevenue = Math.round(avgRevenue * (1 + growthRate));
+    const forecastOrders = Math.round(avgOrders * (1 + growthRate));
+
+    return {
+      historical: months,
+      forecast: {
+        nextMonth: {
+          revenue: forecastRevenue,
+          orders: forecastOrders,
+        },
+        confidence:
+          growthRate > 0.5 ? "low" : growthRate > 0.2 ? "medium" : "high",
+        basedOnMonths: months.length,
+        avgMonthlyRevenue: avgRevenue,
+        growthRate: Math.round(growthRate * 100),
+      },
+    };
+  }
+
+  // ============================================================================
+  // EXISTING METHODS (unchanged)
+  // ============================================================================
+
+  async getAdminStockAlert() {
+    const lowThreshold = parseInt(
+      await this.#getSetting("stock_low_threshold", "5"),
+      10
+    );
+    const [outOfStock, lowStock, overStock] = await Promise.all([
+      prisma.product.findMany({
+        where: { type: "SPAREPART", isActive: true, stock: 0 },
+        select: { id: true, sku: true, name: true, cost: true },
+        take: 10,
+      }),
+      prisma.product.findMany({
+        where: {
+          type: "SPAREPART",
+          isActive: true,
+          stock: { gt: 0, lte: lowThreshold },
+        },
+        select: { id: true, sku: true, name: true, stock: true, cost: true },
+        take: 10,
+      }),
+      prisma.product.findMany({
+        where: { type: "SPAREPART", isActive: true, stock: { gte: 100 } },
+        select: { id: true, sku: true, name: true, stock: true, cost: true },
+        take: 10,
+      }),
+    ]);
+    return { outOfStock, lowStock, overStock, lowThreshold };
+  }
+
   async getAdminRevenueVsTarget() {
-    return cached(shortCache, "admin:revenuetarget", TTL.SHORT, async () => {
-      const now = new Date();
-      const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-      const [revenue, targetSetting] = await Promise.all([
-        prisma.order.aggregate({
-          where: {
-            createdAt: { gte: startMonth },
-            status: { in: ["COMPLETED", "CLOSED"] },
-            deletedAt: null,
-          },
-          _sum: { total: true },
-        }),
-        getSetting("monthly_revenue_target", "0"),
-      ]);
-      const currentRevenue = Number(revenue._sum.total || 0);
-      const target = Number(targetSetting || 0);
-      return {
-        currentRevenue,
+    const now = new Date();
+    const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startYear = new Date(now.getFullYear(), 0, 1);
+    const [monthlyRevenue, yearlyRevenue, targetSetting] = await Promise.all([
+      prisma.order.aggregate({
+        where: {
+          createdAt: { gte: startMonth },
+          status: { in: ["COMPLETED", "CLOSED"] },
+          deletedAt: null,
+        },
+        _sum: { total: true },
+      }),
+      prisma.order.aggregate({
+        where: {
+          createdAt: { gte: startYear },
+          status: { in: ["COMPLETED", "CLOSED"] },
+          deletedAt: null,
+        },
+        _sum: { total: true },
+      }),
+      this.#getSetting("monthly_revenue_target", "0"),
+    ]);
+    const monthlyRev = Number(monthlyRevenue._sum.total || 0);
+    const yearlyRev = Number(yearlyRevenue._sum.total || 0);
+    const target = Number(targetSetting || 0);
+    const yearlyTarget = target * 12;
+    return {
+      monthly: {
+        current: monthlyRev,
         target,
-        percentage:
-          target > 0 ? Math.round((currentRevenue / target) * 100) : 0,
-        remaining: Math.max(target - currentRevenue, 0),
+        percentage: target > 0 ? Math.round((monthlyRev / target) * 100) : 0,
+        remaining: Math.max(target - monthlyRev, 0),
         daysInMonth: new Date(
           now.getFullYear(),
           now.getMonth() + 1,
           0
         ).getDate(),
         daysPassed: now.getDate(),
-        projectedRevenue:
+        projected:
           now.getDate() > 0
             ? Math.round(
-                (currentRevenue / now.getDate()) *
+                (monthlyRev / now.getDate()) *
                   new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate()
               )
             : 0,
-      };
-    });
+      },
+      yearly: {
+        current: yearlyRev,
+        target: yearlyTarget,
+        percentage:
+          yearlyTarget > 0 ? Math.round((yearlyRev / yearlyTarget) * 100) : 0,
+        remaining: Math.max(yearlyTarget - yearlyRev, 0),
+      },
+    };
   }
 
-  // ============================================================================
-  // ADMIN - CUSTOMER & MISC (5 methods)
-  // ============================================================================
-
-  /**
-   * 10 pelanggan paling sering berkunjung
-   * @returns {Promise<Array<{customerId: string, customerName: string, phone: string, totalVisits: number, totalSpent: number, lastVisit: Date}>>}
-   */
   async getAdminTopCustomersByVisit() {
-    return cached(mediumCache, "admin:topcustomers", TTL.MEDIUM, async () => {
-      const raw =
-        await prisma.$queryRaw`SELECT c."id", c."name", c."phone", COUNT(DISTINCT o."id")::int as total_visits, COALESCE(SUM(o."total"), 0)::bigint as total_spent, MAX(o."createdAt") as last_visit FROM "Customer" c INNER JOIN "Order" o ON c."id" = o."customerId" WHERE o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL GROUP BY c."id", c."name", c."phone" ORDER BY total_visits DESC LIMIT 10`;
-      return raw.map((r) => ({
+    const [topCustomers, newCustomers] = await Promise.all([
+      prisma.$queryRaw`SELECT c."id", c."name", c."phone", COUNT(DISTINCT o."id")::int as total_visits, COALESCE(SUM(o."total"), 0)::bigint as total_spent, MAX(o."createdAt") as last_visit FROM "Customer" c INNER JOIN "Order" o ON c."id" = o."customerId" WHERE o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL GROUP BY c."id", c."name", c."phone" ORDER BY total_visits DESC LIMIT 10`,
+      prisma.customer.findMany({
+        select: {
+          id: true,
+          name: true,
+          phone: true,
+          createdAt: true,
+          _count: { select: { orders: true, vehicles: true } },
+        },
+        orderBy: { createdAt: "desc" },
+        take: 10,
+      }),
+    ]);
+    return {
+      topByVisits: topCustomers.map((r) => ({
         customerId: r.id,
         customerName: r.name,
         phone: r.phone,
         totalVisits: Number(r.total_visits),
         totalSpent: Number(r.total_spent),
         lastVisit: r.last_visit,
-      }));
-    });
+      })),
+      newestCustomers: newCustomers.map((c) => ({
+        id: c.id,
+        name: c.name,
+        phone: c.phone,
+        registeredAt: c.createdAt,
+        orderCount: c._count.orders,
+        vehicleCount: c._count.vehicles,
+      })),
+    };
   }
 
-  /**
-   * Rata-rata waktu penyelesaian order
-   * @returns {Promise<{avgHours: number, minHours: number, maxHours: number, totalOrders: number}>}
-   */
   async getAdminOrderCompletionTime() {
-    return cached(mediumCache, "admin:completiontime", TTL.MEDIUM, async () => {
-      const raw =
-        await prisma.$queryRaw`SELECT ROUND(AVG(EXTRACT(EPOCH FROM (o."completedAt" - o."createdAt")) / 3600)::numeric, 1) as avg_hours, ROUND(MIN(EXTRACT(EPOCH FROM (o."completedAt" - o."createdAt")) / 3600)::numeric, 1) as min_hours, ROUND(MAX(EXTRACT(EPOCH FROM (o."completedAt" - o."createdAt")) / 3600)::numeric, 1) as max_hours, COUNT(o."id")::int as total_orders FROM "Order" o WHERE o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL AND o."completedAt" IS NOT NULL`;
-      return {
-        avgHours: Number(raw[0].avg_hours) || 0,
-        minHours: Number(raw[0].min_hours) || 0,
-        maxHours: Number(raw[0].max_hours) || 0,
-        totalOrders: Number(raw[0].total_orders),
-      };
-    });
+    const startMonth = this.#getStartOfMonth();
+    const startYear = this.#getOneYearAgo();
+    const [monthly, yearly] = await Promise.all([
+      prisma.$queryRaw`SELECT ROUND(AVG(EXTRACT(EPOCH FROM (o."completedAt" - o."createdAt")) / 3600)::numeric, 1) as avg_hours, COUNT(o."id")::int as total_orders FROM "Order" o WHERE o."createdAt" >= ${startMonth} AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL AND o."completedAt" IS NOT NULL`,
+      prisma.$queryRaw`SELECT ROUND(AVG(EXTRACT(EPOCH FROM (o."completedAt" - o."createdAt")) / 3600)::numeric, 1) as avg_hours, COUNT(o."id")::int as total_orders FROM "Order" o WHERE o."createdAt" >= ${startYear} AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL AND o."completedAt" IS NOT NULL`,
+    ]);
+    return {
+      monthly: {
+        avgHours: Number(monthly[0].avg_hours) || 0,
+        totalOrders: Number(monthly[0].total_orders),
+      },
+      yearly: {
+        avgHours: Number(yearly[0].avg_hours) || 0,
+        totalOrders: Number(yearly[0].total_orders),
+      },
+    };
   }
 
-  /**
-   * Distribusi metode pembayaran
-   * @param {Object} [params] - { days, startDate }
-   * @returns {Promise<Array<{method: string, count: number, total: number, pct: number}>>}
-   */
-  async getAdminPaymentMethodDistribution(params = {}) {
-    const days = params.days || 30;
-    return cached(
-      mediumCache,
-      `admin:paymentdist:${days}`,
-      TTL.MEDIUM,
-      async () => {
-        const since = params.startDate
-          ? new Date(params.startDate)
-          : new Date(Date.now() - days * 86400000);
-        const raw =
-          await prisma.$queryRaw`SELECT p."method", COUNT(p."id")::int as count, COALESCE(SUM(p."amountPaid"), 0)::bigint as total FROM "Payment" p INNER JOIN "Order" o ON p."orderId" = o."id" WHERE p."status" = 'PAID' AND p."paidAt" >= ${since} AND o."deletedAt" IS NULL GROUP BY p."method" ORDER BY count DESC`;
-        const total = raw.reduce((s, r) => s + Number(r.count), 0);
-        return raw.map((r) => ({
-          method: r.method,
-          count: Number(r.count),
-          total: Number(r.total),
-          pct: total ? Math.round((Number(r.count) / total) * 10000) / 100 : 0,
-        }));
-      }
-    );
-  }
-
-  /**
-   * Ketersediaan mekanik (utilisasi)
-   * @returns {Promise<Array<{mechanicId: string, mechanicName: string, activeJobs: number, maxTasks: number, available: number, utilizationPct: number}>>}
-   */
   async getAdminMechanicAvailability() {
-    const maxTasks = parseInt(await getSetting("mechanic_max_tasks", "5"), 10);
+    const maxTasks = parseInt(
+      await this.#getSetting("mechanic_max_tasks", "5"),
+      10
+    );
     const raw =
       await prisma.$queryRaw`SELECT u."id", u."fullName", COUNT(ma."id")::int as active_jobs FROM "User" u LEFT JOIN "MechanicAssignment" ma ON u."id" = ma."mechanicId" AND ma."endAt" IS NULL AND EXISTS (SELECT 1 FROM "OrderItem" oi INNER JOIN "Order" o ON oi."orderId" = o."id" WHERE oi."id" = ma."orderItemId" AND o."status" IN ('QUEUED','IN_PROGRESS') AND o."deletedAt" IS NULL) WHERE u."role" = 'MECHANIC' AND u."isActive" = true GROUP BY u."id", u."fullName" ORDER BY active_jobs ASC`;
     return raw.map((r) => ({
@@ -1497,473 +2292,51 @@ class InsightRepository {
     }));
   }
 
-  /**
-   * Review performa bisnis bulanan (YoY comparison)
-   * @param {Object} [params] - { month, year }
-   * @returns {Promise<{thisMonth: Object, lastYear: Object, yoyGrowth: number, targetAchievement: number}>}
-   */
-  async getAdminMonthlyBusinessReview(params = {}) {
-    const now = new Date();
-    const targetMonth = params.month
-      ? parseInt(params.month) - 1
-      : now.getMonth();
-    const targetYear = params.year || now.getFullYear();
-    const thisMonthStart = new Date(targetYear, targetMonth, 1);
-    const thisMonthEnd = new Date(targetYear, targetMonth + 1, 0, 23, 59, 59);
-    const lastYearStart = new Date(targetYear - 1, targetMonth, 1);
-    const lastYearEnd = new Date(
-      targetYear - 1,
-      targetMonth + 1,
-      0,
-      23,
-      59,
-      59
-    );
-
-    return cached(
-      mediumCache,
-      `admin:monthlyreview:${targetYear}:${targetMonth}`,
-      TTL.MEDIUM,
-      async () => {
-        const [thisMonthData, lastYearData, targetSetting] = await Promise.all([
-          Promise.all([
-            prisma.order.aggregate({
-              where: {
-                createdAt: { gte: thisMonthStart, lte: thisMonthEnd },
-                status: { in: ["COMPLETED", "CLOSED"] },
-                deletedAt: null,
-              },
-              _sum: { total: true },
-              _count: true,
-            }),
-            prisma.customer.count({
-              where: { createdAt: { gte: thisMonthStart, lte: thisMonthEnd } },
-            }),
-            prisma.expense.aggregate({
-              where: { date: { gte: thisMonthStart, lte: thisMonthEnd } },
-              _sum: { amount: true },
-            }),
-            prisma.mechanicAssignment.count({
-              where: {
-                endAt: { gte: thisMonthStart, lte: thisMonthEnd },
-                orderItem: {
-                  order: {
-                    status: { in: ["COMPLETED", "CLOSED"] },
-                    deletedAt: null,
-                  },
-                },
-              },
-            }),
-          ]),
-          Promise.all([
-            prisma.order.aggregate({
-              where: {
-                createdAt: { gte: lastYearStart, lte: lastYearEnd },
-                status: { in: ["COMPLETED", "CLOSED"] },
-                deletedAt: null,
-              },
-              _sum: { total: true },
-              _count: true,
-            }),
-            prisma.customer.count({
-              where: { createdAt: { gte: lastYearStart, lte: lastYearEnd } },
-            }),
-          ]),
-          getSetting("monthly_revenue_target", "0"),
-        ]);
-
-        const thisRevenue = Number(thisMonthData[0]._sum.total || 0);
-        const lastRevenue = Number(lastYearData[0]._sum.total || 0);
-        const target = Number(targetSetting || 0);
-
-        return {
-          thisMonth: {
-            revenue: thisRevenue,
-            orders: thisMonthData[0]._count,
-            newCustomers: thisMonthData[1],
-            expenses: Number(thisMonthData[2]._sum.amount || 0),
-            jobsCompleted: thisMonthData[3],
-          },
-          lastYear: {
-            revenue: lastRevenue,
-            orders: lastYearData[0]._count,
-            newCustomers: lastYearData[1],
-          },
-          yoyGrowth: lastRevenue
-            ? Math.round(((thisRevenue - lastRevenue) / lastRevenue) * 10000) /
-              100
-            : 0,
-          targetAchievement:
-            target > 0 ? Math.round((thisRevenue / target) * 100) : 0,
-        };
-      }
-    );
-  }
-
-  // ============================================================================
-  // PRODUCT (3 methods)
-  // ============================================================================
-
-  /**
-   * Ringkasan katalog produk
-   * @returns {Promise<{total: number, spareparts: number, services: number, inactive: number}>}
-   */
-  async getProductCatalogSummary() {
-    return cached(longCache, "product:catalog", TTL.LONG, async () => {
-      const [spareparts, services, total, inactive] = await Promise.all([
-        prisma.product.count({ where: { type: "SPAREPART", isActive: true } }),
-        prisma.product.count({ where: { type: "SERVICE", isActive: true } }),
-        prisma.product.count({ where: { isActive: true } }),
-        prisma.product.count({ where: { isActive: false } }),
-      ]);
-      return { total, spareparts, services, inactive };
-    });
-  }
-
-  /**
-   * Detail produk + statistik penjualan
-   * @param {string} productId
-   * @returns {Promise<Object|null>}
-   */
-  async getProductDetail(productId) {
-    return cached(
-      mediumCache,
-      `product:detail:${productId}`,
-      TTL.MEDIUM,
-      async () => {
-        const product = await prisma.product.findUnique({
-          where: { id: productId },
-          include: {
-            image: { select: { path: true } },
-            priceHistory: {
-              orderBy: { effectiveFrom: "desc" },
-              take: 5,
-              select: { price: true, cost: true, effectiveFrom: true },
-            },
-          },
-        });
-        if (!product) return null;
-        const [totalSold, totalRevenue] = await Promise.all([
-          prisma.orderItem.aggregate({
-            where: {
-              productId,
-              order: {
-                status: { in: ["COMPLETED", "CLOSED"] },
-                deletedAt: null,
-              },
-            },
-            _sum: { quantity: true },
-          }),
-          prisma.orderItem.aggregate({
-            where: {
-              productId,
-              order: {
-                status: { in: ["COMPLETED", "CLOSED"] },
-                deletedAt: null,
-              },
-            },
-            _sum: { subtotal: true },
-          }),
-        ]);
-        return {
-          ...product,
-          totalSold: Number(totalSold._sum.quantity || 0),
-          totalRevenue: Number(totalRevenue._sum.subtotal || 0),
-          margin: product.price - product.cost,
-          marginPct:
-            product.price > 0
-              ? Math.round(
-                  ((product.price - product.cost) / product.price) * 1000
-                ) / 10
-              : 0,
-        };
-      }
-    );
-  }
-
-  /**
-   * Produk dengan margin tertinggi
-   * @param {number} [limit=10]
-   * @returns {Promise<Array<{id: string, name: string, sku: string, price: number, cost: number, stock: number, margin: number, marginPct: number}>>}
-   */
-  async getTopMarginProducts(limit = 10) {
-    return cached(
-      mediumCache,
-      `product:topmargin:${limit}`,
-      TTL.MEDIUM,
-      async () => {
-        const raw =
-          await prisma.$queryRaw`SELECT p."id", p."name", p."sku", p."price", p."cost", p."stock", (p."price" - p."cost")::int as margin, CASE WHEN p."price" > 0 THEN ROUND(((p."price" - p."cost")::float / p."price" * 100)::numeric, 1) ELSE 0 END as margin_pct FROM "Product" p WHERE p."type" = 'SPAREPART' AND p."isActive" = true ORDER BY margin DESC LIMIT ${limit}`;
-        return raw.map((r) => ({
-          id: r.id,
-          name: r.name,
-          sku: r.sku,
-          price: Number(r.price),
-          cost: Number(r.cost),
-          stock: Number(r.stock),
-          margin: Number(r.margin),
-          marginPct: Number(r.margin_pct),
-        }));
-      }
-    );
-  }
-
-  // ============================================================================
-  // SETTINGS (3 methods)
-  // ============================================================================
-
-  /**
-   * Semua settings
-   * @returns {Promise<Array<{key: string, value: string, updatedAt: Date}>>}
-   */
-  async getAllSettings() {
-    return cached(longCache, "settings:all", TTL.LONG, async () =>
-      prisma.setting.findMany({
-        select: { key: true, value: true, updatedAt: true },
-        orderBy: { key: "asc" },
-      })
-    );
-  }
-
-  /**
-   * Setting by key
-   * @param {string} key
-   * @returns {Promise<Object|null>}
-   */
-  async getSettingByKey(key) {
-    return cached(longCache, `settings:key:${key}`, TTL.LONG, async () =>
-      prisma.setting.findUnique({
-        where: { key },
-        select: { key: true, value: true, updatedAt: true },
-      })
-    );
-  }
-
-  /**
-   * Konfigurasi sistem (tax, ppn, pph, threshold, target)
-   * @returns {Promise<Object>}
-   */
-  async getSystemConfiguration() {
-    return cached(longCache, "settings:system", TTL.LONG, async () => {
-      const settings = await prisma.setting.findMany({
-        where: {
-          key: {
-            in: [
-              "tax_rate",
-              "enable_ppn",
-              "enable_pph",
-              "pph_rate",
-              "ppn_rate",
-              "mechanic_max_tasks",
-              "shift_min_starting_cash",
-              "stock_low_threshold",
-              "monthly_revenue_target",
-            ],
-          },
-        },
-        select: { key: true, value: true },
-      });
-      const config = {};
-      for (const s of settings) config[s.key] = s.value;
-      return config;
-    });
-  }
-
-  // ============================================================================
-  // CUSTOMER (3 methods)
-  // ============================================================================
-
-  /**
-   * Profil pelanggan + statistik
-   * @param {string} customerId
-   * @returns {Promise<Object|null>}
-   */
-  async getCustomerProfile(customerId) {
-    return cached(
-      mediumCache,
-      `customer:profile:${customerId}`,
-      TTL.MEDIUM,
-      async () => {
-        const customer = await prisma.customer.findUnique({
-          where: { id: customerId },
-          include: {
-            vehicles: {
-              select: { plateNumber: true, brand: true, model: true },
-            },
-          },
-        });
-        if (!customer) return null;
-        const [orderStats, lastOrder, firstOrder] = await Promise.all([
-          prisma.order.aggregate({
-            where: {
-              customerId,
-              status: { in: ["COMPLETED", "CLOSED"] },
-              deletedAt: null,
-            },
-            _count: true,
-            _sum: { total: true },
-            _avg: { total: true },
-          }),
-          prisma.order.findFirst({
-            where: { customerId, deletedAt: null },
-            select: { createdAt: true },
-            orderBy: { createdAt: "desc" },
-          }),
-          prisma.order.findFirst({
-            where: { customerId, deletedAt: null },
-            select: { createdAt: true },
-            orderBy: { createdAt: "asc" },
-          }),
-        ]);
-        return {
-          ...customer,
-          totalOrders: orderStats._count,
-          totalSpent: Number(orderStats._sum.total || 0),
-          avgOrderValue: Math.round(Number(orderStats._avg.total || 0)),
-          lastVisit: lastOrder?.createdAt || null,
-          firstVisit: firstOrder?.createdAt || null,
-        };
-      }
-    );
-  }
-
-  /**
-   * Pelanggan baru dalam N hari terakhir
-   * @param {number} [days=30]
-   * @returns {Promise<Array>}
-   */
-  async getNewCustomers(days = 30) {
-    return cached(mediumCache, `customer:new:${days}`, TTL.MEDIUM, async () => {
-      const since = new Date(Date.now() - days * 86400000);
-      return prisma.customer.findMany({
-        where: { createdAt: { gte: since } },
-        select: {
-          id: true,
-          name: true,
-          phone: true,
-          createdAt: true,
-          _count: { select: { orders: true, vehicles: true } },
-        },
-        orderBy: { createdAt: "desc" },
-      });
-    });
-  }
-
-  /**
-   * Pelanggan tidak aktif (>90 hari)
-   * @returns {Promise<Array<{customerId: string, customerName: string, phone: string, lastVisit: Date, totalOrders: number, totalSpent: number}>>}
-   */
-  async getInactiveCustomers() {
-    return cached(mediumCache, "customer:inactive", TTL.MEDIUM, async () => {
-      const ninetyDaysAgo = new Date(Date.now() - 90 * 86400000);
-      const raw =
-        await prisma.$queryRaw`SELECT c."id", c."name", c."phone", MAX(o."createdAt") as last_visit, COUNT(o."id")::int as total_orders, COALESCE(SUM(o."total"), 0)::bigint as total_spent FROM "Customer" c INNER JOIN "Order" o ON c."id" = o."customerId" WHERE o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL GROUP BY c."id", c."name", c."phone" HAVING MAX(o."createdAt") < ${ninetyDaysAgo} ORDER BY last_visit ASC LIMIT 20`;
-      return raw.map((r) => ({
-        customerId: r.id,
-        customerName: r.name,
-        phone: r.phone,
-        lastVisit: r.last_visit,
-        totalOrders: Number(r.total_orders),
-        totalSpent: Number(r.total_spent),
-      }));
-    });
-  }
-
-  // ============================================================================
-  // VEHICLE (2 methods)
-  // ============================================================================
-
-  /**
-   * Distribusi model Vespa
-   * @returns {Promise<Array<{model: string, count: number}>>}
-   */
-  async getVehicleModelDistribution() {
-    return cached(longCache, "vehicle:distribution", TTL.LONG, async () => {
-      const raw =
-        await prisma.$queryRaw`SELECT COALESCE(v."model", 'Unknown') as model, COUNT(v."id")::int as count FROM "Vehicle" v GROUP BY v."model" ORDER BY count DESC`;
-      return raw.map((r) => ({ model: r.model, count: Number(r.count) }));
-    });
-  }
-
-  /**
-   * Statistik kendaraan
-   * @returns {Promise<{total: number, withOrders: number, withoutOrders: number}>}
-   */
-  async getVehicleStats() {
-    return cached(longCache, "vehicle:stats", TTL.LONG, async () => {
-      const [total, withOrders, withoutOrders] = await Promise.all([
-        prisma.vehicle.count(),
-        prisma.$queryRaw`SELECT COUNT(DISTINCT v."id")::int as count FROM "Vehicle" v INNER JOIN "Order" o ON v."id" = o."vehicleId" WHERE o."deletedAt" IS NULL`,
-        prisma.$queryRaw`SELECT COUNT(v."id")::int as count FROM "Vehicle" v WHERE NOT EXISTS (SELECT 1 FROM "Order" o WHERE o."vehicleId" = v."id" AND o."deletedAt" IS NULL)`,
-      ]);
-      return {
-        total,
-        withOrders: Number(withOrders[0].count),
-        withoutOrders: Number(withoutOrders[0].count),
-      };
-    });
-  }
-
-  // ============================================================================
-  // CACHE MANAGEMENT (8 methods)
-  // ============================================================================
-
-  async invalidateMechanicCache(mechanicId) {
-    const k1 = await shortCache.invalidate(`mechanic:${mechanicId}`);
-    const k2 = await mediumCache.invalidate(`mechanic:${mechanicId}`);
-    return k1 + k2;
-  }
-  async invalidateCashierCache(cashierId) {
-    const k1 = await shortCache.invalidate(`cashier:${cashierId}`);
-    const k2 = await mediumCache.invalidate(`cashier:${cashierId}`);
-    return k1 + k2;
-  }
-  async invalidateAdminCache() {
-    const k1 = await shortCache.invalidate("admin:");
-    const k2 = await mediumCache.invalidate("admin:");
-    return k1 + k2;
-  }
-  async invalidateProductCache(productId = null) {
-    if (productId) {
-      const k1 = await mediumCache.invalidate(`product:${productId}`);
-      const k2 = await longCache.invalidate(`product:${productId}`);
-      return k1 + k2;
-    }
-    const k1 = await mediumCache.invalidate("product:");
-    const k2 = await longCache.invalidate("product:");
-    return k1 + k2;
-  }
-  async invalidateSettingsCache() {
-    return await longCache.invalidate("settings:");
-  }
-  async invalidateCustomerCache(customerId = null) {
-    if (customerId)
-      return await mediumCache.invalidate(`customer:${customerId}`);
-    return await mediumCache.invalidate("customer:");
-  }
-  async invalidateVehicleCache() {
-    return await longCache.invalidate("vehicle:");
-  }
-  async getCacheInfo() {
-    const [s, m, l] = await Promise.all([
-      shortCache.getInfo(),
-      mediumCache.getInfo(),
-      longCache.getInfo(),
+  async getAdminCustomerRetention() {
+    const oneYearAgo = this.#getOneYearAgo();
+    const [raw, monthlyDetail] = await Promise.all([
+      prisma.$queryRaw`WITH customer_months AS (SELECT DISTINCT c."id", DATE_TRUNC('month', o."createdAt")::date as month FROM "Customer" c INNER JOIN "Order" o ON c."id" = o."customerId" WHERE o."createdAt" >= ${oneYearAgo} AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL), first_month AS (SELECT "id", MIN(month) as first_month FROM customer_months GROUP BY "id"), retention_data AS (SELECT cm.month, COUNT(DISTINCT cm."id") as total_customers, COUNT(DISTINCT CASE WHEN fm.first_month < cm.month THEN cm."id" END) as returning_customers FROM customer_months cm INNER JOIN first_month fm ON cm."id" = fm."id" GROUP BY cm.month ORDER BY cm.month) SELECT ROUND(AVG(CASE WHEN total_customers > 0 THEN (returning_customers::float / total_customers * 100) ELSE 0 END)::numeric, 1) as avg_retention_rate, SUM(total_customers)::int as total_customers, SUM(returning_customers)::int as total_returning FROM retention_data`,
+      prisma.$queryRaw`WITH customer_months AS (SELECT DISTINCT c."id", DATE_TRUNC('month', o."createdAt")::date as month FROM "Customer" c INNER JOIN "Order" o ON c."id" = o."customerId" WHERE o."createdAt" >= ${oneYearAgo} AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL), first_month AS (SELECT "id", MIN(month) as first_month FROM customer_months GROUP BY "id") SELECT cm.month, COUNT(DISTINCT cm."id")::int as total, COUNT(DISTINCT CASE WHEN fm.first_month < cm.month THEN cm."id" END)::int as returning, COUNT(DISTINCT CASE WHEN fm.first_month = cm.month THEN cm."id" END)::int as new_customers FROM customer_months cm INNER JOIN first_month fm ON cm."id" = fm."id" GROUP BY cm.month ORDER BY cm.month DESC LIMIT 12`,
     ]);
     return {
-      short: s,
-      medium: m,
-      long: l,
-      totalKeys: s.totalKeys + m.totalKeys + l.totalKeys,
+      summary: {
+        avgRetentionRate: Number(raw[0].avg_retention_rate) || 0,
+        totalCustomers: Number(raw[0].total_customers),
+        totalReturning: Number(raw[0].total_returning),
+      },
+      monthlyDetail: monthlyDetail.map((r) => ({
+        month: r.month,
+        total: Number(r.total),
+        returning: Number(r.returning),
+        new: Number(r.new_customers),
+        retentionRate:
+          Number(r.total) > 0
+            ? Math.round((Number(r.returning) / Number(r.total)) * 1000) / 10
+            : 0,
+      })),
     };
   }
-  async clearAllCaches() {
-    const [s, m, l] = await Promise.all([
-      shortCache.invalidateAll(),
-      mediumCache.invalidateAll(),
-      longCache.invalidateAll(),
+
+  async getAdminPaymentMethodDistribution() {
+    const startMonth = this.#getStartOfMonth();
+    const startYear = this.#getOneYearAgo();
+    const [monthly, yearly] = await Promise.all([
+      prisma.$queryRaw`SELECT p."method", COUNT(p."id")::int as count, COALESCE(SUM(p."amountPaid"), 0)::bigint as total FROM "Payment" p INNER JOIN "Order" o ON p."orderId" = o."id" WHERE p."status" = 'PAID' AND p."paidAt" >= ${startMonth} AND o."deletedAt" IS NULL GROUP BY p."method" ORDER BY count DESC`,
+      prisma.$queryRaw`SELECT p."method", COUNT(p."id")::int as count, COALESCE(SUM(p."amountPaid"), 0)::bigint as total FROM "Payment" p INNER JOIN "Order" o ON p."orderId" = o."id" WHERE p."status" = 'PAID' AND p."paidAt" >= ${startYear} AND o."deletedAt" IS NULL GROUP BY p."method" ORDER BY count DESC`,
     ]);
-    return { short: s, medium: m, long: l, total: s + m + l };
+    const formatDistribution = (raw) => {
+      const total = raw.reduce((s, r) => s + Number(r.count), 0);
+      return raw.map((r) => ({
+        method: r.method,
+        count: Number(r.count),
+        total: Number(r.total),
+        pct: total ? Math.round((Number(r.count) / total) * 10000) / 100 : 0,
+      }));
+    };
+    return {
+      monthly: formatDistribution(monthly),
+      yearly: formatDistribution(yearly),
+    };
   }
 }
 

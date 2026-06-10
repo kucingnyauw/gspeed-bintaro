@@ -81,7 +81,10 @@ class ReportService {
         labels = Array.from({ length: 12 }, (_, i) => {
           const d = new Date(startDate);
           d.setMonth(d.getMonth() + i);
-          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(
+            2,
+            "0"
+          )}`;
         });
         break;
       }
@@ -103,8 +106,15 @@ class ReportService {
    * @throws {ApiError} 400 - Periode tidak valid
    */
   async getSalesSummary(period = "monthly", options = {}) {
-    const { startDate, endDate, labels } = this.#getPeriodRange(period, options);
-    logger.info("Mengambil ringkasan penjualan", { period, startDate, endDate });
+    const { startDate, endDate, labels } = this.#getPeriodRange(
+      period,
+      options
+    );
+    logger.info("Mengambil ringkasan penjualan", {
+      period,
+      startDate,
+      endDate,
+    });
 
     const [salesData, dailySales, hourlySales] = await Promise.all([
       this.reportRepo.getSalesData(startDate, endDate),
@@ -123,8 +133,8 @@ class ReportService {
         totalSales: salesData.totalSales,
         totalSubtotal: salesData.totalSubtotal,
         totalTax: salesData.totalTax,
-        totalPPH: salesData.totalPPH,           // ✅ PPh UMKM dari repository
-        pphRate: salesData.pphRate,             // ✅ Rate PPh dari settings
+        totalPPH: salesData.totalPPH, // ✅ PPh UMKM dari repository
+        pphRate: salesData.pphRate, // ✅ Rate PPh dari settings
         averageOrderValue: salesData.averageOrderValue,
       },
       breakdown: period === "daily" ? hourlySales : dailySales,
@@ -139,7 +149,10 @@ class ReportService {
    * @throws {ApiError} 400 - Periode tidak valid
    */
   async getProfitLossReport(period = "monthly", options = {}) {
-    const { startDate, endDate, labels } = this.#getPeriodRange(period, options);
+    const { startDate, endDate, labels } = this.#getPeriodRange(
+      period,
+      options
+    );
     logger.info("Mengambil laporan laba rugi", { period, startDate, endDate });
 
     const [profitLossData, dailyProfitLoss] = await Promise.all([
@@ -159,10 +172,10 @@ class ReportService {
         totalOperatingExpenses: profitLossData.totalOperatingExpenses,
         netProfit: profitLossData.netProfit,
         netMargin: profitLossData.netMargin,
-        totalPPH: profitLossData.totalPPH,                // ✅ PPh UMKM
-        pphRate: profitLossData.pphRate,                  // ✅ Rate PPh
-        netProfitAfterPPH: profitLossData.netProfitAfterPPH,  // ✅ Laba setelah PPh
-        netMarginAfterPPH: profitLossData.netMarginAfterPPH,  // ✅ Margin setelah PPh
+        totalPPH: profitLossData.totalPPH, // ✅ PPh UMKM
+        pphRate: profitLossData.pphRate, // ✅ Rate PPh
+        netProfitAfterPPH: profitLossData.netProfitAfterPPH, // ✅ Laba setelah PPh
+        netMarginAfterPPH: profitLossData.netMarginAfterPPH, // ✅ Margin setelah PPh
       },
       breakdown: dailyProfitLoss,
     };
@@ -226,9 +239,18 @@ class ReportService {
    */
   async getTopProductsReport(period = "monthly", options = {}) {
     const { startDate, endDate } = this.#getPeriodRange(period, options);
-    logger.info("Mengambil laporan produk terlaris", { period, startDate, endDate, ...options });
+    logger.info("Mengambil laporan produk terlaris", {
+      period,
+      startDate,
+      endDate,
+      ...options,
+    });
 
-    const result = await this.reportRepo.getProductSalesReport(startDate, endDate, options);
+    const result = await this.reportRepo.getProductSalesReport(
+      startDate,
+      endDate,
+      options
+    );
 
     const productsWithImages = await Promise.all(
       result.data.map(async (product) => ({
@@ -237,9 +259,18 @@ class ReportService {
       }))
     );
 
-    const totalQuantity = productsWithImages.reduce((sum, p) => sum + p.quantitySold, 0);
-    const totalRevenue = productsWithImages.reduce((sum, p) => sum + p.totalRevenue, 0);
-    const totalProfit = productsWithImages.reduce((sum, p) => sum + p.profit, 0);
+    const totalQuantity = productsWithImages.reduce(
+      (sum, p) => sum + p.quantitySold,
+      0
+    );
+    const totalRevenue = productsWithImages.reduce(
+      (sum, p) => sum + p.totalRevenue,
+      0
+    );
+    const totalProfit = productsWithImages.reduce(
+      (sum, p) => sum + p.profit,
+      0
+    );
 
     return {
       period,
@@ -266,13 +297,28 @@ class ReportService {
    */
   async getMechanicPerformanceReport(period = "monthly", options = {}) {
     const { startDate, endDate } = this.#getPeriodRange(period, options);
-    logger.info("Mengambil laporan performa mekanik", { period, startDate, endDate, ...options });
+    logger.info("Mengambil laporan performa mekanik", {
+      period,
+      startDate,
+      endDate,
+      ...options,
+    });
 
-    const result = await this.reportRepo.getMechanicPerformanceReport(startDate, endDate, options);
+    const result = await this.reportRepo.getMechanicPerformanceReport(
+      startDate,
+      endDate,
+      options
+    );
 
     const totalTasks = result.data.reduce((sum, m) => sum + m.totalTasks, 0);
-    const totalCompleted = result.data.reduce((sum, m) => sum + m.completedTasks, 0);
-    const totalEarnings = result.data.reduce((sum, m) => sum + m.totalEarnings, 0);
+    const totalCompleted = result.data.reduce(
+      (sum, m) => sum + m.completedTasks,
+      0
+    );
+    const totalEarnings = result.data.reduce(
+      (sum, m) => sum + m.totalEarnings,
+      0
+    );
 
     return {
       period,
@@ -341,6 +387,12 @@ class ReportService {
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     startOfMonth.setHours(0, 0, 0, 0);
 
+    const lowThresholdSetting = await prisma.setting.findUnique({
+      where: { key: "stock_low_threshold" },
+      select: { value: true },
+    });
+    const lowThreshold = parseInt(lowThresholdSetting?.value || "5", 10);
+
     const [
       todaySales,
       monthSales,
@@ -355,7 +407,11 @@ class ReportService {
       this.reportRepo.getActiveShift(),
       this.reportRepo.countOrdersByStatus(["DRAFT", "QUEUED", "IN_PROGRESS"]),
       this.reportRepo.getProductSummary(),
-      this.reportRepo.getLowStockProducts({ threshold: 5, page: 1, limit: 5 }),
+      this.reportRepo.getLowStockProducts({
+        threshold: lowThreshold,
+        page: 1,
+        limit: 10,
+      }),
       this.reportRepo.getCustomerSummary(startOfMonth, endOfDay),
     ]);
 
@@ -375,17 +431,17 @@ class ReportService {
         date: startOfDay,
         orders: todaySales.totalOrders,
         revenue: todaySales.totalSales,
-        ppn: todaySales.totalTax,           // ✅ PPN
-        pph: todaySales.totalPPH,           // ✅ PPh UMKM
-        pphRate: todaySales.pphRate,        // ✅ Rate PPh
+        ppn: todaySales.totalTax,
+        pph: todaySales.totalPPH,
+        pphRate: todaySales.pphRate,
         averageOrderValue: todaySales.averageOrderValue,
       },
       thisMonth: {
         orders: monthSales.totalOrders,
         revenue: monthSales.totalSales,
-        ppn: monthSales.totalTax,           // ✅ PPN
-        pph: monthSales.totalPPH,           // ✅ PPh UMKM
-        pphRate: monthSales.pphRate,        // ✅ Rate PPh
+        ppn: monthSales.totalTax,
+        pph: monthSales.totalPPH,
+        pphRate: monthSales.pphRate,
         newCustomers: customerSummary.newCustomers,
         activeCustomers: customerSummary.activeCustomers,
       },
@@ -406,6 +462,7 @@ class ReportService {
         lowStockCount: productSummary.lowStockCount,
         outOfStockCount: productSummary.outOfStockCount,
         totalStockValue: productSummary.totalStockValue,
+        lowStockThreshold: lowThreshold,
         lowStockProducts: lowStockWithImages,
       },
       customers: {
@@ -519,7 +576,9 @@ class ReportService {
         completionRate:
           overallStats.totalTasks > 0
             ? Math.round(
-                (overallStats.completedTasks / overallStats.totalTasks) * 100 * 100
+                (overallStats.completedTasks / overallStats.totalTasks) *
+                  100 *
+                  100
               ) / 100
             : 0,
       },
@@ -546,8 +605,15 @@ class ReportService {
    * @throws {ApiError} 400 - Periode tidak valid
    */
   async getExpenseReport(period = "monthly", options = {}) {
-    const { startDate, endDate, labels } = this.#getPeriodRange(period, options);
-    logger.info("Mengambil laporan pengeluaran", { period, startDate, endDate });
+    const { startDate, endDate, labels } = this.#getPeriodRange(
+      period,
+      options
+    );
+    logger.info("Mengambil laporan pengeluaran", {
+      period,
+      startDate,
+      endDate,
+    });
 
     const filters = {};
     if (options.category) filters.category = options.category;
@@ -578,14 +644,21 @@ class ReportService {
    * @throws {ApiError} 400 - Periode tidak valid
    */
   async getPaymentReport(period = "monthly", options = {}) {
-    const { startDate, endDate, labels } = this.#getPeriodRange(period, options);
+    const { startDate, endDate, labels } = this.#getPeriodRange(
+      period,
+      options
+    );
     logger.info("Mengambil laporan pembayaran", { period, startDate, endDate });
 
     const filters = {};
     if (options.method) filters.method = options.method;
     if (options.status) filters.status = options.status;
 
-    const paymentSummary = await this.reportRepo.getPaymentSummary(startDate, endDate, filters);
+    const paymentSummary = await this.reportRepo.getPaymentSummary(
+      startDate,
+      endDate,
+      filters
+    );
 
     return {
       period,
@@ -615,10 +688,20 @@ class ReportService {
    */
   async getStockMovementReport(productId, period = "monthly", options = {}) {
     const { startDate, endDate } = this.#getPeriodRange(period, options);
-    logger.info("Mengambil laporan pergerakan stok", { productId, period, startDate, endDate });
+    logger.info("Mengambil laporan pergerakan stok", {
+      productId,
+      period,
+      startDate,
+      endDate,
+    });
 
     const [movementSummary, stockConsistency] = await Promise.all([
-      this.reportRepo.getMovementSummary(productId, startDate, endDate, options),
+      this.reportRepo.getMovementSummary(
+        productId,
+        startDate,
+        endDate,
+        options
+      ),
       this.reportRepo.validateStockConsistency(productId),
     ]);
 
@@ -674,9 +757,18 @@ class ReportService {
    */
   async getMechanicEarnings(mechanicId, period = "monthly", options = {}) {
     const { startDate, endDate } = this.#getPeriodRange(period, options);
-    logger.info("Mengambil pendapatan mekanik", { mechanicId, period, startDate, endDate });
+    logger.info("Mengambil pendapatan mekanik", {
+      mechanicId,
+      period,
+      startDate,
+      endDate,
+    });
 
-    const earnings = await this.reportRepo.getTotalEarningsByMechanic(mechanicId, startDate, endDate);
+    const earnings = await this.reportRepo.getTotalEarningsByMechanic(
+      mechanicId,
+      startDate,
+      endDate
+    );
 
     return {
       mechanicId,
@@ -694,17 +786,32 @@ class ReportService {
    * @throws {ApiError} 400 - Periode tidak valid
    */
   async getCustomerSummary(period = "monthly", options = {}) {
-    const { startDate, endDate, labels } = this.#getPeriodRange(period, options);
-    logger.info("Mengambil ringkasan pelanggan", { period, startDate, endDate });
+    const { startDate, endDate, labels } = this.#getPeriodRange(
+      period,
+      options
+    );
+    logger.info("Mengambil ringkasan pelanggan", {
+      period,
+      startDate,
+      endDate,
+    });
 
-    const [customerSummary, dailyAcquisition, visitFrequency, topCustomersResult, retention] =
-      await Promise.all([
-        this.reportRepo.getCustomerSummary(startDate, endDate),
-        this.reportRepo.getDailyCustomerAcquisition(startDate, endDate),
-        this.reportRepo.getCustomerVisitFrequency(startDate, endDate),
-        this.reportRepo.getTopCustomers(startDate, endDate, { page: 1, limit: 10 }),
-        this.reportRepo.getMonthlyCustomerRetention(startDate, endDate),
-      ]);
+    const [
+      customerSummary,
+      dailyAcquisition,
+      visitFrequency,
+      topCustomersResult,
+      retention,
+    ] = await Promise.all([
+      this.reportRepo.getCustomerSummary(startDate, endDate),
+      this.reportRepo.getDailyCustomerAcquisition(startDate, endDate),
+      this.reportRepo.getCustomerVisitFrequency(startDate, endDate),
+      this.reportRepo.getTopCustomers(startDate, endDate, {
+        page: 1,
+        limit: 10,
+      }),
+      this.reportRepo.getMonthlyCustomerRetention(startDate, endDate),
+    ]);
 
     return {
       period,
@@ -730,7 +837,12 @@ class ReportService {
    */
   async getTopCustomers(period = "monthly", options = {}) {
     const { startDate, endDate } = this.#getPeriodRange(period, options);
-    logger.info("Mengambil top customers", { period, startDate, endDate, ...options });
+    logger.info("Mengambil top customers", {
+      period,
+      startDate,
+      endDate,
+      ...options,
+    });
 
     return this.reportRepo.getTopCustomers(startDate, endDate, options);
   }
@@ -744,11 +856,24 @@ class ReportService {
    * @throws {ApiError} 400 - Periode tidak valid
    * @throws {ApiError} 404 - Pelanggan tidak ditemukan
    */
-  async getCustomerTransactionHistory(customerId, period = "monthly", options = {}) {
+  async getCustomerTransactionHistory(
+    customerId,
+    period = "monthly",
+    options = {}
+  ) {
     const { startDate, endDate } = this.#getPeriodRange(period, options);
-    logger.info("Mengambil riwayat transaksi pelanggan", { customerId, period, startDate, endDate });
+    logger.info("Mengambil riwayat transaksi pelanggan", {
+      customerId,
+      period,
+      startDate,
+      endDate,
+    });
 
-    const result = await this.reportRepo.getCustomerTransactionHistory(customerId, startDate, endDate);
+    const result = await this.reportRepo.getCustomerTransactionHistory(
+      customerId,
+      startDate,
+      endDate
+    );
 
     if (!result) {
       throw ApiError.notFound({

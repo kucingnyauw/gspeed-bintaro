@@ -1,5 +1,5 @@
 /**
- * Todo - Dialog catatan cepat dengan fitur CRUD, checklist, dan animasi.
+ * Todo - Dialog catatan cepat minimalis dengan fitur CRUD, checklist, dan animasi.
  *
  * Fitur:
  * - Tambah catatan baru dengan input + tombol Plus
@@ -10,8 +10,7 @@
  * - Empty state dengan ilustrasi SVG
  * - Counter "belum" di header
  * - Scroll area untuk daftar catatan
- * - Font monospace untuk nilai uang (opsional)
- * - Animasi active scale pada tombol
+ * - Desain minimalis dengan spacing lega
  *
  * @param {Object} props
  * @param {boolean} props.open - Status dialog terbuka/tutup
@@ -31,7 +30,7 @@ import {
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { motion, AnimatePresence } from "framer-motion";
-import { X, Plus } from "lucide-react";
+import { X, Plus, CheckSquare } from "lucide-react";
 import {
   addTodo,
   toggleTodoStatus,
@@ -46,7 +45,6 @@ import {
 
 /**
  * EmptyState - Tampilan saat belum ada catatan.
- * Menampilkan ilustrasi checklist dengan pesan informatif.
  *
  * @returns {JSX.Element} Komponen empty state
  */
@@ -60,35 +58,22 @@ const EmptyState = () => {
         flexDirection: "column",
         alignItems: "center",
         py: 10,
-        gap: 3,
+        gap: 4,
       }}
     >
       <Box
         sx={{
-          width: 88,
-          height: 88,
-          borderRadius: "50%",
+          width: 72,
+          height: 72,
+          borderRadius: `${theme.shape.borderRadius}px`,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           bgcolor: alpha(theme.palette.secondary.main, 0.06),
-          border: `2px dashed ${alpha(theme.palette.secondary.main, 0.15)}`,
+          color: "secondary.main",
         }}
       >
-        <svg
-          width="32"
-          height="32"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke={theme.palette.secondary.main}
-          strokeWidth="1.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          opacity={0.6}
-        >
-          <path d="M9 11l3 3L22 4" />
-          <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" />
-        </svg>
+        <CheckSquare size={28} strokeWidth={1.5} />
       </Box>
       <Box sx={{ textAlign: "center", maxWidth: 260 }}>
         <Typography variant="subtitle1" sx={{ fontWeight: 600, color: "text.secondary", mb: 0.75 }}>
@@ -104,14 +89,11 @@ const EmptyState = () => {
 
 /**
  * Variants animasi untuk item todo.
- * hidden: transparan, bergeser ke kiri, tinggi 0
- * visible: muncul dengan spring animation
- * exit: transparan, bergeser ke kanan, tinggi 0
  *
  * @type {Object}
  */
 const itemVariants = {
-  hidden: { opacity: 0, x: -20, height: 0 },
+  hidden: { opacity: 0, x: -16, height: 0 },
   visible: {
     opacity: 1,
     x: 0,
@@ -120,7 +102,7 @@ const itemVariants = {
   },
   exit: {
     opacity: 0,
-    x: 20,
+    x: 16,
     height: 0,
     transition: { duration: 0.2 },
   },
@@ -138,40 +120,23 @@ const Todo = ({ open, onClose }) => {
   const theme = useTheme();
   const dispatch = useDispatch();
 
-  /**
-   * Semua todo items dari Redux store.
-   *
-   * @type {Array<Object>}
-   */
+  /** @type {Array<Object>} */
   const todos = useSelector(selectTodos);
 
-  /**
-   * Todo yang belum selesai.
-   *
-   * @type {Array<Object>}
-   */
+  /** @type {Array<Object>} */
   const pendingTodos = useSelector(selectPendingTodos);
 
-  /**
-   * Todo yang sudah selesai.
-   *
-   * @type {Array<Object>}
-   */
+  /** @type {Array<Object>} */
   const completedTodos = useSelector(selectCompletedTodos);
 
-  /**
-   * Teks input untuk todo baru.
-   *
-   * @type {[string, Function]}
-   */
+  /** @type {[string, Function]} */
   const [text, setText] = useState("");
 
-  /** @type {string} Nilai border radius dari theme */
+  /** @type {string} */
   const borderRadius = `${theme.shape.borderRadius}px`;
 
   /**
    * Handler tambah todo baru.
-   * Hanya dispatch jika teks tidak kosong setelah di-trim.
    */
   const handleAdd = useCallback(() => {
     const trimmed = text.trim();
@@ -181,9 +146,7 @@ const Todo = ({ open, onClose }) => {
   }, [text, dispatch]);
 
   /**
-   * Handler keyboard: Tambah todo saat Enter ditekan.
-   *
-   * @param {React.KeyboardEvent} e - Event keyboard
+   * Handler keyboard: Tambah todo saat Enter.
    */
   const handleKeyDown = useCallback(
     (e) => {
@@ -193,9 +156,7 @@ const Todo = ({ open, onClose }) => {
   );
 
   /**
-   * Handler toggle status selesai todo.
-   *
-   * @param {string} id - ID todo
+   * Handler toggle status selesai.
    */
   const handleToggle = useCallback(
     (id) => dispatch(toggleTodoStatus(id)),
@@ -204,8 +165,6 @@ const Todo = ({ open, onClose }) => {
 
   /**
    * Handler hapus todo.
-   *
-   * @param {string} id - ID todo
    */
   const handleDelete = useCallback(
     (id) => dispatch(deleteTodo(id)),
@@ -213,7 +172,7 @@ const Todo = ({ open, onClose }) => {
   );
 
   /**
-   * Handler bersihkan semua todo yang sudah selesai.
+   * Handler bersihkan semua todo selesai.
    */
   const handleClearCompleted = useCallback(
     () => dispatch(clearCompletedTodos()),
@@ -234,8 +193,8 @@ const Todo = ({ open, onClose }) => {
         alignItems: "center",
         justifyContent: "center",
         p: 2,
-        bgcolor: alpha(theme.palette.common.black, 0.45),
-        backdropFilter: "blur(8px)",
+        bgcolor: alpha(theme.palette.common.black, 0.35),
+        backdropFilter: "blur(4px)",
       }}
     >
       <Box
@@ -249,12 +208,12 @@ const Todo = ({ open, onClose }) => {
           flexDirection: "column",
           borderRadius: borderRadius,
           bgcolor: "background.paper",
-          border: `1px solid ${theme.palette.divider}`,
-          boxShadow: `0 24px 64px ${alpha(theme.palette.common.black, 0.2)}`,
+          border: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
+          boxShadow: `0 24px 64px ${alpha(theme.palette.common.black, 0.12)}`,
           overflow: "hidden",
         }}
       >
-        {/* HEADER */}
+        {/* HEADER - Minimalis */}
         <Stack
           direction="row"
           sx={{
@@ -262,22 +221,37 @@ const Todo = ({ open, onClose }) => {
             justifyContent: "space-between",
             px: 3,
             py: 2.5,
-            borderBottom: `1px solid ${theme.palette.divider}`,
-            bgcolor: alpha(theme.palette.background.default, 0.6),
+            borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
             flexShrink: 0,
           }}
         >
           <Stack direction="row" sx={{ gap: 1.5, alignItems: "center" }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-              Catatan Cepat
-            </Typography>
+            <Box
+              sx={{
+                width: 36,
+                height: 36,
+                borderRadius: borderRadius,
+                bgcolor: alpha(theme.palette.secondary.main, 0.08),
+                color: "secondary.main",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <CheckSquare size={18} strokeWidth={1.5} />
+            </Box>
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: "0.9375rem" }}>
+                Catatan Cepat
+              </Typography>
+            </Box>
             {todos.length > 0 && (
               <Box
                 sx={{
                   px: 1.25,
-                  py: 0.375,
+                  py: 0.25,
                   borderRadius: borderRadius,
-                  bgcolor: alpha(theme.palette.secondary.main, 0.1),
+                  bgcolor: alpha(theme.palette.secondary.main, 0.08),
                   border: `1px solid ${alpha(theme.palette.secondary.main, 0.15)}`,
                 }}
               >
@@ -298,12 +272,12 @@ const Todo = ({ open, onClose }) => {
               color: "text.secondary",
               borderRadius: borderRadius,
               "&:hover": {
-                color: "error.main",
-                bgcolor: alpha(theme.palette.error.main, 0.08),
+                color: "text.primary",
+                bgcolor: "action.hover",
               },
             }}
           >
-            <X size={20} strokeWidth={1.5} />
+            <X size={18} strokeWidth={1.5} />
           </IconButton>
         </Stack>
 
@@ -322,15 +296,16 @@ const Todo = ({ open, onClose }) => {
               sx={{
                 "& .MuiOutlinedInput-root": {
                   borderRadius: borderRadius,
-                  bgcolor: "background.default",
+                  bgcolor: alpha(theme.palette.secondary.main, 0.03),
                   fontSize: "0.9375rem",
-                  "& fieldset": { borderColor: "divider" },
-                  "&:hover fieldset": { borderColor: "secondary.main" },
+                  "& fieldset": { borderColor: "transparent" },
+                  "&:hover fieldset": { borderColor: alpha(theme.palette.secondary.main, 0.2) },
                   "&.Mui-focused fieldset": {
-                    borderColor: "secondary.main",
+                    borderColor: alpha(theme.palette.secondary.main, 0.3),
                     borderWidth: 1,
                   },
                 },
+                "& .MuiOutlinedInput-input": { py: 1.5 },
               }}
             />
             <IconButton
@@ -338,29 +313,29 @@ const Todo = ({ open, onClose }) => {
               disabled={!text.trim()}
               aria-label="Tambah catatan"
               sx={{
-                width: 50,
-                height: 50,
+                width: 48,
+                height: 48,
                 borderRadius: borderRadius,
-                color: "secondary.contrastText",
-                bgcolor: "secondary.main",
-                boxShadow: `0 4px 14px ${alpha(theme.palette.secondary.main, 0.3)}`,
+                color: text.trim() ? "secondary.contrastText" : "text.disabled",
+                bgcolor: text.trim() ? "secondary.main" : "transparent",
+                boxShadow: "none",
                 transition: (t) =>
-                  t.transitions.create(["background-color", "transform", "box-shadow"], {
+                  t.transitions.create(["background-color", "transform", "color"], {
                     duration: t.transitions.duration.shorter,
                   }),
                 "&:hover": {
-                  bgcolor: "secondary.dark",
-                  boxShadow: `0 6px 20px ${alpha(theme.palette.secondary.main, 0.4)}`,
+                  bgcolor: text.trim() ? "secondary.dark" : alpha(theme.palette.secondary.main, 0.06),
+                  boxShadow: text.trim() ? `0 2px 8px ${alpha(theme.palette.secondary.main, 0.3)}` : "none",
                 },
                 "&:active": { transform: "scale(0.94)" },
                 "&.Mui-disabled": {
-                  bgcolor: "action.disabledBackground",
-                  color: "action.disabled",
+                  bgcolor: "transparent",
+                  color: "text.disabled",
                   boxShadow: "none",
                 },
               }}
             >
-              <Plus size={24} strokeWidth={2} />
+              <Plus size={22} strokeWidth={2} />
             </IconButton>
           </Stack>
 
@@ -374,9 +349,12 @@ const Todo = ({ open, onClose }) => {
                 gap: 0.5,
                 flex: 1,
                 overflowY: "auto",
-                "&::-webkit-scrollbar": { width: 5 },
+                "&::-webkit-scrollbar": { width: 4 },
                 "&::-webkit-scrollbar-track": { bgcolor: "transparent" },
-                "&::-webkit-scrollbar-thumb": { bgcolor: "divider", borderRadius: 10 },
+                "&::-webkit-scrollbar-thumb": {
+                  bgcolor: alpha(theme.palette.divider, 0.5),
+                  borderRadius: 10,
+                },
               }}
             >
               <AnimatePresence>
@@ -395,14 +373,14 @@ const Todo = ({ open, onClose }) => {
                       sx={{
                         alignItems: "center",
                         gap: 1.5,
-                        py: 1.75,
+                        py: 2,
                         px: 2,
                         borderRadius: borderRadius,
                         transition: (t) =>
                           t.transitions.create("background-color", {
                             duration: t.transitions.duration.shorter,
                           }),
-                        "&:hover": { bgcolor: "action.hover" },
+                        "&:hover": { bgcolor: alpha(theme.palette.secondary.main, 0.04) },
                         "&:hover .delete-btn": { opacity: 1 },
                       }}
                     >
@@ -427,7 +405,7 @@ const Todo = ({ open, onClose }) => {
                           stroke={
                             todo.isCompleted
                               ? theme.palette.success.main
-                              : alpha(theme.palette.secondary.main, 0.4)
+                              : alpha(theme.palette.secondary.main, 0.35)
                           }
                           strokeWidth="2"
                           strokeLinecap="round"
@@ -486,7 +464,7 @@ const Todo = ({ open, onClose }) => {
               sx={{
                 mt: 3,
                 pt: 2.5,
-                borderTop: `1px solid ${theme.palette.divider}`,
+                borderTop: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
                 textAlign: "center",
                 flexShrink: 0,
               }}
@@ -496,12 +474,15 @@ const Todo = ({ open, onClose }) => {
                 sx={{
                   fontWeight: 600,
                   textTransform: "none",
-                  fontSize: "0.875rem",
-                  color: "error.main",
+                  fontSize: "0.8125rem",
+                  color: "text.secondary",
                   px: 3,
                   py: 1.25,
                   borderRadius: borderRadius,
-                  "&:hover": { bgcolor: alpha(theme.palette.error.main, 0.06) },
+                  "&:hover": {
+                    color: "error.main",
+                    bgcolor: alpha(theme.palette.error.main, 0.06),
+                  },
                 }}
               >
                 Bersihkan yang selesai ({completedTodos.length})

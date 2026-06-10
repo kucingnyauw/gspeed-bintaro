@@ -1,24 +1,23 @@
 /**
- * TaxCalculator - Dialog kalkulator pajak untuk menghitung PPN dan PPh dengan persentase bebas.
+ * TaxCalculator - Dialog kalkulator pajak minimalis untuk menghitung PPN dan PPh.
  *
  * Fitur:
  * - Input jumlah dengan prefix "Rp" dan format IDR otomatis
  * - Input persentase pajak bebas (default 11%)
  * - Quick preset chips: PPN 11%, PPH 0.5%, 10%
- * - Perhitungan PPN (ditambahkan ke harga dasar)
- * - Perhitungan PPh (dikurangkan dari harga dasar)
+ * - Perhitungan PPN (ditambahkan) dan PPh (dikurangkan)
  * - Tampilan hasil detail: Harga Dasar, Pajak, Total
- * - Result card dengan warna berbeda (PPN: secondary, PPh: warning)
+ * - Result card dengan warna subtle (PPN: secondary, PPh: warning)
  * - Tombol Reset untuk mengosongkan input
  * - Font monospace untuk nilai uang
- * - Animasi active scale pada tombol
+ * - Desain minimalis dengan spacing yang lega dan tinggi yang nyaman
  *
  * @param {Object} props - Properti komponen
  * @param {boolean} props.open - Status dialog terbuka/tutup
  * @param {Function} props.onClose - Handler untuk menutup dialog
  * @returns {JSX.Element|null} Komponen dialog kalkulator pajak
  */
-import { X, Percent } from "lucide-react";
+import { X, Percent, Calculator } from "lucide-react";
 import {
   Box,
   Button,
@@ -37,9 +36,6 @@ import { useTaxCalculator } from "../hooks/useTaxCalculator";
 const TaxCalculator = ({ open, onClose }) => {
   const theme = useTheme();
 
-  /**
-   * Hook kalkulator pajak yang menyediakan state dan handler.
-   */
   const {
     amount,
     taxRate,
@@ -52,13 +48,13 @@ const TaxCalculator = ({ open, onClose }) => {
     formatToIdr,
   } = useTaxCalculator();
 
-  /** @type {string} Nilai amount yang sudah diformat */
+  /** @type {string} */
   const displayAmount = amount ? formatInput(amount) : "";
 
-  /** @type {boolean} Flag apakah tombol hitung bisa diklik */
+  /** @type {boolean} */
   const canCalculate = amount && taxRate;
 
-  /** @type {string} Nilai border radius dari theme */
+  /** @type {string} */
   const borderRadius = `${theme.shape.borderRadius}px`;
 
   return (
@@ -75,19 +71,19 @@ const TaxCalculator = ({ open, onClose }) => {
         alignItems: "center",
         justifyContent: "center",
         p: 2,
-        bgcolor: alpha(theme.palette.common.black, 0.45),
-        backdropFilter: "blur(8px)",
+        bgcolor: alpha(theme.palette.common.black, 0.35),
+        backdropFilter: "blur(4px)",
       }}
     >
       <Box
         onClick={(e) => e.stopPropagation()}
         sx={{
-          width: { xs: "100%", sm: 480 },
-          maxWidth: 480,
+          width: { xs: "100%", sm: 460 },
+          maxWidth: 460,
           borderRadius: borderRadius,
           bgcolor: "background.paper",
-          border: `1px solid ${theme.palette.divider}`,
-          boxShadow: `0 24px 64px ${alpha(theme.palette.common.black, 0.2)}`,
+          border: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
+          boxShadow: `0 24px 64px ${alpha(theme.palette.common.black, 0.12)}`,
           overflow: "hidden",
         }}
       >
@@ -98,19 +94,34 @@ const TaxCalculator = ({ open, onClose }) => {
             alignItems: "center",
             justifyContent: "space-between",
             px: 3,
-            py: 2,
-            borderBottom: `1px solid ${theme.palette.divider}`,
-            bgcolor: alpha(theme.palette.background.default, 0.6),
+            py: 2.5,
+            borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
           }}
         >
-          <Box>
-            <Typography variant="subtitle2" sx={{ fontWeight: 700, lineHeight: 1.3 }}>
-              Kalkulator Pajak
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              Hitung PPN & PPh dengan persentase bebas
-            </Typography>
-          </Box>
+          <Stack direction="row" sx={{ gap: 1.5, alignItems: "center" }}>
+            <Box
+              sx={{
+                width: 40,
+                height: 40,
+                borderRadius: borderRadius,
+                bgcolor: alpha(theme.palette.secondary.main, 0.08),
+                color: "secondary.main",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Calculator size={20} strokeWidth={1.5} />
+            </Box>
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, lineHeight: 1.3, fontSize: "0.9375rem" }}>
+                Kalkulator Pajak
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                PPN & PPh dengan persentase bebas
+              </Typography>
+            </Box>
+          </Stack>
           <IconButton
             onClick={onClose}
             size="small"
@@ -119,31 +130,32 @@ const TaxCalculator = ({ open, onClose }) => {
               color: "text.secondary",
               borderRadius: borderRadius,
               "&:hover": {
-                color: "error.main",
-                bgcolor: alpha(theme.palette.error.main, 0.08),
+                color: "text.primary",
+                bgcolor: "action.hover",
               },
             }}
           >
-            <X size={20} strokeWidth={1.5} />
+            <X size={18} strokeWidth={1.5} />
           </IconButton>
         </Stack>
 
         {/* BODY */}
-        <Box sx={{ p: 3, display: "flex", flexDirection: "column", gap: 3 }}>
+        <Box sx={{ p: 3, display: "flex", flexDirection: "column", gap: 4 }}>
           {/* INPUT AMOUNT */}
           <Box>
             <Typography
               variant="caption"
               sx={{
-                fontWeight: 700,
-                mb: 1,
+                fontWeight: 600,
+                mb: 1.25,
                 display: "block",
                 color: "text.secondary",
-                letterSpacing: "0.05em",
                 textTransform: "uppercase",
+                letterSpacing: "0.04em",
+                fontSize: "0.6875rem",
               }}
             >
-              Jumlah (Rp)
+              Jumlah
             </Typography>
             <TextField
               fullWidth
@@ -159,7 +171,7 @@ const TaxCalculator = ({ open, onClose }) => {
                       <Typography
                         variant="body2"
                         color="text.disabled"
-                        sx={{ fontWeight: 500 }}
+                        sx={{ fontWeight: 500, fontSize: "1rem" }}
                       >
                         Rp
                       </Typography>
@@ -170,19 +182,19 @@ const TaxCalculator = ({ open, onClose }) => {
               sx={{
                 "& .MuiOutlinedInput-root": {
                   borderRadius: borderRadius,
-                  bgcolor: "background.default",
+                  bgcolor: alpha(theme.palette.secondary.main, 0.03),
                   fontSize: "1.25rem",
-                  fontWeight: 700,
+                  fontWeight: 600,
                   fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
                   letterSpacing: "-0.02em",
-                  "& fieldset": { borderColor: "divider" },
-                  "&:hover fieldset": { borderColor: "secondary.main" },
+                  "& fieldset": { borderColor: "transparent" },
+                  "&:hover fieldset": { borderColor: alpha(theme.palette.secondary.main, 0.2) },
                   "&.Mui-focused fieldset": {
-                    borderColor: "secondary.main",
+                    borderColor: alpha(theme.palette.secondary.main, 0.3),
                     borderWidth: 1,
                   },
                 },
-                "& .MuiOutlinedInput-input": { py: 1.75 },
+                "& .MuiOutlinedInput-input": { py: 2 },
               }}
             />
           </Box>
@@ -192,12 +204,13 @@ const TaxCalculator = ({ open, onClose }) => {
             <Typography
               variant="caption"
               sx={{
-                fontWeight: 700,
-                mb: 1,
+                fontWeight: 600,
+                mb: 1.25,
                 display: "block",
                 color: "text.secondary",
-                letterSpacing: "0.05em",
                 textTransform: "uppercase",
+                letterSpacing: "0.04em",
+                fontSize: "0.6875rem",
               }}
             >
               Persentase Pajak
@@ -213,7 +226,7 @@ const TaxCalculator = ({ open, onClose }) => {
                   endAdornment: (
                     <InputAdornment position="end">
                       <Percent
-                        size={18}
+                        size={16}
                         strokeWidth={1.5}
                         style={{ color: theme.palette.text.secondary }}
                       />
@@ -224,25 +237,25 @@ const TaxCalculator = ({ open, onClose }) => {
               sx={{
                 "& .MuiOutlinedInput-root": {
                   borderRadius: borderRadius,
-                  bgcolor: "background.default",
+                  bgcolor: alpha(theme.palette.secondary.main, 0.03),
                   fontSize: "1.25rem",
-                  fontWeight: 700,
+                  fontWeight: 600,
                   fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
                   letterSpacing: "-0.02em",
-                  "& fieldset": { borderColor: "divider" },
-                  "&:hover fieldset": { borderColor: "secondary.main" },
+                  "& fieldset": { borderColor: "transparent" },
+                  "&:hover fieldset": { borderColor: alpha(theme.palette.secondary.main, 0.2) },
                   "&.Mui-focused fieldset": {
-                    borderColor: "secondary.main",
+                    borderColor: alpha(theme.palette.secondary.main, 0.3),
                     borderWidth: 1,
                   },
                 },
-                "& .MuiOutlinedInput-input": { py: 1.75 },
+                "& .MuiOutlinedInput-input": { py: 2 },
               }}
             />
           </Box>
 
           {/* QUICK TAX RATE CHIPS */}
-          <Stack direction="row" sx={{ gap: 1, flexWrap: "wrap" }}>
+          <Stack direction="row" sx={{ gap: 1.25, flexWrap: "wrap" }}>
             {[
               { label: "PPN 11%", value: "11" },
               { label: "PPH 0.5%", value: "0.5" },
@@ -259,10 +272,12 @@ const TaxCalculator = ({ open, onClose }) => {
                   fontWeight: 600,
                   fontSize: "0.75rem",
                   cursor: "pointer",
+                  height: 32,
+                  px: 0.5,
                   ...(taxRate === preset.value && {
-                    bgcolor: alpha(theme.palette.secondary.main, 0.12),
+                    bgcolor: alpha(theme.palette.secondary.main, 0.1),
                     color: "secondary.main",
-                    borderColor: "secondary.main",
+                    borderColor: alpha(theme.palette.secondary.main, 0.3),
                   }),
                 }}
               />
@@ -277,14 +292,15 @@ const TaxCalculator = ({ open, onClose }) => {
               onClick={handleClear}
               sx={{
                 borderRadius: borderRadius,
-                py: 1.25,
+                py: 1.5,
                 fontWeight: 600,
                 textTransform: "none",
                 fontSize: "0.875rem",
                 color: "text.secondary",
-                borderColor: "divider",
+                borderColor: alpha(theme.palette.divider, 0.6),
+                bgcolor: "transparent",
                 "&:hover": {
-                  borderColor: alpha(theme.palette.error.main, 0.4),
+                  borderColor: alpha(theme.palette.error.main, 0.3),
                   color: "error.main",
                   bgcolor: alpha(theme.palette.error.main, 0.04),
                 },
@@ -299,24 +315,24 @@ const TaxCalculator = ({ open, onClose }) => {
               disabled={!canCalculate}
               sx={{
                 borderRadius: borderRadius,
-                py: 1.25,
-                fontWeight: 700,
+                py: 1.5,
+                fontWeight: 600,
                 textTransform: "none",
                 fontSize: "0.875rem",
                 bgcolor: "secondary.main",
-                boxShadow: `0 4px 14px ${alpha(theme.palette.secondary.main, 0.3)}`,
+                boxShadow: "none",
                 "&:hover": {
                   bgcolor: "secondary.dark",
-                  boxShadow: `0 6px 20px ${alpha(theme.palette.secondary.main, 0.4)}`,
+                  boxShadow: `0 2px 8px ${alpha(theme.palette.secondary.main, 0.3)}`,
                 },
                 "&:disabled": {
-                  bgcolor: "action.disabledBackground",
-                  color: "action.disabled",
+                  bgcolor: alpha(theme.palette.secondary.main, 0.12),
+                  color: alpha(theme.palette.secondary.main, 0.4),
                   boxShadow: "none",
                 },
               }}
             >
-              Hitung PPN
+              PPN
             </Button>
             <Button
               fullWidth
@@ -325,25 +341,25 @@ const TaxCalculator = ({ open, onClose }) => {
               disabled={!canCalculate}
               sx={{
                 borderRadius: borderRadius,
-                py: 1.25,
-                fontWeight: 700,
+                py: 1.5,
+                fontWeight: 600,
                 textTransform: "none",
                 fontSize: "0.875rem",
                 bgcolor: "warning.main",
                 color: "warning.contrastText",
-                boxShadow: `0 4px 14px ${alpha(theme.palette.warning.main, 0.3)}`,
+                boxShadow: "none",
                 "&:hover": {
                   bgcolor: "warning.dark",
-                  boxShadow: `0 6px 20px ${alpha(theme.palette.warning.main, 0.4)}`,
+                  boxShadow: `0 2px 8px ${alpha(theme.palette.warning.main, 0.3)}`,
                 },
                 "&:disabled": {
-                  bgcolor: "action.disabledBackground",
-                  color: "action.disabled",
+                  bgcolor: alpha(theme.palette.warning.main, 0.12),
+                  color: alpha(theme.palette.warning.main, 0.4),
                   boxShadow: "none",
                 },
               }}
             >
-              Hitung PPh
+              PPh
             </Button>
           </Stack>
 
@@ -353,61 +369,54 @@ const TaxCalculator = ({ open, onClose }) => {
               sx={{
                 p: 3,
                 borderRadius: borderRadius,
-                bgcolor:
-                  result.mode === "PPN"
-                    ? alpha(theme.palette.secondary.main, 0.04)
-                    : alpha(theme.palette.warning.main, 0.04),
-                border: `1px solid ${
-                  result.mode === "PPN"
-                    ? alpha(theme.palette.secondary.main, 0.15)
-                    : alpha(theme.palette.warning.main, 0.15)
-                }`,
+                bgcolor: alpha(
+                  result.mode === "PPN" ? theme.palette.secondary.main : theme.palette.warning.main,
+                  0.04
+                ),
+                border: `1px solid ${alpha(
+                  result.mode === "PPN" ? theme.palette.secondary.main : theme.palette.warning.main,
+                  0.1
+                )}`,
                 display: "flex",
                 flexDirection: "column",
-                gap: 2.5,
+                gap: 3,
               }}
             >
               {/* Result Header */}
-              <Stack
-                direction="row"
-                sx={{ justifyContent: "space-between", alignItems: "center" }}
-              >
+              <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center" }}>
                 <Typography
                   variant="caption"
                   sx={{
                     fontWeight: 700,
-                    letterSpacing: "0.05em",
+                    letterSpacing: "0.04em",
                     textTransform: "uppercase",
+                    fontSize: "0.6875rem",
                     color: result.mode === "PPN" ? "secondary.main" : "warning.main",
                   }}
                 >
                   Hasil {result.mode}
                 </Typography>
                 <Chip
-                  label={`Pajak ${result.taxRate}%`}
+                  label={`${result.taxRate}%`}
                   size="small"
                   variant="outlined"
                   sx={{
-                    height: 22,
+                    height: 24,
                     fontWeight: 600,
                     fontSize: "0.6875rem",
                     borderRadius: borderRadius,
                     color: result.mode === "PPN" ? "secondary.main" : "warning.main",
-                    borderColor:
-                      result.mode === "PPN"
-                        ? alpha(theme.palette.secondary.main, 0.3)
-                        : alpha(theme.palette.warning.main, 0.3),
+                    borderColor: alpha(
+                      result.mode === "PPN" ? theme.palette.secondary.main : theme.palette.warning.main,
+                      0.2
+                    ),
                   }}
                 />
               </Stack>
 
               {/* Breakdown */}
               <Stack sx={{ gap: 2 }}>
-                {/* Base Amount */}
-                <Stack
-                  direction="row"
-                  sx={{ justifyContent: "space-between", alignItems: "center" }}
-                >
+                <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center" }}>
                   <Typography variant="body2" color="text.secondary">
                     Harga Dasar
                   </Typography>
@@ -422,45 +431,39 @@ const TaxCalculator = ({ open, onClose }) => {
                   </Typography>
                 </Stack>
 
-                <Divider />
+                <Divider sx={{ opacity: 0.4 }} />
 
-                {/* Tax Amount */}
-                <Stack
-                  direction="row"
-                  sx={{ justifyContent: "space-between", alignItems: "center" }}
-                >
+                <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center" }}>
                   <Typography variant="body2" color="text.secondary">
-                    Pajak ({result.taxRate}%)
+                    Pajak {result.taxRate}%
                   </Typography>
                   <Typography
                     variant="body2"
                     sx={{
-                      fontWeight: 700,
+                      fontWeight: 600,
                       color: result.mode === "PPN" ? "secondary.main" : "warning.main",
                       fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
                     }}
                   >
-                    + {formatToIdr(result.taxAmount)}
+                    {result.mode === "PPN" ? "+ " : "− "}
+                    {formatToIdr(result.taxAmount)}
                   </Typography>
                 </Stack>
 
-                <Divider />
+                <Divider sx={{ opacity: 0.4 }} />
 
-                {/* Total */}
-                <Stack
-                  direction="row"
-                  sx={{ justifyContent: "space-between", alignItems: "center" }}
-                >
-                  <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-                    {result.mode === "PPN" ? "Total + PPN" : "Total - PPh"}
+                <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center" }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600 }}>
+                    Total
                   </Typography>
                   <Typography
-                    variant="h6"
+                    variant="subtitle2"
                     sx={{
                       fontWeight: 700,
                       color: result.mode === "PPN" ? "secondary.main" : "warning.main",
                       fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
                       letterSpacing: "-0.01em",
+                      fontSize: "1.25rem",
                     }}
                   >
                     {formatToIdr(result.totalAfterTax)}

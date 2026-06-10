@@ -289,7 +289,7 @@ const MechanicDashboard = ({ data, isLoading, refetch }) => {
       <Card
         sx={{
           border: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
-          boxShadow: "none",
+
           borderRadius: `${theme.shape.borderRadius}px`,
         }}
       >

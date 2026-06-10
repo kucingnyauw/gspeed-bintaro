@@ -7,7 +7,7 @@
  *
  * @component
  * @param {Object} props - Props komponen
- * @param {Array<{color?: string, disabled?: boolean, hasTransitions?: boolean, icon: React.ElementType, isBulkAction?: boolean, label: string, onClick: Function}>} [props.actions=[]] - Daftar aksi (regular & bulk)
+ * @param {Array<{color?: string, disabled?: boolean, hasTransitions?: boolean, icon: React.ElementType, isBulkAction?: boolean, label: string, onClick: Function}>} [props.actions=[]] - Daftar aksi
  * @param {number} props.count - Jumlah total halaman untuk pagination
  * @param {Array<Object>} [props.data=[]] - Data baris tabel
  * @param {string} [props.emptyStateMessage="Tidak ada data ditemukan."] - Pesan saat data kosong
@@ -16,15 +16,15 @@
  * @param {boolean} [props.hideRowsPerPage=false] - Sembunyikan menu baris per halaman
  * @param {boolean} [props.isLoading=false] - Status loading
  * @param {number} [props.minWidth=900] - Minimal lebar tabel (px)
- * @param {Function} [props.onChange] - Handler perubahan halaman: (event, page) => void
- * @param {Function} [props.onRowClick] - Handler klik baris: (row) => void
- * @param {Function} [props.onRowDoubleClick] - Handler double-click baris: (row) => void
- * @param {Function} [props.onRowsPerPageChange] - Handler perubahan baris per halaman: (limit) => void
- * @param {Function} [props.onSearchChange] - Handler perubahan pencarian: (event) => void
- * @param {Function} [props.onSelectionChange] - Handler perubahan seleksi: (selectedIds: string[]) => void
+ * @param {Function} [props.onChange] - Handler perubahan halaman
+ * @param {Function} [props.onRowClick] - Handler klik baris
+ * @param {Function} [props.onRowDoubleClick] - Handler double-click baris
+ * @param {Function} [props.onRowsPerPageChange] - Handler perubahan baris per halaman
+ * @param {Function} [props.onSearchChange] - Handler perubahan pencarian
+ * @param {Function} [props.onSelectionChange] - Handler perubahan seleksi
  * @param {number} [props.page=1] - Halaman aktif saat ini
- * @param {Function} [props.renderRow] - Render kustom untuk sel baris: (row) => ReactNode[]
- * @param {Function} [props.renderExpandableRow] - Render konten expandable: (row) => ReactNode
+ * @param {Function} [props.renderRow] - Render kustom untuk sel baris
+ * @param {Function} [props.renderExpandableRow] - Render konten expandable
  * @param {number} [props.rowsPerPage=5] - Jumlah baris per halaman
  * @param {number[]} [props.rowsPerPageOptions=[5, 10, 25, 50]] - Opsi baris per halaman
  * @param {number} [props.rowsSkeletonCount=10] - Jumlah skeleton saat loading
@@ -35,7 +35,6 @@
  * @param {{duration?: number, maxStack?: number, position?: "right"|"left"}} [props.snackbarProps] - Konfigurasi snackbar salin
  * @param {string} [props.subtitle] - Subtitle tabel
  * @param {string} [props.title] - Judul tabel
- *
  * @returns {JSX.Element} Komponen tabel
  */
 import {
@@ -90,7 +89,7 @@ import { useDevice } from "@hooks/useDevice.js";
 
 /**
  * Mengekstrak teks dari node React untuk keperluan copy.
- * Menangani string, number, array, dan nested children.
+ *
  * @param {*} node - Node React atau nilai primitif
  * @returns {string} Teks hasil ekstraksi
  */
@@ -103,10 +102,11 @@ const extractCellText = (node) => {
 
 /**
  * Variants untuk animasi stacked snackbar.
+ *
  * @type {Object}
  */
 const stackedSnackbarVariants = {
-  initial: (index) => ({
+  initial: () => ({
     opacity: 0,
     x: 120,
     scale: 0.92,
@@ -124,14 +124,11 @@ const stackedSnackbarVariants = {
       delay: index * 0.05,
     },
   }),
-  exit: (index) => ({
+  exit: () => ({
     opacity: 0,
     x: 120,
     scale: 0.92,
-    transition: {
-      duration: 0.2,
-      ease: "easeIn",
-    },
+    transition: { duration: 0.2, ease: "easeIn" },
   }),
 };
 
@@ -173,10 +170,10 @@ const AppTable = memo(
     const { isMobile } = useDevice();
     const tableContainerRef = useRef(null);
 
-    /** @type {number} Durasi snackbar sebelum hilang (ms) */
+    /** @type {number} Durasi snackbar */
     const snackbarDuration = snackbarProps?.duration || 3000;
 
-    /** @type {number} Maksimal jumlah snackbar yang ditampilkan */
+    /** @type {number} Maksimal snackbar ditampilkan */
     const snackbarMaxStack = snackbarProps?.maxStack || 5;
 
     const [contextMenu, setContextMenu] = useState(null);
@@ -188,7 +185,6 @@ const AppTable = memo(
     const [colToggleAnchor, setColToggleAnchor] = useState(null);
     const [expandedRows, setExpandedRows] = useState(new Set());
     const [focusedIndex, setFocusedIndex] = useState(-1);
-
     const [internalSelectedRows, setInternalSelectedRows] = useState([]);
 
     const selectedRows =
@@ -196,7 +192,8 @@ const AppTable = memo(
     const isControlled = selectedRowsProp !== undefined;
 
     /**
-     * Menghapus snackbar berdasarkan ID dan membersihkan timeout.
+     * Menghapus snackbar berdasarkan ID.
+     *
      * @param {number} id - ID snackbar
      */
     const removeSnackbar = useCallback((id) => {
@@ -209,7 +206,6 @@ const AppTable = memo(
 
     /**
      * Menambahkan snackbar baru ke queue.
-     * Jika melebihi maxStack, snackbar terlama akan dihapus.
      */
     const addSnackbar = useCallback(() => {
       const id = ++snackbarIdCounter;
@@ -238,7 +234,7 @@ const AppTable = memo(
 
     /**
      * Handler perubahan seleksi baris.
-     * Mendukung controlled dan uncontrolled mode.
+     *
      * @param {Array<string|number>} newSelection - Array ID baris terpilih
      */
     const handleSelectionChange = useCallback(
@@ -251,11 +247,15 @@ const AppTable = memo(
       [isControlled, onSelectionChange]
     );
 
-    const hasHeader =
-      title || subtitle || onSearchChange || actions.length > 0;
+    const hasHeader = title || subtitle || onSearchChange || actions.length > 0;
     const hasExpandable = Boolean(renderExpandableRow);
     const hasCheckbox = enableMultiSelect;
 
+    /**
+     * Jumlah kolom yang terlihat.
+     *
+     * @type {number}
+     */
     const visibleColCount = useMemo(() => {
       let count = headers.length - hiddenColumns.size;
       if (hasExpandable) count += 1;
@@ -263,15 +263,30 @@ const AppTable = memo(
       return count;
     }, [headers.length, hiddenColumns.size, hasExpandable, hasCheckbox]);
 
+    /**
+     * ID baris pada halaman saat ini.
+     *
+     * @type {Array<string|number>}
+     */
     const currentPageRowIds = useMemo(() => {
       return data.map((row) => row.id ?? data.indexOf(row));
     }, [data]);
 
+    /**
+     * Apakah semua baris di halaman ini terpilih.
+     *
+     * @type {boolean}
+     */
     const isAllSelected = useMemo(() => {
       if (!hasCheckbox || data.length === 0) return false;
       return currentPageRowIds.every((id) => selectedRows.includes(id));
     }, [hasCheckbox, data, currentPageRowIds, selectedRows]);
 
+    /**
+     * Apakah checkbox dalam state indeterminate.
+     *
+     * @type {boolean}
+     */
     const isIndeterminate = useMemo(() => {
       if (!hasCheckbox || data.length === 0) return false;
       const selectedCount = currentPageRowIds.filter((id) =>
@@ -283,6 +298,9 @@ const AppTable = memo(
     const regularActions = actions.filter((action) => !action.isBulkAction);
     const bulkActions = actions.filter((action) => action.isBulkAction);
 
+    /**
+     * Handler select all checkbox.
+     */
     const handleSelectAll = useCallback(() => {
       if (isAllSelected) {
         handleSelectionChange(
@@ -294,6 +312,12 @@ const AppTable = memo(
       }
     }, [isAllSelected, currentPageRowIds, selectedRows, handleSelectionChange]);
 
+    /**
+     * Handler select satu baris.
+     *
+     * @param {string|number} rowId - ID baris
+     * @param {React.MouseEvent} e - Event klik
+     */
     const handleSelectRow = useCallback(
       (rowId, e) => {
         e.stopPropagation();
@@ -306,6 +330,11 @@ const AppTable = memo(
       [selectedRows, handleSelectionChange]
     );
 
+    /**
+     * Handler klik bulk action.
+     *
+     * @param {Object} action - Object aksi
+     */
     const handleBulkActionClick = useCallback(
       (action) => {
         action.onClick?.(selectedRows);
@@ -313,6 +342,11 @@ const AppTable = memo(
       [selectedRows]
     );
 
+    /**
+     * Handler keyboard navigasi.
+     *
+     * @param {React.KeyboardEvent} e - Event keyboard
+     */
     const handleKeyDown = useCallback(
       (e) => {
         if (!data || data.length === 0) return;
@@ -329,9 +363,7 @@ const AppTable = memo(
           if (hasExpandable) {
             handleToggleExpand(selectedRow.id ?? focusedIndex);
           }
-          if (onRowClick) {
-            onRowClick(selectedRow);
-          }
+          onRowClick?.(selectedRow);
         }
       },
       [data, focusedIndex, hasExpandable, onRowClick]
@@ -343,6 +375,12 @@ const AppTable = memo(
 
     const handleOpenColToggle = (e) => setColToggleAnchor(e.currentTarget);
     const handleCloseColToggle = () => setColToggleAnchor(null);
+
+    /**
+     * Toggle visibilitas kolom.
+     *
+     * @param {number} idx - Index kolom
+     */
     const toggleColumnVisibility = (idx) => {
       setHiddenColumns((prev) => {
         const next = new Set(prev);
@@ -352,6 +390,11 @@ const AppTable = memo(
       });
     };
 
+    /**
+     * Toggle expand baris.
+     *
+     * @param {string|number} rowId - ID baris
+     */
     const handleToggleExpand = (rowId) => {
       setExpandedRows((prev) => {
         const next = new Set(prev);
@@ -361,6 +404,15 @@ const AppTable = memo(
       });
     };
 
+    /**
+     * Handler context menu (klik kanan).
+     *
+     * @param {React.MouseEvent} e - Event klik kanan
+     * @param {*} cellValue - Nilai sel
+     * @param {string|number} rowId - ID baris
+     * @param {number} colIdx - Index kolom
+     * @param {string} rowText - Teks seluruh baris
+     */
     const handleContextMenu = useCallback(
       (e, cellValue, rowId, colIdx, rowText) => {
         e.preventDefault();
@@ -384,6 +436,11 @@ const AppTable = memo(
       setHighlightedCell(null);
     }, []);
 
+    /**
+     * Menyalin teks ke clipboard.
+     *
+     * @param {string} text - Teks yang akan disalin
+     */
     const copyToClipboard = useCallback(
       async (text) => {
         if (!text) return;
@@ -408,6 +465,12 @@ const AppTable = memo(
     const handleCopyCell = () => copyToClipboard(contextMenu?.cellText);
     const handleCopyRow = () => copyToClipboard(contextMenu?.rowText);
 
+    /**
+     * Render header tabel.
+     *
+     * @returns {JSX.Element}
+     */
+  
     const renderedHeaders = (
       <TableRow>
         {hasExpandable && (
@@ -430,21 +493,33 @@ const AppTable = memo(
               backgroundColor: alpha(theme.palette.background.default, 0.6),
             }}
           >
-            <Checkbox
-              checked={isAllSelected}
-              indeterminate={isIndeterminate}
-              onChange={handleSelectAll}
-              size="small"
-              sx={{
-                color: alpha(theme.palette.secondary.main, 0.5),
-                "&.Mui-checked": {
-                  color: theme.palette.secondary.main,
-                },
-                "&.MuiCheckbox-indeterminate": {
-                  color: theme.palette.secondary.main,
-                },
-              }}
-            />
+            {isLoading ? (
+              <Skeleton
+                variant="rounded"
+                width={20}
+                height={20}
+                sx={{
+                  borderRadius: `${theme.shape.borderRadius / 3}px`,
+                  ml: 0.5,
+                }}
+              />
+            ) : (
+              <Checkbox
+                checked={isAllSelected}
+                indeterminate={isIndeterminate}
+                onChange={handleSelectAll}
+                size="small"
+                sx={{
+                  color: alpha(theme.palette.secondary.main, 0.5),
+                  "&.Mui-checked": {
+                    color: theme.palette.secondary.main,
+                  },
+                  "&.MuiCheckbox-indeterminate": {
+                    color: theme.palette.secondary.main,
+                  },
+                }}
+              />
+            )}
           </TableCell>
         )}
         {headers.map((header, idx) => {
@@ -475,7 +550,13 @@ const AppTable = memo(
         })}
       </TableRow>
     );
+    
 
+    /**
+     * Render skeleton rows.
+     *
+     * @returns {JSX.Element[]}
+     */
     const renderedSkeletons = Array.from({ length: rowsSkeletonCount }).map(
       (_, idx) => (
         <TableRow key={`skeleton-${idx}`}>
@@ -488,9 +569,10 @@ const AppTable = memo(
           )}
           {hasCheckbox && (
             <TableCell
+              padding="checkbox"
               sx={{ py: { xs: 1.75, sm: 2 }, px: { xs: 1, sm: 1.5 } }}
             >
-              <Skeleton variant="circular" width={20} height={20} />
+              <Skeleton variant="rounded" width={20} height={20} sx={{ borderRadius: `${theme.shape.borderRadius / 2}px` }} />
             </TableCell>
           )}
           {headers.map((_, i) => {
@@ -526,11 +608,7 @@ const AppTable = memo(
             }}
           >
             <Stack sx={{ gap: 1.5, alignItems: "center" }}>
-              <Typography
-                color="text.secondary"
-                variant="h6"
-                fontWeight={600}
-              >
+              <Typography color="text.secondary" variant="h6" fontWeight={600}>
                 {emptyStateMessage}
               </Typography>
               <Typography color="text.disabled" variant="caption">
@@ -795,21 +873,12 @@ const AppTable = memo(
                 gap: 1,
               }}
             >
-              <Typography
-                variant="body2"
-                color="text.secondary"
-                fontWeight={600}
-              >
+              <Typography variant="body2" color="text.secondary" fontWeight={600}>
                 {selectedRows.length} baris dipilih
               </Typography>
               <Stack direction="row" spacing={1}>
                 {bulkActions.map((action, idx) => {
-                  const {
-                    color = "error",
-                    disabled,
-                    icon: Icon,
-                    label,
-                  } = action;
+                  const { color = "error", disabled, icon: Icon, label } = action;
 
                   return (
                     <Tooltip key={idx} arrow placement="top" title={label}>
@@ -856,11 +925,7 @@ const AppTable = memo(
                   </Typography>
                 )}
                 {subtitle && (
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{ mt: 0.5 }}
-                  >
+                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
                     {subtitle}
                   </Typography>
                 )}
@@ -907,14 +972,8 @@ const AppTable = memo(
                             "color",
                           ]),
                           "&:hover": {
-                            bgcolor: alpha(
-                              theme.palette.secondary.main,
-                              0.06
-                            ),
-                            borderColor: alpha(
-                              theme.palette.secondary.main,
-                              0.4
-                            ),
+                            bgcolor: alpha(theme.palette.secondary.main, 0.06),
+                            borderColor: alpha(theme.palette.secondary.main, 0.4),
                             color: theme.palette.secondary.main,
                           },
                         }}
@@ -960,10 +1019,7 @@ const AppTable = memo(
                                 width: 32,
                                 height: 26,
                                 borderRadius: `${theme.shape.borderRadius}px`,
-                                bgcolor: alpha(
-                                  theme.palette.secondary.main,
-                                  0.08
-                                ),
+                                bgcolor: alpha(theme.palette.secondary.main, 0.08),
                                 color: theme.palette.secondary.main,
                                 mr: 1,
                               }}
@@ -1112,25 +1168,12 @@ const AppTable = memo(
                         bgcolor: theme.palette.background.paper,
                         color: theme.palette.text.secondary,
                         transition: theme.transitions.create(
-                          [
-                            "background-color",
-                            "border-color",
-                            "color",
-                            "box-shadow",
-                          ],
-                          {
-                            duration: theme.transitions.duration.shorter,
-                          }
+                          ["background-color", "border-color", "color", "box-shadow"],
+                          { duration: theme.transitions.duration.shorter }
                         ),
                         "&:hover": {
-                          bgcolor: alpha(
-                            theme.palette.secondary.main,
-                            0.06
-                          ),
-                          borderColor: alpha(
-                            theme.palette.secondary.main,
-                            0.4
-                          ),
+                          bgcolor: alpha(theme.palette.secondary.main, 0.06),
+                          borderColor: alpha(theme.palette.secondary.main, 0.4),
                           color: theme.palette.secondary.main,
                         },
                         "&.Mui-selected": {
@@ -1138,10 +1181,7 @@ const AppTable = memo(
                           color: theme.palette.secondary.contrastText,
                           borderColor: theme.palette.secondary.main,
                           fontWeight: 600,
-                          boxShadow: `0 2px 8px ${alpha(
-                            theme.palette.secondary.main,
-                            0.3
-                          )}`,
+                          boxShadow: `0 2px 8px ${alpha(theme.palette.secondary.main, 0.3)}`,
                           "&:hover": {
                             bgcolor: theme.palette.secondary.dark,
                           },
@@ -1172,14 +1212,8 @@ const AppTable = memo(
               sx: {
                 mt: 1,
                 borderRadius: `${theme.shape.borderRadius}px`,
-                border: `1px solid ${alpha(
-                  theme.palette.secondary.main,
-                  0.15
-                )}`,
-                boxShadow: `0 4px 20px ${alpha(
-                  theme.palette.secondary.main,
-                  0.12
-                )}`,
+                border: `1px solid ${alpha(theme.palette.secondary.main, 0.15)}`,
+                boxShadow: `0 4px 20px ${alpha(theme.palette.secondary.main, 0.12)}`,
                 minWidth: 180,
                 py: 2,
               },
@@ -1233,14 +1267,8 @@ const AppTable = memo(
             paper: {
               sx: {
                 borderRadius: `${theme.shape.borderRadius}px`,
-                border: `1px solid ${alpha(
-                  theme.palette.secondary.main,
-                  0.15
-                )}`,
-                boxShadow: `0 4px 20px ${alpha(
-                  theme.palette.secondary.main,
-                  0.12
-                )}`,
+                border: `1px solid ${alpha(theme.palette.secondary.main, 0.15)}`,
+                boxShadow: `0 4px 20px ${alpha(theme.palette.secondary.main, 0.12)}`,
                 minWidth: 160,
                 py: 0.5,
               },
@@ -1255,10 +1283,7 @@ const AppTable = memo(
                 borderRadius: `${theme.shape.borderRadius}px`,
                 mx: 0.5,
                 "&:hover": {
-                  backgroundColor: alpha(
-                    theme.palette.secondary.main,
-                    0.06
-                  ),
+                  backgroundColor: alpha(theme.palette.secondary.main, 0.06),
                 },
               }}
             >
@@ -1281,10 +1306,7 @@ const AppTable = memo(
                 borderRadius: `${theme.shape.borderRadius}px`,
                 mx: 0.5,
                 "&:hover": {
-                  backgroundColor: alpha(
-                    theme.palette.secondary.main,
-                    0.06
-                  ),
+                  backgroundColor: alpha(theme.palette.secondary.main, 0.06),
                 },
               }}
             >
@@ -1356,10 +1378,7 @@ const AppTable = memo(
                     sx={{
                       minWidth: { xs: 280, sm: 340 },
                       borderRadius: `${theme.shape.borderRadius}px`,
-                      boxShadow: `0 8px 32px ${alpha(
-                        theme.palette.common.black,
-                        0.12
-                      )}`,
+                      boxShadow: `0 8px 32px ${alpha(theme.palette.common.black, 0.12)}`,
                       border: "1px solid",
                       borderColor: alpha(theme.palette.success.main, 0.15),
                       bgcolor: theme.palette.background.paper,

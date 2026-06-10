@@ -1,5 +1,5 @@
 /**
- * Calculator - Dialog kalkulator dengan mode ilmiah, memori, dan tampilan responsif.
+ * Calculator - Dialog kalkulator minimalis dengan mode ilmiah, memori, dan tampilan responsif.
  *
  * Fitur:
  * - Mode ilmiah (fx) dengan fungsi trigonometri, logaritma, faktorial, dll.
@@ -10,6 +10,7 @@
  * - Responsif: tampilan vertikal di mobile, horizontal di desktop
  * - Empty state untuk memori kosong (MR disabled)
  * - Error state (display "Error")
+ * - Desain minimalis dengan spacing lega dan tinggi nyaman
  *
  * @param {Object} props
  * @param {boolean} props.open - Status dialog terbuka/tutup
@@ -17,12 +18,11 @@
  */
 import { Box, Button, IconButton, Stack, Tooltip, Typography, useTheme } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { X } from "lucide-react";
+import { X, Sigma } from "lucide-react";
 import { useCalculator } from "../hooks";
 
 /**
  * Konfigurasi tombol fungsi ilmiah per baris.
- * Setiap objek memiliki label, func identifier, dan tooltip.
  *
  * @type {Array<Array<{label: string, func: string, tooltip: string}>>}
  */
@@ -89,9 +89,6 @@ const operatorButtons = [
 const Calculator = ({ open, onClose }) => {
   const theme = useTheme();
 
-  /**
-   * Hook kalkulator yang menyediakan semua state dan handler.
-   */
   const {
     display,
     expression,
@@ -108,12 +105,11 @@ const Calculator = ({ open, onClose }) => {
     formatDisplay,
   } = useCalculator();
 
-  /** @type {string} Nilai border radius dari theme */
+  /** @type {string} */
   const borderRadius = `${theme.shape.borderRadius}px`;
 
   /**
    * Base style untuk semua tombol.
-   * Termasuk animasi active scale.
    *
    * @type {Object}
    */
@@ -138,17 +134,15 @@ const Calculator = ({ open, onClose }) => {
   const numberBtnSx = {
     ...baseBtnSx,
     flex: 1,
-    py: 1.75,
+    py: 2,
     fontSize: "1.25rem",
     fontWeight: 500,
     color: "text.primary",
-    bgcolor: "background.paper",
-    border: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
-    boxShadow: `0 1px 3px ${alpha(theme.palette.common.black, 0.04)}`,
+    bgcolor: alpha(theme.palette.secondary.main, 0.03),
+    border: `1px solid transparent`,
     "&:hover": {
-      bgcolor: "action.hover",
-      borderColor: alpha(theme.palette.secondary.main, 0.3),
-      boxShadow: `0 2px 6px ${alpha(theme.palette.common.black, 0.06)}`,
+      bgcolor: alpha(theme.palette.secondary.main, 0.08),
+      borderColor: alpha(theme.palette.secondary.main, 0.15),
     },
   };
 
@@ -160,16 +154,15 @@ const Calculator = ({ open, onClose }) => {
   const operatorBtnSx = {
     ...baseBtnSx,
     flex: 1,
-    py: 1.75,
+    py: 2,
     fontSize: "1.35rem",
     fontWeight: 600,
     color: "secondary.main",
     bgcolor: alpha(theme.palette.secondary.main, 0.06),
-    border: `1px solid ${alpha(theme.palette.secondary.main, 0.12)}`,
+    border: `1px solid transparent`,
     "&:hover": {
-      bgcolor: alpha(theme.palette.secondary.main, 0.14),
-      borderColor: alpha(theme.palette.secondary.main, 0.3),
-      boxShadow: `0 2px 8px ${alpha(theme.palette.secondary.main, 0.15)}`,
+      bgcolor: alpha(theme.palette.secondary.main, 0.12),
+      borderColor: alpha(theme.palette.secondary.main, 0.2),
     },
   };
 
@@ -181,40 +174,35 @@ const Calculator = ({ open, onClose }) => {
   const functionBtnSx = {
     ...baseBtnSx,
     flex: 1,
-    py: 1,
+    py: 1.25,
     fontSize: "0.8125rem",
     fontWeight: 600,
     color: "text.secondary",
     bgcolor: "transparent",
     border: `1px solid transparent`,
-    borderRadius: borderRadius,
     "&:hover": {
-      bgcolor: "action.hover",
+      bgcolor: alpha(theme.palette.secondary.main, 0.06),
       color: "secondary.main",
-      borderColor: alpha(theme.palette.secondary.main, 0.2),
+      borderColor: alpha(theme.palette.secondary.main, 0.15),
     },
   };
 
   /**
    * Style untuk tombol memori.
-   * Berubah warna saat memori tidak kosong.
    *
    * @type {Object}
    */
   const memoryBtnSx = {
     ...baseBtnSx,
     flex: 1,
-    py: 0.75,
+    py: 1,
     fontSize: "0.75rem",
     fontWeight: 600,
-    borderRadius: borderRadius,
     color: memory !== 0 ? "secondary.main" : "text.disabled",
-    bgcolor: memory !== 0 ? alpha(theme.palette.secondary.main, 0.04) : "transparent",
-    border: `1px solid ${
-      memory !== 0 ? alpha(theme.palette.secondary.main, 0.15) : "transparent"
-    }`,
+    bgcolor: memory !== 0 ? alpha(theme.palette.secondary.main, 0.06) : "transparent",
+    border: `1px solid ${memory !== 0 ? alpha(theme.palette.secondary.main, 0.12) : "transparent"}`,
     "&:hover": {
-      bgcolor: memory !== 0 ? alpha(theme.palette.secondary.main, 0.1) : "action.hover",
+      bgcolor: memory !== 0 ? alpha(theme.palette.secondary.main, 0.1) : alpha(theme.palette.secondary.main, 0.04),
     },
   };
 
@@ -232,8 +220,8 @@ const Calculator = ({ open, onClose }) => {
         alignItems: "center",
         justifyContent: "center",
         p: 2,
-        bgcolor: alpha(theme.palette.common.black, 0.45),
-        backdropFilter: "blur(8px)",
+        bgcolor: alpha(theme.palette.common.black, 0.35),
+        backdropFilter: "blur(4px)",
       }}
     >
       <Box
@@ -243,44 +231,50 @@ const Calculator = ({ open, onClose }) => {
           maxWidth: 720,
           borderRadius: borderRadius,
           bgcolor: "background.paper",
-          border: `1px solid ${theme.palette.divider}`,
-          boxShadow: `0 24px 64px ${alpha(theme.palette.common.black, 0.2)}`,
+          border: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
+          boxShadow: `0 24px 64px ${alpha(theme.palette.common.black, 0.12)}`,
           overflow: "hidden",
         }}
       >
-        {/* HEADER */}
+        {/* HEADER - Minimalis */}
         <Stack
           direction="row"
           sx={{
             alignItems: "center",
             justifyContent: "space-between",
             px: 3,
-            py: 2,
-            borderBottom: `1px solid ${theme.palette.divider}`,
-            bgcolor: alpha(theme.palette.background.default, 0.6),
+            py: 2.5,
+            borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
           }}
         >
           <Stack direction="row" sx={{ gap: 1.5, alignItems: "center" }}>
             <Box
               sx={{
-                width: 10,
-                height: 10,
-                borderRadius: "50%",
-                bgcolor: "success.main",
-                boxShadow: `0 0 0 3px ${alpha(theme.palette.success.main, 0.2)}`,
+                width: 36,
+                height: 36,
+                borderRadius: borderRadius,
+                bgcolor: alpha(theme.palette.secondary.main, 0.08),
+                color: "secondary.main",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
               }}
-            />
-            <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
-              Kalkulator
-            </Typography>
+            >
+              <Sigma size={18} strokeWidth={1.5} />
+            </Box>
+            <Box>
+              <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: "0.9375rem" }}>
+                Kalkulator
+              </Typography>
+            </Box>
             {memory !== 0 && (
               <Box
                 sx={{
-                  px: 1,
+                  px: 1.25,
                   py: 0.25,
                   borderRadius: borderRadius,
-                  bgcolor: alpha(theme.palette.secondary.main, 0.12),
-                  border: `1px solid ${alpha(theme.palette.secondary.main, 0.2)}`,
+                  bgcolor: alpha(theme.palette.secondary.main, 0.08),
+                  border: `1px solid ${alpha(theme.palette.secondary.main, 0.15)}`,
                 }}
               >
                 <Typography
@@ -289,7 +283,7 @@ const Calculator = ({ open, onClose }) => {
                     color: "secondary.main",
                     fontWeight: 700,
                     fontSize: "0.6875rem",
-                    letterSpacing: "0.05em",
+                    letterSpacing: "0.04em",
                   }}
                 >
                   M
@@ -304,21 +298,15 @@ const Calculator = ({ open, onClose }) => {
                 sx={{
                   ...baseBtnSx,
                   px: 2,
-                  py: 0.5,
+                  py: 0.75,
                   fontSize: "0.8125rem",
                   fontWeight: 700,
                   borderRadius: borderRadius,
                   color: showScientific ? "secondary.main" : "text.secondary",
-                  bgcolor: showScientific
-                    ? alpha(theme.palette.secondary.main, 0.08)
-                    : "transparent",
-                  border: `1px solid ${
-                    showScientific
-                      ? alpha(theme.palette.secondary.main, 0.2)
-                      : "transparent"
-                  }`,
+                  bgcolor: showScientific ? alpha(theme.palette.secondary.main, 0.08) : "transparent",
+                  border: `1px solid ${showScientific ? alpha(theme.palette.secondary.main, 0.15) : "transparent"}`,
                   "&:hover": {
-                    bgcolor: alpha(theme.palette.secondary.main, 0.14),
+                    bgcolor: alpha(theme.palette.secondary.main, 0.12),
                   },
                 }}
               >
@@ -334,8 +322,8 @@ const Calculator = ({ open, onClose }) => {
                   color: "text.secondary",
                   borderRadius: borderRadius,
                   "&:hover": {
-                    color: "error.main",
-                    bgcolor: alpha(theme.palette.error.main, 0.08),
+                    color: "text.primary",
+                    bgcolor: "action.hover",
                   },
                 }}
               >
@@ -354,9 +342,9 @@ const Calculator = ({ open, onClose }) => {
               p: 3,
               display: "flex",
               flexDirection: "column",
-              gap: 2,
-              borderRight: { sm: `1px solid ${theme.palette.divider}` },
-              bgcolor: alpha(theme.palette.background.default, 0.4),
+              gap: 3,
+              borderRight: { sm: `1px solid ${alpha(theme.palette.divider, 0.5)}` },
+              bgcolor: alpha(theme.palette.secondary.main, 0.02),
             }}
           >
             {/* DISPLAY */}
@@ -365,14 +353,13 @@ const Calculator = ({ open, onClose }) => {
                 p: 3,
                 borderRadius: borderRadius,
                 bgcolor: "background.paper",
-                border: `1px solid ${theme.palette.divider}`,
-                boxShadow: `inset 0 2px 6px ${alpha(theme.palette.common.black, 0.04)}`,
+                border: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
                 textAlign: "right",
                 display: "flex",
                 flexDirection: "column",
                 justifyContent: "flex-end",
-                gap: 1.5,
-                minHeight: 130,
+                gap: 2,
+                minHeight: 140,
               }}
             >
               {expression && (
@@ -382,7 +369,7 @@ const Calculator = ({ open, onClose }) => {
                     fontFamily: "'JetBrains Mono', 'Fira Code', monospace",
                     fontSize: "0.875rem",
                     color: "text.secondary",
-                    opacity: 0.65,
+                    opacity: 0.6,
                     lineHeight: 1.4,
                     letterSpacing: "0.02em",
                   }}
@@ -392,7 +379,7 @@ const Calculator = ({ open, onClose }) => {
               )}
               <Typography
                 sx={{
-                  fontWeight: 700,
+                  fontWeight: 600,
                   letterSpacing: "-0.02em",
                   color: display === "Error" ? "error.main" : "text.primary",
                   wordBreak: "break-all",
@@ -427,10 +414,7 @@ const Calculator = ({ open, onClose }) => {
                   <Stack direction="row" key={i} sx={{ gap: 1, mb: 1 }}>
                     {row.map((btn) => (
                       <Tooltip key={btn.func} title={btn.tooltip} arrow>
-                        <Button
-                          onClick={() => handleFunction(btn.func)}
-                          sx={functionBtnSx}
-                        >
+                        <Button onClick={() => handleFunction(btn.func)} sx={functionBtnSx}>
                           {btn.label}
                         </Button>
                       </Tooltip>
@@ -448,7 +432,7 @@ const Calculator = ({ open, onClose }) => {
               p: 3,
               display: "flex",
               flexDirection: "column",
-              gap: 1.5,
+              gap: 2,
             }}
           >
             {/* AC & DEL */}
@@ -459,16 +443,16 @@ const Calculator = ({ open, onClose }) => {
                   sx={{
                     ...baseBtnSx,
                     flex: 1,
-                    py: 1.5,
+                    py: 1.75,
                     fontSize: "0.875rem",
                     fontWeight: 700,
                     borderRadius: borderRadius,
                     color: "error.main",
                     bgcolor: alpha(theme.palette.error.main, 0.06),
-                    border: `1px solid ${alpha(theme.palette.error.main, 0.15)}`,
+                    border: `1px solid transparent`,
                     "&:hover": {
-                      bgcolor: alpha(theme.palette.error.main, 0.14),
-                      borderColor: alpha(theme.palette.error.main, 0.3),
+                      bgcolor: alpha(theme.palette.error.main, 0.12),
+                      borderColor: alpha(theme.palette.error.main, 0.2),
                     },
                   }}
                 >
@@ -481,17 +465,17 @@ const Calculator = ({ open, onClose }) => {
                   sx={{
                     ...baseBtnSx,
                     flex: 1,
-                    py: 1.5,
+                    py: 1.75,
                     fontSize: "0.875rem",
                     fontWeight: 700,
                     borderRadius: borderRadius,
                     color: "text.secondary",
                     bgcolor: alpha(theme.palette.secondary.main, 0.04),
-                    border: `1px solid ${alpha(theme.palette.secondary.main, 0.1)}`,
+                    border: `1px solid transparent`,
                     "&:hover": {
-                      bgcolor: alpha(theme.palette.secondary.main, 0.12),
+                      bgcolor: alpha(theme.palette.secondary.main, 0.1),
                       color: "secondary.main",
-                      borderColor: alpha(theme.palette.secondary.main, 0.25),
+                      borderColor: alpha(theme.palette.secondary.main, 0.2),
                     },
                   }}
                 >
@@ -513,11 +497,7 @@ const Calculator = ({ open, onClose }) => {
                   ].map((row, i) => (
                     <Stack direction="row" key={i} sx={{ gap: 1 }}>
                       {row.map((btn) => (
-                        <Button
-                          key={btn}
-                          onClick={() => handleNumber(btn)}
-                          sx={numberBtnSx}
-                        >
+                        <Button key={btn} onClick={() => handleNumber(btn)} sx={numberBtnSx}>
                           {btn}
                         </Button>
                       ))}
@@ -530,10 +510,7 @@ const Calculator = ({ open, onClose }) => {
               <Stack sx={{ flex: 1 }} spacing={1}>
                 {operatorButtons.map((item) => (
                   <Tooltip key={item.op} title={item.tooltip} arrow>
-                    <Button
-                      onClick={() => handleOperator(item.op)}
-                      sx={operatorBtnSx}
-                    >
+                    <Button onClick={() => handleOperator(item.op)} sx={operatorBtnSx}>
                       {item.label}
                     </Button>
                   </Tooltip>
@@ -543,21 +520,21 @@ const Calculator = ({ open, onClose }) => {
                     onClick={handleEquals}
                     sx={{
                       flex: 1,
-                      py: 1.75,
+                      py: 2,
                       fontSize: "1.75rem",
                       fontWeight: 700,
                       borderRadius: borderRadius,
                       textTransform: "none",
                       color: "secondary.contrastText",
                       bgcolor: "secondary.main",
-                      boxShadow: `0 4px 14px ${alpha(theme.palette.secondary.main, 0.35)}`,
+                      boxShadow: "none",
                       transition: theme.transitions.create(
                         ["background-color", "transform", "box-shadow"],
                         { duration: theme.transitions.duration.shorter }
                       ),
                       "&:hover": {
                         bgcolor: "secondary.dark",
-                        boxShadow: `0 6px 20px ${alpha(theme.palette.secondary.main, 0.45)}`,
+                        boxShadow: `0 2px 8px ${alpha(theme.palette.secondary.main, 0.3)}`,
                       },
                       "&:active": {
                         transform: "scale(0.94)",
