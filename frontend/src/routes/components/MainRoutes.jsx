@@ -154,7 +154,7 @@ const MainRoutes = {
       path: "customers",
       element: (
         <PrivateRoutes>
-          <RoleRoutes allowedRoles={[Role.ADMIN, Role.CASHIER]}>
+          <RoleRoutes allowedRoles={[ Role.CASHIER]}>
             <Customers />
           </RoleRoutes>
         </PrivateRoutes>
@@ -164,7 +164,7 @@ const MainRoutes = {
       path: "vehicles",
       element: (
         <PrivateRoutes>
-          <RoleRoutes allowedRoles={[Role.ADMIN, Role.CASHIER]}>
+          <RoleRoutes allowedRoles={[ Role.CASHIER]}>
             <Vehicles />
           </RoleRoutes>
         </PrivateRoutes>
@@ -184,7 +184,7 @@ const MainRoutes = {
       path: "tasks/mechanic",
       element: (
         <PrivateRoutes>
-          <RoleRoutes allowedRoles={[Role.ADMIN, Role.MECHANIC]}>
+          <RoleRoutes allowedRoles={[ Role.MECHANIC]}>
             <MechanicTasks />
           </RoleRoutes>
         </PrivateRoutes>
@@ -204,7 +204,7 @@ const MainRoutes = {
       path: "tasks/unassigned",
       element: (
         <PrivateRoutes>
-          <RoleRoutes allowedRoles={[Role.ADMIN, Role.CASHIER]}>
+          <RoleRoutes allowedRoles={[Role.CASHIER]}>
             <UnassignedTasks />
           </RoleRoutes>
         </PrivateRoutes>
@@ -214,7 +214,7 @@ const MainRoutes = {
       path: "tasks/mechanics/available",
       element: (
         <PrivateRoutes>
-          <RoleRoutes allowedRoles={[Role.ADMIN, Role.CASHIER]}>
+          <RoleRoutes allowedRoles={[ Role.CASHIER]}>
             <AvailableMechanics />
           </RoleRoutes>
         </PrivateRoutes>

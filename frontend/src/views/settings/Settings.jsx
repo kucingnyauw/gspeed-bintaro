@@ -23,10 +23,10 @@ import { showNotification } from "@store/notifications/notificationsSlice.js";
 
 /**
  * Map label untuk setiap key settings dalam bahasa Indonesia.
+ *
  * @type {Object<string, string>}
  */
 const labelMap = {
-  tax_rate: "Tarif Pajak (%)",
   enable_ppn: "Aktifkan PPN",
   ppn_rate: "Tarif PPN (%)",
   enable_pph: "Aktifkan PPH",
@@ -38,10 +38,10 @@ const labelMap = {
 
 /**
  * Map teks bantuan (helper text) untuk setiap key settings.
+ *
  * @type {Object<string, string>}
  */
 const helperMap = {
-  tax_rate: "Persentase pajak yang diterapkan ke setiap pesanan",
   enable_ppn: "Aktifkan/nonaktifkan Pajak Pertambahan Nilai (PPN)",
   ppn_rate: "Tarif PPN dalam persen (default: 11%)",
   enable_pph: "Aktifkan/nonaktifkan Pajak Penghasilan (PPH)",
@@ -53,14 +53,10 @@ const helperMap = {
 
 /**
  * Aturan validasi untuk setiap field settings.
+ *
  * @type {Object<string, Object>}
  */
 const validationRules = {
-  tax_rate: {
-    required: "Wajib diisi",
-    min: { value: 0, message: "Minimal 0" },
-    max: { value: 100, message: "Maksimal 100" },
-  },
   ppn_rate: {
     required: "Wajib diisi",
     min: { value: 0, message: "Minimal 0" },
@@ -87,25 +83,36 @@ const validationRules = {
 
 /**
  * Daftar field yang menggunakan format mata uang (IDR).
+ *
  * @type {string[]}
  */
 const currencyFields = ["shift_min_starting_cash"];
 
 /**
  * Daftar field yang menggunakan format persentase.
+ *
  * @type {string[]}
  */
-const percentageFields = ["tax_rate", "ppn_rate", "pph_rate"];
+const percentageFields = ["ppn_rate", "pph_rate"];
 
 /**
  * Daftar field dengan tipe data boolean (switch).
+ *
  * @type {string[]}
  */
 const booleanFields = ["enable_ppn", "enable_pph"];
 
 /**
+ * Daftar key settings yang disembunyikan dari UI (tidak ditampilkan).
+ * `tax_rate` dihapus karena redundant dengan `ppn_rate`.
+ *
+ * @type {string[]}
+ */
+const hiddenFields = ["tax_rate"];
+
+/**
  * Komponen skeleton untuk tampilan loading halaman settings.
- * Menampilkan placeholder card dengan skeleton text dan input fields.
+ *
  * @returns {JSX.Element} Tampilan skeleton loading
  */
 const SettingsSkeleton = () => (
@@ -120,7 +127,7 @@ const SettingsSkeleton = () => (
       <Divider />
       <Box sx={{ p: 3 }}>
         <Stack sx={{ gap: 2 }}>
-          {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+          {[1, 2, 3, 4, 5, 6, 7].map((i) => (
             <Skeleton key={i} variant="rounded" height={80} />
           ))}
         </Stack>
@@ -135,16 +142,16 @@ const SettingsSkeleton = () => (
 
 /**
  * Halaman Pengaturan Sistem - Form untuk mengkonfigurasi parameter operasional bengkel.
- * 
+ *
  * Fitur:
- * - Mengelola pengaturan pajak (PPN, PPH, tax rate)
+ * - Mengelola pengaturan pajak (PPN, PPH)
  * - Mengelola pengaturan operasional (tugas mekanik, shift, stok)
  * - Toggle switch untuk enable/disable fitur
  * - Format input otomatis (currency, percentage, number)
  * - Validasi real-time dengan react-hook-form
  * - Auto-save dengan React Query mutation tanpa reload halaman
  * - Notifikasi sukses/gagal melalui Redux notification slice
- * 
+ *
  * @component
  * @returns {JSX.Element} Halaman pengaturan sistem
  */
@@ -157,7 +164,7 @@ const Settings = () => {
 
   /**
    * Query untuk mengambil data settings dari API.
-   * Data di-cache selama STALE_TIME untuk mengurangi request.
+   *
    * @type {import("@tanstack/react-query").UseQueryResult}
    */
   const { data: settings, isLoading } = useQuery({
@@ -168,14 +175,14 @@ const Settings = () => {
 
   /**
    * Form instance dari react-hook-form.
+   *
    * @type {import("react-hook-form").UseFormReturn}
    */
   const { control, handleSubmit, reset, formState: { isDirty } } = useForm();
 
   /**
    * Mutation untuk menyimpan perubahan settings secara bulk.
-   * Setelah sukses, invalidate cache dan tampilkan notifikasi sukses.
-   * Jika gagal, tampilkan notifikasi error.
+   *
    * @type {import("@tanstack/react-query").UseMutationResult}
    */
   const bulkUpdate = useMutation({
@@ -191,7 +198,6 @@ const Settings = () => {
           autoHide: 3000,
         })
       );
-      // Reset form dirty state setelah sukses
       reset({}, { keepValues: true });
     },
     onError: (error) => {
@@ -211,15 +217,22 @@ const Settings = () => {
   const isSubmitting = bulkUpdate.isPending;
 
   /**
+   * Settings yang sudah difilter (tanpa hiddenFields).
+   *
+   * @type {Array<Object>}
+   */
+  const visibleSettings = settings?.filter(
+    (s) => !hiddenFields.includes(s.key)
+  ) || [];
+
+  /**
    * Effect untuk me-reset form saat data settings berubah.
-   * Mengkonversi string boolean ke tipe boolean untuk switch fields.
    */
   useEffect(() => {
     if (settings?.length) {
       /** @type {Object<string, string|boolean>} */
       const defaults = {};
       settings.forEach((s) => {
-        // Konversi string boolean ke actual boolean untuk switch fields
         if (booleanFields.includes(s.key)) {
           defaults[s.key] = s.value === "true";
         } else {
@@ -232,7 +245,7 @@ const Settings = () => {
 
   /**
    * Handler submit form untuk menyimpan semua perubahan settings.
-   * Mengkonversi tipe data ke string sebelum dikirim ke API.
+   *
    * @param {Object} formData - Data form yang akan disimpan
    */
   const onSubmit = (formData) => {
@@ -243,13 +256,12 @@ const Settings = () => {
     if (payload.length > 0) bulkUpdate.mutate(payload);
   };
 
-  // Tampilkan skeleton saat loading
   if (isLoading) return <SettingsSkeleton />;
 
   return (
     <Box component="form" onSubmit={handleSubmit(onSubmit)}>
       <Card sx={{ border: "1px solid", borderColor: "divider", boxShadow: "none", borderRadius: 1 }}>
-        {/* Header - Judul dan deskripsi */}
+        {/* Header */}
         <Box sx={{ p: 3 }}>
           <Typography variant="h5" sx={{ fontWeight: 700, letterSpacing: "-0.02em" }}>
             Pengaturan Sistem
@@ -261,10 +273,10 @@ const Settings = () => {
 
         <Divider />
 
-        {/* Content - Daftar setting items */}
+        {/* Content */}
         <Box sx={{ p: 3 }}>
           <Stack divider={<Divider />}>
-            {settings?.map((setting) => (
+            {visibleSettings.map((setting) => (
               <Stack
                 key={setting.id}
                 direction={{ xs: "column", sm: "row" }}
@@ -275,7 +287,6 @@ const Settings = () => {
                   py: 3,
                 }}
               >
-                {/* Label dan deskripsi setting */}
                 <Box sx={{ flex: 1 }}>
                   <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
                     {labelMap[setting.key] || setting.key}
@@ -285,7 +296,6 @@ const Settings = () => {
                   </Typography>
                 </Box>
 
-                {/* Switch untuk field boolean */}
                 {booleanFields.includes(setting.key) ? (
                   <Controller
                     name={setting.key}
@@ -306,7 +316,6 @@ const Settings = () => {
                     )}
                   />
                 ) : (
-                  /* Input field untuk numeric/currency/percentage */
                   <Controller
                     name={setting.key}
                     control={control}
@@ -326,11 +335,9 @@ const Settings = () => {
                         }
                         onChange={(e) => {
                           if (currencyFields.includes(setting.key)) {
-                            // Hanya izinkan angka untuk currency
                             const raw = e.target.value.replace(/[^0-9]/g, "");
                             field.onChange(raw ? Number(raw) : "");
                           } else if (percentageFields.includes(setting.key)) {
-                            // Izinkan angka dan desimal untuk persentase
                             const raw = e.target.value.replace(/[^0-9.]/g, "");
                             field.onChange(raw);
                           } else {
@@ -358,7 +365,7 @@ const Settings = () => {
 
         <Divider />
 
-        {/* Footer - Tombol simpan */}
+        {/* Footer */}
         <Box sx={{ p: 3, display: "flex", justifyContent: "flex-end" }}>
           <Button
             type="submit"

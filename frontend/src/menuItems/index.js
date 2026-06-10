@@ -92,7 +92,7 @@ const menuItems = {
       id: "customersGroup",
       title: "Pelanggan",
       type: "group",
-      roles: [Role.ADMIN, Role.CASHIER],
+      roles: [Role.CASHIER],
       children: [
         {
           id: "customersList",
@@ -100,7 +100,7 @@ const menuItems = {
           type: "item",
           url: "/customers",
           icon: Users,
-          roles: [Role.ADMIN, Role.CASHIER],
+          roles: [Role.CASHIER],
         },
         {
           id: "customersVehicles",
@@ -108,7 +108,7 @@ const menuItems = {
           type: "item",
           url: "/vehicles",
           icon: Car,
-          roles: [Role.ADMIN, Role.CASHIER],
+          roles: [Role.CASHIER],
         },
       ],
     },
@@ -149,7 +149,7 @@ const menuItems = {
           type: "item",
           url: "/tasks/unassigned",
           icon: UserPlus,
-          roles: [Role.ADMIN, Role.CASHIER],
+          roles: [Role.CASHIER],
         },
         {
           id: "operationsAvailableMechanics",
@@ -157,7 +157,7 @@ const menuItems = {
           type: "item",
           url: "/tasks/mechanics/available",
           icon: UserCheck,
-          roles: [Role.ADMIN, Role.CASHIER],
+          roles: [Role.CASHIER],
         },
       ],
     },
@@ -359,7 +359,9 @@ const menuItems = {
  * @returns {string} Normalized role
  */
 const normalize = (role) =>
-  typeof role === "string" ? role.toLowerCase() : Role[role]?.toLowerCase() || "";
+  typeof role === "string"
+    ? role.toLowerCase()
+    : Role[role]?.toLowerCase() || "";
 
 /**
  * Filter menu items berdasarkan role user

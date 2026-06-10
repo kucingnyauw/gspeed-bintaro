@@ -97,7 +97,9 @@ export const getTopProductsReport = async (params) => {
  * @returns {Promise<Object>} Data performa mekanik
  */
 export const getMechanicPerformanceReport = async (params) => {
-  const { data } = await Client.get("/reports/mechanics/performance", { params });
+  const { data } = await Client.get("/reports/mechanics/performance", {
+    params,
+  });
   return data;
 };
 
@@ -120,7 +122,10 @@ export const getMechanicTaskStats = async (mechanicId) => {
  * @returns {Promise<Object>} Data pendapatan mekanik
  */
 export const getMechanicEarnings = async (mechanicId, params) => {
-  const { data } = await Client.get(`/reports/mechanics/${mechanicId}/earnings`, { params });
+  const { data } = await Client.get(
+    `/reports/mechanics/${mechanicId}/earnings`,
+    { params }
+  );
   return data;
 };
 
@@ -145,7 +150,9 @@ export const getShiftReport = async (shiftId) => {
  * @returns {Promise<Object>} Data pergerakan stok
  */
 export const getStockMovementReport = async (productId, params) => {
-  const { data } = await Client.get(`/reports/stock/${productId}/movements`, { params });
+  const { data } = await Client.get(`/reports/stock/${productId}/movements`, {
+    params,
+  });
   return data;
 };
 
@@ -198,7 +205,10 @@ export const getTopCustomers = async (params) => {
  * @returns {Promise<Object>} Data riwayat transaksi
  */
 export const getCustomerTransactionHistory = async (customerId, params) => {
-  const { data } = await Client.get(`/reports/customers/${customerId}/transactions`, { params });
+  const { data } = await Client.get(
+    `/reports/customers/${customerId}/transactions`,
+    { params }
+  );
   return data;
 };
 
@@ -223,7 +233,9 @@ export const getInactiveCustomers = async (params) => {
  * @returns {Promise<Object>} Data CLV pelanggan
  */
 export const getCustomerLifetimeValue = async (params) => {
-  const { data } = await Client.get("/reports/customers/lifetime-value", { params });
+  const { data } = await Client.get("/reports/customers/lifetime-value", {
+    params,
+  });
   return data;
 };
 
