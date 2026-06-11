@@ -44,6 +44,13 @@ import {
 import { Role } from "@shared/constant/enum.js";
 
 /**
+ * URL API dari environment variable.
+ *
+ * @type {string}
+ */
+const apiUrl = import.meta.env.VITE_API_URL || window.location.origin;
+
+/**
  * Konfigurasi menu items dengan role-based access control.
  *
  * @type {Object}
@@ -392,7 +399,7 @@ const menuItems = {
           id: "docsApi",
           title: "API Reference",
           type: "item",
-          url: "https://gspeed.mintlify.app/",
+          url: `${apiUrl}/docs`,
           icon: Code,
           roles: [Role.ADMIN],
         },
