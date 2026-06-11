@@ -432,7 +432,6 @@ const MainLayoutLoader = ({ isLoading }) => {
 
   if (!isLoading) return null;
 
-  const headerHeight = isMobile ? HEADER.MOBILE_HEIGHT : HEADER.DESKTOP_HEIGHT;
 
   return (
     <Box

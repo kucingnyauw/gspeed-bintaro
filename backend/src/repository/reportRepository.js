@@ -106,6 +106,108 @@ class ReportRepository {
   }
 
   /**
+   * Mendapatkan target revenue harian dari settings
+   * @returns {Promise<number>} Target revenue harian (default 0)
+   * @private
+   */
+  async #getDailyRevenueTarget() {
+    const setting = await prisma.setting.findUnique({
+      where: { key: "daily_revenue_target" },
+      select: { value: true },
+    });
+    return setting ? parseInt(setting.value, 10) : 0;
+  }
+
+  /**
+   * Mendapatkan target revenue tahunan dari settings
+   * @returns {Promise<number>} Target revenue tahunan (default 0)
+   * @private
+   */
+  async #getYearlyRevenueTarget() {
+    const setting = await prisma.setting.findUnique({
+      where: { key: "yearly_revenue_target" },
+      select: { value: true },
+    });
+    return setting ? parseInt(setting.value, 10) : 0;
+  }
+
+  /**
+   * Mendapatkan target profit bulanan dari settings
+   * @returns {Promise<number>} Target profit bulanan (default 0)
+   * @private
+   */
+  async #getMonthlyProfitTarget() {
+    const setting = await prisma.setting.findUnique({
+      where: { key: "monthly_profit_target" },
+      select: { value: true },
+    });
+    return setting ? parseInt(setting.value, 10) : 0;
+  }
+
+  /**
+   * Mendapatkan target order bulanan dari settings
+   * @returns {Promise<number>} Target order bulanan (default 0)
+   * @private
+   */
+  async #getMonthlyOrderTarget() {
+    const setting = await prisma.setting.findUnique({
+      where: { key: "monthly_order_target" },
+      select: { value: true },
+    });
+    return setting ? parseInt(setting.value, 10) : 0;
+  }
+
+  /**
+   * Mendapatkan target order harian dari settings
+   * @returns {Promise<number>} Target order harian (default 0)
+   * @private
+   */
+  async #getDailyOrderTarget() {
+    const setting = await prisma.setting.findUnique({
+      where: { key: "daily_order_target" },
+      select: { value: true },
+    });
+    return setting ? parseInt(setting.value, 10) : 0;
+  }
+
+  /**
+   * Mendapatkan semua target bisnis dari settings
+   * @returns {Promise<Object>}
+   */
+  async getBusinessTargets() {
+    const [
+      monthlyRevenue,
+      dailyRevenue,
+      yearlyRevenue,
+      monthlyProfit,
+      monthlyOrder,
+      dailyOrder,
+    ] = await Promise.all([
+      this.#getMonthlyRevenueTarget(),
+      this.#getDailyRevenueTarget(),
+      this.#getYearlyRevenueTarget(),
+      this.#getMonthlyProfitTarget(),
+      this.#getMonthlyOrderTarget(),
+      this.#getDailyOrderTarget(),
+    ]);
+
+    return {
+      daily: {
+        revenue: dailyRevenue,
+        orders: dailyOrder,
+      },
+      monthly: {
+        revenue: monthlyRevenue,
+        orders: monthlyOrder,
+        profit: monthlyProfit,
+      },
+      yearly: {
+        revenue: yearlyRevenue,
+      },
+    };
+  }
+
+  /**
    * Mendapatkan data penjualan agregat dalam rentang waktu tertentu
    * @param {Date} startDate - Tanggal mulai
    * @param {Date} endDate - Tanggal akhir

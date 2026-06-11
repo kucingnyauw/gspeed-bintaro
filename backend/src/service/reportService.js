@@ -374,105 +374,164 @@ class ReportService {
   }
 
   /**
-   * Dashboard untuk Admin (termasuk PPN & PPh UMKM)
-   * @returns {Promise<Object>}
-   * @private
-   */
-  async #getAdminDashboard() {
-    const today = new Date();
-    const startOfDay = new Date(today);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(today);
-    endOfDay.setHours(23, 59, 59, 999);
-    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
-    startOfMonth.setHours(0, 0, 0, 0);
+ * Dashboard untuk Admin (termasuk PPN, PPh UMKM, dan target bisnis)
+ * @returns {Promise<Object>}
+ * @private
+ */
+async #getAdminDashboard() {
+  const today = new Date();
+  const startOfDay = new Date(today);
+  startOfDay.setHours(0, 0, 0, 0);
+  const endOfDay = new Date(today);
+  endOfDay.setHours(23, 59, 59, 999);
+  const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  startOfMonth.setHours(0, 0, 0, 0);
+  const startOfYear = new Date(today.getFullYear() - 1, today.getMonth(), 1);
+  startOfYear.setHours(0, 0, 0, 0);
 
-    const lowThresholdSetting = await prisma.setting.findUnique({
-      where: { key: "stock_low_threshold" },
-      select: { value: true },
-    });
-    const lowThreshold = parseInt(lowThresholdSetting?.value || "5", 10);
+  const lowThresholdSetting = await prisma.setting.findUnique({
+    where: { key: "stock_low_threshold" },
+    select: { value: true },
+  });
+  const lowThreshold = parseInt(lowThresholdSetting?.value || "5", 10);
 
-    const [
-      todaySales,
-      monthSales,
-      activeShift,
-      pendingCount,
-      productSummary,
-      lowStockResult,
-      customerSummary,
-    ] = await Promise.all([
-      this.reportRepo.getSalesData(startOfDay, endOfDay),
-      this.reportRepo.getSalesData(startOfMonth, endOfDay),
-      this.reportRepo.getActiveShift(),
-      this.reportRepo.countOrdersByStatus(["DRAFT", "QUEUED", "IN_PROGRESS"]),
-      this.reportRepo.getProductSummary(),
-      this.reportRepo.getLowStockProducts({
-        threshold: lowThreshold,
-        page: 1,
-        limit: 10,
-      }),
-      this.reportRepo.getCustomerSummary(startOfMonth, endOfDay),
-    ]);
+  const [
+    todaySales,
+    monthSales,
+    yearlySales,
+    activeShift,
+    pendingCount,
+    productSummary,
+    lowStockResult,
+    customerSummary,
+    businessTargets,
+  ] = await Promise.all([
+    this.reportRepo.getSalesData(startOfDay, endOfDay),
+    this.reportRepo.getSalesData(startOfMonth, endOfDay),
+    this.reportRepo.getSalesData(startOfYear, endOfDay),
+    this.reportRepo.getActiveShift(),
+    this.reportRepo.countOrdersByStatus(["DRAFT", "QUEUED", "IN_PROGRESS"]),
+    this.reportRepo.getProductSummary(),
+    this.reportRepo.getLowStockProducts({ threshold: lowThreshold, page: 1, limit: 10 }),
+    this.reportRepo.getCustomerSummary(startOfMonth, endOfDay),
+    this.reportRepo.getBusinessTargets(),
+  ]);
 
-    const lowStockWithImages = await Promise.all(
-      lowStockResult.data.map(async (p) => ({
-        id: p.id,
-        sku: p.sku,
-        name: p.name,
-        stock: p.stock,
-        stockStatus: p.stockStatus,
-        image: await this.#getSignedUrl(p.image),
-      }))
-    );
+  const lowStockWithImages = await Promise.all(
+    lowStockResult.data.map(async (p) => ({
+      id: p.id,
+      sku: p.sku,
+      name: p.name,
+      stock: p.stock,
+      stockStatus: p.stockStatus,
+      image: await this.#getSignedUrl(p.image),
+    }))
+  );
 
-    return {
-      today: {
-        date: startOfDay,
-        orders: todaySales.totalOrders,
-        revenue: todaySales.totalSales,
-        ppn: todaySales.totalTax,
-        pph: todaySales.totalPPH,
-        pphRate: todaySales.pphRate,
-        averageOrderValue: todaySales.averageOrderValue,
+  return {
+    today: {
+      date: startOfDay,
+      orders: todaySales.totalOrders,
+      revenue: todaySales.totalSales,
+      ppn: todaySales.totalTax,
+      pph: todaySales.totalPPH,
+      pphRate: todaySales.pphRate,
+      averageOrderValue: todaySales.averageOrderValue,
+    },
+    thisMonth: {
+      orders: monthSales.totalOrders,
+      revenue: monthSales.totalSales,
+      ppn: monthSales.totalTax,
+      pph: monthSales.totalPPH,
+      pphRate: monthSales.pphRate,
+      newCustomers: customerSummary.newCustomers,
+      activeCustomers: customerSummary.activeCustomers,
+    },
+    thisYear: {
+      orders: yearlySales.totalOrders,
+      revenue: yearlySales.totalSales,
+      ppn: yearlySales.totalTax,
+      pph: yearlySales.totalPPH,
+      pphRate: yearlySales.pphRate,
+      averageOrderValue: yearlySales.averageOrderValue,
+    },
+    pending: {
+      orders: pendingCount,
+    },
+    activeShift: activeShift
+      ? {
+          id: activeShift.id,
+          cashier: activeShift.cashier?.fullName || null,
+          openedAt: activeShift.openedAt,
+          startingCash: activeShift.startingCash,
+          currentCashSales: activeShift.cashSales,
+          orderCount: activeShift._count?.orders || 0,
+        }
+      : null,
+    inventory: {
+      totalProducts: productSummary.totalProducts,
+      activeProducts: productSummary.activeProducts,
+      lowStockCount: productSummary.lowStockCount,
+      outOfStockCount: productSummary.outOfStockCount,
+      totalStockValue: productSummary.totalStockValue,
+      lowStockThreshold: lowThreshold,
+      lowStockProducts: lowStockWithImages,
+    },
+    customers: {
+      totalCustomers: customerSummary.totalCustomers,
+      newThisMonth: customerSummary.newCustomers,
+      activeThisMonth: customerSummary.activeCustomers,
+      totalVehicles: customerSummary.totalVehicles,
+    },
+    targets: {
+      daily: {
+        revenue: {
+          target: businessTargets.daily.revenue,
+          actual: todaySales.totalSales,
+          percentage: businessTargets.daily.revenue > 0
+            ? Math.round((todaySales.totalSales / businessTargets.daily.revenue) * 100)
+            : 0,
+        },
+        orders: {
+          target: businessTargets.daily.orders,
+          actual: todaySales.totalOrders,
+          percentage: businessTargets.daily.orders > 0
+            ? Math.round((todaySales.totalOrders / businessTargets.daily.orders) * 100)
+            : 0,
+        },
       },
-      thisMonth: {
-        orders: monthSales.totalOrders,
-        revenue: monthSales.totalSales,
-        ppn: monthSales.totalTax,
-        pph: monthSales.totalPPH,
-        pphRate: monthSales.pphRate,
-        newCustomers: customerSummary.newCustomers,
-        activeCustomers: customerSummary.activeCustomers,
+      monthly: {
+        revenue: {
+          target: businessTargets.monthly.revenue,
+          actual: monthSales.totalSales,
+          percentage: businessTargets.monthly.revenue > 0
+            ? Math.round((monthSales.totalSales / businessTargets.monthly.revenue) * 100)
+            : 0,
+        },
+        orders: {
+          target: businessTargets.monthly.orders,
+          actual: monthSales.totalOrders,
+          percentage: businessTargets.monthly.orders > 0
+            ? Math.round((monthSales.totalOrders / businessTargets.monthly.orders) * 100)
+            : 0,
+        },
+        profit: {
+          target: businessTargets.monthly.profit,
+        },
       },
-      pending: { orders: pendingCount },
-      activeShift: activeShift
-        ? {
-            id: activeShift.id,
-            cashier: activeShift.cashier?.fullName || null,
-            openedAt: activeShift.openedAt,
-            startingCash: activeShift.startingCash,
-            currentCashSales: activeShift.cashSales,
-            orderCount: activeShift._count?.orders || 0,
-          }
-        : null,
-      inventory: {
-        totalProducts: productSummary.totalProducts,
-        activeProducts: productSummary.activeProducts,
-        lowStockCount: productSummary.lowStockCount,
-        outOfStockCount: productSummary.outOfStockCount,
-        totalStockValue: productSummary.totalStockValue,
-        lowStockThreshold: lowThreshold,
-        lowStockProducts: lowStockWithImages,
+      yearly: {
+        revenue: {
+          target: businessTargets.yearly.revenue,
+          actual: yearlySales.totalSales,
+          percentage: businessTargets.yearly.revenue > 0
+            ? Math.round((yearlySales.totalSales / businessTargets.yearly.revenue) * 100)
+            : 0,
+        },
       },
-      customers: {
-        totalCustomers: customerSummary.totalCustomers,
-        newThisMonth: customerSummary.newCustomers,
-        activeThisMonth: customerSummary.activeCustomers,
-        totalVehicles: customerSummary.totalVehicles,
-      },
-    };
-  }
+    },
+  };
+}
+
 
   /**
    * Dashboard untuk Kasir

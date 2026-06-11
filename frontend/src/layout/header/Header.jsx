@@ -338,8 +338,8 @@ const Header = () => {
             minHeight: `${
               isSmallDevice ? HEADER.MOBILE_HEIGHT : HEADER.DESKTOP_HEIGHT
             }px !important`,
-            pl: { xs: 4, sm: 2, md: 0 },
-            pr: { xs: 4, sm: 2, md: 2 },
+            pl: { xs: 3, sm: 2, md: 0 },
+            pr: { xs: 3, sm: 2, md: 2 },
             display: isSmallDevice && showMobileSearch ? "none" : "flex",
             gap: { xs: 1, sm: 2 },
           }}

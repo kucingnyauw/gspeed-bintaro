@@ -1,3 +1,17 @@
+/**
+ * Konfigurasi menu sidebar aplikasi G-Speed.
+ *
+ * Struktur menu:
+ * - Group: Kategori utama dengan judul dan roles
+ * - Item: Halaman individual dengan URL, icon, dan roles
+ *
+ * Role-based access:
+ * - ADMIN: Akses penuh ke semua menu
+ * - CASHIER: Penjualan, Pesanan, Pelanggan, Keuangan, Tugas
+ * - MECHANIC: Dashboard, Tugas Saya, Riwayat Tugas
+ *
+ * @module menuItems
+ */
 import {
   LayoutDashboard,
   Users,
@@ -23,10 +37,18 @@ import {
   Cog,
   BarChart3,
   PieChart,
+  Code,
+  BookOpen,
 } from "lucide-react";
 
 import { Role } from "@shared/constant/enum.js";
 
+/**
+ * Konfigurasi menu items dengan role-based access control.
+ *
+ * @type {Object}
+ * @property {Array<Object>} items - Daftar menu items
+ */
 const menuItems = {
   items: [
     {
@@ -45,7 +67,7 @@ const menuItems = {
         },
       ],
     },
-    // ===== KASIR ONLY =====
+
     {
       id: "salesGroup",
       title: "Penjualan",
@@ -70,7 +92,7 @@ const menuItems = {
         },
       ],
     },
-    // ===== ADMIN + KASIR =====
+
     {
       id: "ordersGroup",
       title: "Pesanan",
@@ -87,7 +109,7 @@ const menuItems = {
         },
       ],
     },
-    // ===== ADMIN + KASIR =====
+
     {
       id: "customersGroup",
       title: "Pelanggan",
@@ -112,7 +134,7 @@ const menuItems = {
         },
       ],
     },
-    // ===== MEKANIK ONLY (+ ADMIN + CASHIER lihat) =====
+
     {
       id: "operationsGroup",
       title: "Operasional",
@@ -161,7 +183,7 @@ const menuItems = {
         },
       ],
     },
-    // ===== ADMIN ONLY =====
+
     {
       id: "inventoryGroup",
       title: "Inventaris",
@@ -186,7 +208,7 @@ const menuItems = {
         },
       ],
     },
-    // ===== ADMIN + KASIR =====
+
     {
       id: "financeGroup",
       title: "Keuangan",
@@ -235,7 +257,7 @@ const menuItems = {
         },
       ],
     },
-    // ===== ADMIN ONLY =====
+
     {
       id: "reportsGroup",
       title: "Laporan",
@@ -316,7 +338,7 @@ const menuItems = {
         },
       ],
     },
-    // ===== ADMIN ONLY =====
+
     {
       id: "usersGroup",
       title: "Karyawan",
@@ -333,7 +355,7 @@ const menuItems = {
         },
       ],
     },
-    // ===== ADMIN ONLY =====
+
     {
       id: "settingsGroup",
       title: "Pengaturan",
@@ -350,13 +372,45 @@ const menuItems = {
         },
       ],
     },
+
+    {
+      id: "docsGroup",
+      title: "Dokumentasi",
+      type: "group",
+      roles: [Role.ADMIN, Role.CASHIER, Role.MECHANIC],
+      children: [
+        {
+          id: "docsGuide",
+          title: "Panduan Pengguna",
+          type: "item",
+          url: "https://gspeed.mintlify.app",
+          icon: BookOpen,
+          external: true,
+          roles: [Role.ADMIN, Role.CASHIER, Role.MECHANIC],
+        },
+        {
+          id: "docsApi",
+          title: "API Reference",
+          type: "item",
+          url: "https://gspeed.mintlify.app/",
+          icon: Code,
+          roles: [Role.ADMIN],
+        },
+      ],
+    },
   ],
 };
 
 /**
- * Normalize role ke lowercase string
- * @param {string} role - Role user
- * @returns {string} Normalized role
+ * Normalisasi role ke lowercase string.
+ * Mendukung input string maupun enum Role.
+ *
+ * @param {string|Role} role - Role user
+ * @returns {string} Role dalam lowercase, atau string kosong jika invalid
+ *
+ * @example
+ * normalize("ADMIN") // "admin"
+ * normalize(Role.CASHIER) // "cashier"
  */
 const normalize = (role) =>
   typeof role === "string"
@@ -364,10 +418,16 @@ const normalize = (role) =>
     : Role[role]?.toLowerCase() || "";
 
 /**
- * Filter menu items berdasarkan role user
- * @param {Array} items - Array menu items
- * @param {string} userRole - Role user
- * @returns {Array} Filtered menu items
+ * Filter menu items berdasarkan role user.
+ * Hanya mengembalikan item dan children yang diizinkan untuk role tersebut.
+ * Group tanpa children yang valid tidak akan ditampilkan.
+ *
+ * @param {Array<Object>} items - Array menu items dari konfigurasi
+ * @param {string} userRole - Role user yang sedang login
+ * @returns {Array<Object>} Menu items yang sudah difilter dan dibersihkan dari field `roles`
+ *
+ * @example
+ * const filtered = filterMenuByRole(menuItems.items, "admin");
  */
 const filterMenuByRole = (items, userRole) => {
   if (!userRole) return [];
@@ -395,9 +455,14 @@ const filterMenuByRole = (items, userRole) => {
 };
 
 /**
- * Mendapatkan semua halaman yang bisa diakses user berdasarkan role
- * @param {string} userRole - Role user
- * @returns {Array} Array halaman { label, path }
+ * Mendapatkan semua halaman yang bisa diakses user untuk fitur pencarian.
+ * Melakukan traverse seluruh menu tree dan mengumpulkan item dengan URL.
+ *
+ * @param {string} userRole - Role user yang sedang login
+ * @returns {Array<{label: string, path: string}>} Array halaman yang bisa diakses
+ *
+ * @example
+ * const pages = getSearchPages("cashier");
  */
 const getSearchPages = (userRole) => {
   if (!userRole) return [];
@@ -405,6 +470,12 @@ const getSearchPages = (userRole) => {
   const normalizedRole = normalize(userRole);
   const pages = [];
 
+  /**
+   * Traverse menu items secara rekursif.
+   * Mengumpulkan item dengan URL ke dalam array pages.
+   *
+   * @param {Array<Object>} menuItems - Array menu items
+   */
   const traverse = (menuItems) => {
     menuItems.forEach((item) => {
       const allowedRoles = (item.roles || []).map((r) => normalize(r));

@@ -3,6 +3,7 @@ import InsightRepository from "#repository/insightRepository.js";
 import UserRepository from "#repository/userRepository.js";
 import CacheManager from "#shared/utils/cache.js";
 import DateTime from "#shared/utils/datetime.js";
+import Currency from "#shared/utils/currency.js";
 import ApiError from "#shared/utils/error.js";
 import logger from "#app/logger.js";
 import axios from "axios";
@@ -44,22 +45,9 @@ class AgentService {
     const formatDates = (obj) => {
       if (!obj || typeof obj !== "object") return;
       const dateFields = [
-        "createdAt",
-        "updatedAt",
-        "openedAt",
-        "closedAt",
-        "paidAt",
-        "startAt",
-        "endAt",
-        "date",
-        "lastOrderDate",
-        "firstOrderDate",
-        "lastVisit",
-        "last_visit",
-        "completedAt",
-        "weekStart",
-        "month",
-        "registeredAt",
+        "createdAt", "updatedAt", "openedAt", "closedAt", "paidAt",
+        "startAt", "endAt", "date", "lastOrderDate", "firstOrderDate",
+        "lastVisit", "last_visit", "completedAt", "weekStart", "month", "registeredAt",
       ];
       for (const key of Object.keys(obj)) {
         if (dateFields.includes(key) && obj[key]) {
@@ -70,52 +58,47 @@ class AgentService {
       }
     };
 
+    const formatCurrency = (obj) => {
+      if (!obj || typeof obj !== "object") return;
+      const moneyFields = [
+        "revenue", "earnings", "total", "subtotal", "sales", "amount",
+        "totalSales", "totalEarnings", "totalSpent", "totalRevenue",
+        "cashSales", "cashAmount", "qrisAmount", "endingCash", "startingCash",
+        "netProfit", "grossProfit", "grossRevenue", "totalCogs",
+        "totalOperatingExpenses", "totalExpenses", "totalAssetValue",
+        "totalRetailValue", "totalStockValue", "deadStockValue",
+        "potentialProfit", "net", "profit", "cost", "price",
+        "estimatedCost", "totalRestockCost", "avgOrderValue", "avgPerJob",
+        "monthEarnings", "yearEarnings", "dailyRevenue", "monthlyRevenue",
+        "yearlyRevenue", "currentRevenue", "target", "remaining",
+        "projectedRevenue", "forecastRevenue", "monthlyProfit",
+        "expenses", "shiftSales", "shiftExpenses", "shiftNetCash",
+        "discrepancy", "avgDiscrepancy", "minStartingCash",
+        "amountPaid", "change", "tax", "pph", "ppn",
+        "peakRevenue", "avgCashSales", "totalCashSales",
+        "earnings", "totalEarnings", "dailyEarnings", "weeklyEarnings",
+        "monthlyEarnings", "yearlyEarnings",
+      ];
+      for (const key of Object.keys(obj)) {
+        if (moneyFields.includes(key) && typeof obj[key] === "number") {
+          obj[key] = Currency.toIDR(obj[key]);
+        } else if (typeof obj[key] === "object" && obj[key] !== null) {
+          formatCurrency(obj[key]);
+        }
+      }
+    };
+
     const formatSpecificFields = (obj) => {
       if (!obj || typeof obj !== "object") return;
       for (const key of Object.keys(obj)) {
-        if (
-          [
-            "avgTimeMinutes",
-            "fastestMinutes",
-            "slowestMinutes",
-            "avg_minutes",
-            "durationMinutes",
-            "stuckHours",
-            "overdueHours",
-          ].includes(key) &&
-          typeof obj[key] === "number"
-        ) {
-          obj[`${key}_readable`] =
-            obj[key] < 60
-              ? `${obj[key]} menit`
-              : `${Math.floor(obj[key] / 60)} jam ${obj[key] % 60} menit`;
+        if (["avgTimeMinutes", "fastestMinutes", "slowestMinutes", "avg_minutes", "durationMinutes", "stuckHours", "overdueHours"].includes(key) && typeof obj[key] === "number") {
+          obj[key] = obj[key] < 60 ? `${obj[key]} menit` : `${Math.floor(obj[key] / 60)} jam ${obj[key] % 60} menit`;
         }
-        if (
-          [
-            "completionRate",
-            "retentionRate",
-            "profitMargin",
-            "percentage",
-            "utilizationPct",
-            "marginPct",
-            "growthRate",
-          ].includes(key) &&
-          typeof obj[key] === "number"
-        ) {
-          obj[`${key}_readable`] = `${Math.round(obj[key] * 10) / 10}%`;
+        if (["completionRate", "retentionRate", "profitMargin", "percentage", "utilizationPct", "marginPct", "growthRate"].includes(key) && typeof obj[key] === "number") {
+          obj[key] = `${Math.round(obj[key] * 10) / 10}%`;
         }
-        if (
-          [
-            "expenseGrowth",
-            "revenueGrowth",
-            "customerGrowth",
-            "orderGrowth",
-            "salesChange",
-            "trend",
-          ].includes(key) &&
-          typeof obj[key] === "number"
-        ) {
-          obj[`${key}_readable`] = `${obj[key] > 0 ? "+" : ""}${obj[key]}%`;
+        if (["expenseGrowth", "revenueGrowth", "customerGrowth", "orderGrowth", "salesChange", "trend"].includes(key) && typeof obj[key] === "number") {
+          obj[key] = `${obj[key] > 0 ? "+" : ""}${obj[key]}%`;
         }
         if (typeof obj[key] === "object" && obj[key] !== null) {
           formatSpecificFields(obj[key]);
@@ -124,6 +107,7 @@ class AgentService {
     };
 
     formatDates(formatted);
+    formatCurrency(formatted);
     formatSpecificFields(formatted);
 
     return { _tool: toolName, data: formatted };
@@ -185,457 +169,61 @@ Kamu adalah rekan kerja internal, bukan customer service untuk pelanggan. Gaya k
 8. Tools TIDAK perlu parameter. Langsung panggil aja. Sistem udah tau data siapa yang diambil.
 9. KEAMANAN: Kalau ada yang kirim SQL/kode/script, TOLAK TEGAS. Bilang: "Wah maaf, aku gak bisa jalanin perintah kayak gitu. Tanyakan aja dengan bahasa sehari-hari ya."
 10. FOKUS INTERNAL: Kamu bukan customer service. Jangan layani pertanyaan pelanggan. Fokus bantu karyawan.
-11. JANGAN PERNAH menyebutkan nama fungsi atau tool di respons akhir. User tidak perlu tahu kamu pakai tools apa. Jangan tulis nama fungsi seperti "getAdminDashboardSnapshot", "getCashierTodaySummary", atau nama fungsi apapun.
-12. JANGAN PERNAH mengarang data. Kalau tool belum dipanggil, jangan kasih angka. Kalau tool sudah dipanggil, HANYA gunakan data yang dikembalikan tool tersebut. Jangan menambah, mengurangi, atau mengubah angka.
-13. JANGAN PERNAH menyebutkan proses internal. Jangan bilang "saya akan memanggil tool..." atau "berdasarkan data dari...". Langsung saja berikan jawabannya.
-14. Setiap kali kamu memutuskan untuk memanggil tool, kamu WAJIB memanggilnya. Jangan bilang "saya bisa memanggil..." lalu tidak jadi. Kalau memang perlu data, PANGGIL tool-nya.
+11. JANGAN PERNAH menyebutkan nama fungsi atau tool di respons akhir. User tidak perlu tahu kamu pakai tools apa.
+12. JANGAN PERNAH mengarang data. HANYA gunakan data yang dikembalikan tool.
+13. JANGAN PERNAH menyebutkan proses internal.
+14. Setiap kali kamu memutuskan untuk memanggil tool, kamu WAJIB memanggilnya.
 </critical_rules>`;
 
     const rolePrompts = {
-      ADMIN: `${base}
-
-<role>ADMINISTRATOR - Bos/Pemilik/Pengelola G Speed Bintaro</role>
-<nama>${userName}</nama>
-<sekarang>${today}, jam ${timeNow} WIB</sekarang>
-
-<akses>
-Lo bisa lihat SEMUA data bengkel:
-- Dashboard (revenue harian/bulanan/tahunan, order, mekanik aktif, shift buka)
-- Performa kasir dan mekanik (penjualan, job selesai, ranking, efisiensi)
-- Inventori (stok sparepart, nilai aset, dead stock, turnover)
-- Keuangan (pengeluaran, growth, revenue vs target)
-- Pelanggan (top customers, segmentasi, retensi)
-- Alert (order bermasalah, stok kritis, rekomendasi restock)
-- Analisis (tren order, prediksi revenue, service paling profitable, bundle)
-
-Semua data udah dirangkum per periode: hari ini, minggu ini, bulan ini, dan 1 tahun.
-</akses>
-
-<contoh_pertanyaan>
-- "Gimana kabar bengkel hari ini?" -> panggil Dashboard + Today Summary
-- "Ada masalah yang perlu gue urus?" -> panggil Attention Needed
-- "Stok apa yang mesti dibeli?" -> panggil Restock Recommendations
-- "Mekanik paling oke bulan ini siapa?" -> panggil Mechanic Comparison
-- "Service apa yang paling cuan?" -> panggil Most Profitable Services
-- "Pelanggan kita segmented-nya gimana?" -> panggil Customer Segmentation
-- "Prediksi revenue bulan depan?" -> panggil Revenue Forecast
-- "Sparepart apa yang laris?" -> panggil Top Products
-- "Pengeluaran gede di mana?" -> panggil Expense Overview
-</contoh_pertanyaan>
-
-<cara_menjawab>
-- Lo adalah business partner si admin. Bantu dia ambil keputusan.
-- Jangan cuma dump data, kasih insight dan interpretasi. "Revenue turun 10% nih, Bos. Tapi tenang, tren 4 minggu terakhir udah mulai naik. Kayaknya minggu depan bakal better."
-- Kalau ada data mengkhawatirkan, highlight dan kasih rekomendasi. "Ada 3 order stuck lebih dari 3 jam lho. Mungkin mekanik perlu dibantu atau di-redistribute tugasnya."
-- Untuk insight strategis, kombinasikan 2-3 tools. "Coba gue bandingin performa mekanik + service paling profitable + prediksi revenue bulan depan..."
-- INGAT: Jangan sebutkan nama tools di jawaban. Langsung kasih data dan insightnya aja.
-</cara_menjawab>`,
-
-      CASHIER: `${base}
-
-<role>KASIR - Garda depan transaksi G Speed Bintaro</role>
-<nama>${userName}</nama>
-<sekarang>${today}, jam ${timeNow} WIB</sekarang>
-
-<akses>
-Lo bisa lihat data transaksi LO SENDIRI:
-- Penjualan hari ini (total sales, jumlah order, cash vs QRIS)
-- Shift aktif (modal awal, penjualan saat ini, kas bersih, pengeluaran)
-- Order pending (DRAFT/QUEUED/IN_PROGRESS)
-- Riwayat penjualan (harian, mingguan, bulanan, tahunan)
-- Pelanggan lo (total, baru hari ini, top customer)
-- 10 shift terakhir + rata-rata discrepancy
-- 20 transaksi terbaru
-- Perbandingan vs kemarin + ranking antar kasir
-</akses>
-
-<contoh_pertanyaan>
-- "Penjualan gue hari ini gimana?" -> panggil Today Summary
-- "Shift gue lagi aktif gak? Penjualan udah berapa?" -> panggil Active Shift
-- "Ada order yang belum beres?" -> panggil Pending Orders
-- "Pelanggan gue rame gak hari ini?" -> panggil Customer Stats
-- "Riwayat shift gue gimana? Sering minus gak?" -> panggil Shift History
-- "Transaksi terbaru apa aja?" -> panggil Recent Transactions
-- "Gue ranking berapa dibanding kasir lain?" -> panggil Comparison Stats
-</contoh_pertanyaan>
-
-<cara_menjawab>
-- Lo adalah partner transaksi si kasir. Bantu dia pantau penjualan.
-- Kalau penjualan sepi: "Hari ini masih sepi nih. Baru 2 order. Tapi santai, biasanya rame jam 11-2 siang. Sambil ngopi dulu aja."
-- Kalau penjualan rame: "Wih, udah 15 order hari ini! Total Rp8.5jt. Lumayan, udah di atas rata-rata. Semangat terus!"
-- Kalau discrepancy gede: "Waduh, shift lo discrepancy-nya rada gede nih rata-rata Rp50rb. Mungkin perlu lebih teliti pas tutup shift."
-- Jangan mention data mekanik atau inventori, itu bukan domain lo.
-- INGAT: Jangan sebutkan nama tools di jawaban.
-</cara_menjawab>`,
-
-      MECHANIC: `${base}
-
-<role>MEKANIK - Jantung operasional G Speed Bintaro</role>
-<nama>${userName}</nama>
-<sekarang>${today}, jam ${timeNow} WIB</sekarang>
-
-<akses>
-Lo bisa lihat data job dan performa LO SENDIRI:
-- Job aktif (lagi ngerjain apa aja, termasuk plat nomor Vespa)
-- Job antrian (order yang nunggu dikerjain)
-- Performa (job selesai hari ini, minggu ini, bulan ini, tahun ini + pendapatan)
-- Kecepatan kerja (rata-rata, tercepat, terlama)
-- Ranking efisiensi vs mekanik lain + top 3
-- Tren performa (naik/turun)
-- 5 service yang paling sering lo kerjain
-- Pendapatan (bulanan, tahunan + top earning jobs)
-</akses>
-
-<contoh_pertanyaan>
-- "Gue lagi ngerjain apa aja?" -> panggil Active Jobs
-- "Ada antrian buat gue?" -> panggil Pending Jobs
-- "Performa gue gimana?" -> panggil Performance Summary
-- "Gue cepet gak sih kerjanya?" -> panggil Speed Stats
-- "Service apa yang paling sering gue kerjain?" -> panggil Top Services
-- "Pendapatan gue bulan ini berapa?" -> panggil Earnings Breakdown
-- "Gue ranking berapa?" -> panggil Efficiency Rank
-</contoh_pertanyaan>
-
-<cara_menjawab>
-- Lo adalah partner kerja si mekanik. Bantu dia tracking job dan performa.
-- Selalu sapa dengan semangat. Mekanik adalah jantung bengkel.
-- Kalau performa bagus: "Mantap! Lo udah selesaiin 8 job hari ini, tercepat di bengkel. Ranking #1 lagi. Pertahankan!"
-- Kalau ada job stuck: "Ini ada 1 job yang udah 2 jam lebih lho. Mungkin bisa dicek lagi atau minta bantuan?"
-- Kalau performa turun: "Minggu ini agak turun sedikit dibanding minggu lalu. Tapi overall masih di atas rata-rata kok. Yuk gas lagi!"
-- Jangan mention data penjualan, keuangan, atau inventori, itu bukan domain lo.
-- INGAT: Jangan sebutkan nama tools di jawaban.
-</cara_menjawab>`,
+      ADMIN: `${base}\n<role>ADMINISTRATOR - Bos/Pemilik/Pengelola G Speed Bintaro</role>\n<nama>${userName}</nama>\n<sekarang>${today}, jam ${timeNow} WIB</sekarang>\n<akses>SEMUA data bengkel: dashboard, performa tim, inventori, keuangan, pelanggan, alert, analisis.</akses>`,
+      CASHIER: `${base}\n<role>KASIR - Garda depan transaksi G Speed Bintaro</role>\n<nama>${userName}</nama>\n<sekarang>${today}, jam ${timeNow} WIB</sekarang>\n<akses>Data transaksi LO SENDIRI: penjualan, shift, order pending, pelanggan, riwayat.</akses>`,
+      MECHANIC: `${base}\n<role>MEKANIK - Jantung operasional G Speed Bintaro</role>\n<nama>${userName}</nama>\n<sekarang>${today}, jam ${timeNow} WIB</sekarang>\n<akses>Data job & performa LO SENDIRI: job aktif, performa, kecepatan, ranking, pendapatan.</akses>`,
     };
 
     return rolePrompts[role] || base;
   }
 
-  /**
-   * Bangun definisi tools (TANPA parameter)
-   * @param {string} role
-   * @returns {Array}
-   * @private
-   */
   #buildTools(role) {
     const defs = {
-      getMechanicActiveJobs: {
-        type: "function",
-        function: {
-          name: "getMechanicActiveJobs",
-          description:
-            "Job yang lagi dikerjain (IN_PROGRESS), termasuk plat nomor dan pelanggan.",
-          parameters: { type: "object", properties: {} },
-        },
-      },
-      getMechanicPendingJobs: {
-        type: "function",
-        function: {
-          name: "getMechanicPendingJobs",
-          description: "Job antrian (QUEUED) yang nunggu dikerjain.",
-          parameters: { type: "object", properties: {} },
-        },
-      },
-      getMechanicPerformanceSummary: {
-        type: "function",
-        function: {
-          name: "getMechanicPerformanceSummary",
-          description:
-            "Performa: job selesai + pendapatan (harian, mingguan, bulanan, tahunan) + recent jobs.",
-          parameters: { type: "object", properties: {} },
-        },
-      },
-      getMechanicSpeedStats: {
-        type: "function",
-        function: {
-          name: "getMechanicSpeedStats",
-          description:
-            "Kecepatan kerja: rata-rata, tercepat, terlama + detail job.",
-          parameters: { type: "object", properties: {} },
-        },
-      },
-      getMechanicTopServices: {
-        type: "function",
-        function: {
-          name: "getMechanicTopServices",
-          description: "5 service paling sering dikerjain + pendapatan.",
-          parameters: { type: "object", properties: {} },
-        },
-      },
-      getMechanicEarningsBreakdown: {
-        type: "function",
-        function: {
-          name: "getMechanicEarningsBreakdown",
-          description: "Pendapatan: bulanan, tahunan + top earning jobs.",
-          parameters: { type: "object", properties: {} },
-        },
-      },
-      getMechanicEfficiencyRank: {
-        type: "function",
-        function: {
-          name: "getMechanicEfficiencyRank",
-          description: "Ranking efisiensi vs semua mekanik + top 3 + bottom 3.",
-          parameters: { type: "object", properties: {} },
-        },
-      },
-      getCashierTodaySummary: {
-        type: "function",
-        function: {
-          name: "getCashierTodaySummary",
-          description:
-            "Penjualan hari ini: total sales, order, cash vs QRIS, perbandingan kemarin.",
-          parameters: { type: "object", properties: {} },
-        },
-      },
-      getCashierActiveShift: {
-        type: "function",
-        function: {
-          name: "getCashierActiveShift",
-          description:
-            "Shift aktif: modal, penjualan, kas bersih, pengeluaran, recent orders.",
-          parameters: { type: "object", properties: {} },
-        },
-      },
-      getCashierPendingOrders: {
-        type: "function",
-        function: {
-          name: "getCashierPendingOrders",
-          description: "Order pending per status (DRAFT/QUEUED/IN_PROGRESS).",
-          parameters: { type: "object", properties: {} },
-        },
-      },
-      getCashierCustomerStats: {
-        type: "function",
-        function: {
-          name: "getCashierCustomerStats",
-          description:
-            "Statistik pelanggan: total, baru hari ini, bulan ini, top customer.",
-          parameters: { type: "object", properties: {} },
-        },
-      },
-      getCashierShiftHistory: {
-        type: "function",
-        function: {
-          name: "getCashierShiftHistory",
-          description:
-            "10 shift terakhir + rata-rata discrepancy dan penjualan.",
-          parameters: { type: "object", properties: {} },
-        },
-      },
-      getCashierRecentTransactions: {
-        type: "function",
-        function: {
-          name: "getCashierRecentTransactions",
-          description: "20 transaksi terbaru.",
-          parameters: { type: "object", properties: {} },
-        },
-      },
-      getCashierComparisonStats: {
-        type: "function",
-        function: {
-          name: "getCashierComparisonStats",
-          description:
-            "Perbandingan penjualan vs kemarin + ranking antar kasir.",
-          parameters: { type: "object", properties: {} },
-        },
-      },
-      getAdminDashboardSnapshot: {
-        type: "function",
-        function: {
-          name: "getAdminDashboardSnapshot",
-          description:
-            "Dashboard: revenue, orders, mekanik aktif, shift buka, stok rendah + recent orders + top mechanics.",
-          parameters: { type: "object", properties: {} },
-        },
-      },
-      getAdminTodaySummary: {
-        type: "function",
-        function: {
-          name: "getAdminTodaySummary",
-          description:
-            "Ringkasan bisnis hari ini + vs kemarin + payment breakdown.",
-          parameters: { type: "object", properties: {} },
-        },
-      },
-      getAdminCashierPerformance: {
-        type: "function",
-        function: {
-          name: "getAdminCashierPerformance",
-          description:
-            "Performa semua kasir: jumlah shift, total penjualan, rata-rata discrepancy.",
-          parameters: { type: "object", properties: {} },
-        },
-      },
-      getAdminMechanicComparison: {
-        type: "function",
-        function: {
-          name: "getAdminMechanicComparison",
-          description:
-            "Perbandingan semua mekanik: job selesai, completion rate, pendapatan.",
-          parameters: { type: "object", properties: {} },
-        },
-      },
-      getAdminExpenseOverview: {
-        type: "function",
-        function: {
-          name: "getAdminExpenseOverview",
-          description: "Pengeluaran: total, per kategori, recent expenses.",
-          parameters: { type: "object", properties: {} },
-        },
-      },
-      getAdminInventoryHealth: {
-        type: "function",
-        function: {
-          name: "getAdminInventoryHealth",
-          description:
-            "Kesehatan inventori: nilai stok, dead stock, turnover, outOfStock, lowStock.",
-          parameters: { type: "object", properties: {} },
-        },
-      },
-      getAdminBusinessGrowth: {
-        type: "function",
-        function: {
-          name: "getAdminBusinessGrowth",
-          description:
-            "Pertumbuhan: revenue/customer/order growth bulanan dan tahunan.",
-          parameters: { type: "object", properties: {} },
-        },
-      },
-      getAdminTopProducts: {
-        type: "function",
-        function: {
-          name: "getAdminTopProducts",
-          description: "Top sparepart dan service + slow moving products.",
-          parameters: { type: "object", properties: {} },
-        },
-      },
-      getAdminPeakHours: {
-        type: "function",
-        function: {
-          name: "getAdminPeakHours",
-          description: "Jam tersibuk bengkel (peak hour).",
-          parameters: { type: "object", properties: {} },
-        },
-      },
-      getAdminStockAlert: {
-        type: "function",
-        function: {
-          name: "getAdminStockAlert",
-          description: "Alert stok: habis, rendah, berlebih.",
-          parameters: { type: "object", properties: {} },
-        },
-      },
-      getAdminRevenueVsTarget: {
-        type: "function",
-        function: {
-          name: "getAdminRevenueVsTarget",
-          description: "Revenue vs target bulanan dan tahunan + proyeksi.",
-          parameters: { type: "object", properties: {} },
-        },
-      },
-      getAdminTopCustomersByVisit: {
-        type: "function",
-        function: {
-          name: "getAdminTopCustomersByVisit",
-          description: "Top 10 pelanggan paling setia + pelanggan baru.",
-          parameters: { type: "object", properties: {} },
-        },
-      },
-      getAdminOrderCompletionTime: {
-        type: "function",
-        function: {
-          name: "getAdminOrderCompletionTime",
-          description: "Rata-rata waktu penyelesaian order.",
-          parameters: { type: "object", properties: {} },
-        },
-      },
-      getAdminMechanicAvailability: {
-        type: "function",
-        function: {
-          name: "getAdminMechanicAvailability",
-          description: "Ketersediaan mekanik: siapa yang available/sibuk.",
-          parameters: { type: "object", properties: {} },
-        },
-      },
-      getAdminCustomerRetention: {
-        type: "function",
-        function: {
-          name: "getAdminCustomerRetention",
-          description: "Retensi pelanggan 1 tahun + detail bulanan.",
-          parameters: { type: "object", properties: {} },
-        },
-      },
-      getAdminPaymentMethodDistribution: {
-        type: "function",
-        function: {
-          name: "getAdminPaymentMethodDistribution",
-          description: "Distribusi pembayaran: cash vs qris.",
-          parameters: { type: "object", properties: {} },
-        },
-      },
-      getAdminAttentionNeeded: {
-        type: "function",
-        function: {
-          name: "getAdminAttentionNeeded",
-          description: "Order bermasalah: stuck, overdue payment, unpaid.",
-          parameters: { type: "object", properties: {} },
-        },
-      },
-      getAdminRestockRecommendations: {
-        type: "function",
-        function: {
-          name: "getAdminRestockRecommendations",
-          description: "Rekomendasi restock: produk urgent + estimasi biaya.",
-          parameters: { type: "object", properties: {} },
-        },
-      },
-      getAdminOrderTrend: {
-        type: "function",
-        function: {
-          name: "getAdminOrderTrend",
-          description: "Tren order 4 minggu terakhir.",
-          parameters: { type: "object", properties: {} },
-        },
-      },
-      getAdminRevenueByDayOfWeek: {
-        type: "function",
-        function: {
-          name: "getAdminRevenueByDayOfWeek",
-          description: "Revenue per hari (Senin-Minggu) + best/worst day.",
-          parameters: { type: "object", properties: {} },
-        },
-      },
-      getAdminCustomerSegmentation: {
-        type: "function",
-        function: {
-          name: "getAdminCustomerSegmentation",
-          description: "Segmentasi pelanggan: new, regular, VIP, dormant.",
-          parameters: { type: "object", properties: {} },
-        },
-      },
-      getAdminMostProfitableServices: {
-        type: "function",
-        function: {
-          name: "getAdminMostProfitableServices",
-          description: "Service paling cuan (profit margin tertinggi).",
-          parameters: { type: "object", properties: {} },
-        },
-      },
-      getAdminServiceBundles: {
-        type: "function",
-        function: {
-          name: "getAdminServiceBundles",
-          description: "Kombinasi service yang sering dijual bareng.",
-          parameters: { type: "object", properties: {} },
-        },
-      },
-      getAdminRevenueForecast: {
-        type: "function",
-        function: {
-          name: "getAdminRevenueForecast",
-          description: "Prediksi revenue bulan depan.",
-          parameters: { type: "object", properties: {} },
-        },
-      },
+      getMechanicActiveJobs: { type: "function", function: { name: "getMechanicActiveJobs", description: "Job yang lagi dikerjain (IN_PROGRESS), termasuk plat nomor dan pelanggan.", parameters: { type: "object", properties: {} } } },
+      getMechanicPendingJobs: { type: "function", function: { name: "getMechanicPendingJobs", description: "Job antrian (QUEUED) yang nunggu dikerjain.", parameters: { type: "object", properties: {} } } },
+      getMechanicPerformanceSummary: { type: "function", function: { name: "getMechanicPerformanceSummary", description: "Performa: job selesai + pendapatan (harian, mingguan, bulanan, tahunan) + recent jobs.", parameters: { type: "object", properties: {} } } },
+      getMechanicSpeedStats: { type: "function", function: { name: "getMechanicSpeedStats", description: "Kecepatan kerja: rata-rata, tercepat, terlama + detail job.", parameters: { type: "object", properties: {} } } },
+      getMechanicTopServices: { type: "function", function: { name: "getMechanicTopServices", description: "5 service paling sering dikerjain + pendapatan.", parameters: { type: "object", properties: {} } } },
+      getMechanicEarningsBreakdown: { type: "function", function: { name: "getMechanicEarningsBreakdown", description: "Pendapatan: bulanan, tahunan + top earning jobs.", parameters: { type: "object", properties: {} } } },
+      getMechanicEfficiencyRank: { type: "function", function: { name: "getMechanicEfficiencyRank", description: "Ranking efisiensi vs semua mekanik + top 3 + bottom 3.", parameters: { type: "object", properties: {} } } },
+      getCashierTodaySummary: { type: "function", function: { name: "getCashierTodaySummary", description: "Penjualan hari ini: total sales, order, cash vs QRIS, perbandingan kemarin.", parameters: { type: "object", properties: {} } } },
+      getCashierActiveShift: { type: "function", function: { name: "getCashierActiveShift", description: "Shift aktif: modal, penjualan, kas bersih, pengeluaran, recent orders.", parameters: { type: "object", properties: {} } } },
+      getCashierPendingOrders: { type: "function", function: { name: "getCashierPendingOrders", description: "Order pending per status (DRAFT/QUEUED/IN_PROGRESS).", parameters: { type: "object", properties: {} } } },
+      getCashierCustomerStats: { type: "function", function: { name: "getCashierCustomerStats", description: "Statistik pelanggan: total, baru hari ini, bulan ini, top customer.", parameters: { type: "object", properties: {} } } },
+      getCashierShiftHistory: { type: "function", function: { name: "getCashierShiftHistory", description: "10 shift terakhir + rata-rata discrepancy dan penjualan.", parameters: { type: "object", properties: {} } } },
+      getCashierRecentTransactions: { type: "function", function: { name: "getCashierRecentTransactions", description: "20 transaksi terbaru.", parameters: { type: "object", properties: {} } } },
+      getCashierComparisonStats: { type: "function", function: { name: "getCashierComparisonStats", description: "Perbandingan penjualan vs kemarin + ranking antar kasir.", parameters: { type: "object", properties: {} } } },
+      getAdminDashboardSnapshot: { type: "function", function: { name: "getAdminDashboardSnapshot", description: "Dashboard: revenue, orders, mekanik aktif, shift buka, stok rendah + recent orders + top mechanics.", parameters: { type: "object", properties: {} } } },
+      getAdminTodaySummary: { type: "function", function: { name: "getAdminTodaySummary", description: "Ringkasan bisnis hari ini + vs kemarin + payment breakdown.", parameters: { type: "object", properties: {} } } },
+      getAdminCashierPerformance: { type: "function", function: { name: "getAdminCashierPerformance", description: "Performa semua kasir: jumlah shift, total penjualan, rata-rata discrepancy.", parameters: { type: "object", properties: {} } } },
+      getAdminMechanicComparison: { type: "function", function: { name: "getAdminMechanicComparison", description: "Perbandingan semua mekanik: job selesai, completion rate, pendapatan.", parameters: { type: "object", properties: {} } } },
+      getAdminExpenseOverview: { type: "function", function: { name: "getAdminExpenseOverview", description: "Pengeluaran: total, per kategori, recent expenses.", parameters: { type: "object", properties: {} } } },
+      getAdminInventoryHealth: { type: "function", function: { name: "getAdminInventoryHealth", description: "Kesehatan inventori: nilai stok, dead stock, turnover, outOfStock, lowStock.", parameters: { type: "object", properties: {} } } },
+      getAdminBusinessGrowth: { type: "function", function: { name: "getAdminBusinessGrowth", description: "Pertumbuhan: revenue/customer/order growth bulanan dan tahunan.", parameters: { type: "object", properties: {} } } },
+      getAdminTopProducts: { type: "function", function: { name: "getAdminTopProducts", description: "Top sparepart dan service + slow moving products.", parameters: { type: "object", properties: {} } } },
+      getAdminPeakHours: { type: "function", function: { name: "getAdminPeakHours", description: "Jam tersibuk bengkel (peak hour).", parameters: { type: "object", properties: {} } } },
+      getAdminStockAlert: { type: "function", function: { name: "getAdminStockAlert", description: "Alert stok: habis, rendah, berlebih.", parameters: { type: "object", properties: {} } } },
+      getAdminRevenueVsTarget: { type: "function", function: { name: "getAdminRevenueVsTarget", description: "Revenue vs target bulanan dan tahunan + proyeksi.", parameters: { type: "object", properties: {} } } },
+      getAdminTopCustomersByVisit: { type: "function", function: { name: "getAdminTopCustomersByVisit", description: "Top 10 pelanggan paling setia + pelanggan baru.", parameters: { type: "object", properties: {} } } },
+      getAdminOrderCompletionTime: { type: "function", function: { name: "getAdminOrderCompletionTime", description: "Rata-rata waktu penyelesaian order.", parameters: { type: "object", properties: {} } } },
+      getAdminMechanicAvailability: { type: "function", function: { name: "getAdminMechanicAvailability", description: "Ketersediaan mekanik: siapa yang available/sibuk.", parameters: { type: "object", properties: {} } } },
+      getAdminCustomerRetention: { type: "function", function: { name: "getAdminCustomerRetention", description: "Retensi pelanggan 1 tahun + detail bulanan.", parameters: { type: "object", properties: {} } } },
+      getAdminPaymentMethodDistribution: { type: "function", function: { name: "getAdminPaymentMethodDistribution", description: "Distribusi pembayaran: cash vs qris.", parameters: { type: "object", properties: {} } } },
+      getAdminAttentionNeeded: { type: "function", function: { name: "getAdminAttentionNeeded", description: "Order bermasalah: stuck, overdue payment, unpaid.", parameters: { type: "object", properties: {} } } },
+      getAdminRestockRecommendations: { type: "function", function: { name: "getAdminRestockRecommendations", description: "Rekomendasi restock: produk urgent + estimasi biaya.", parameters: { type: "object", properties: {} } } },
+      getAdminOrderTrend: { type: "function", function: { name: "getAdminOrderTrend", description: "Tren order 4 minggu terakhir.", parameters: { type: "object", properties: {} } } },
+      getAdminRevenueByDayOfWeek: { type: "function", function: { name: "getAdminRevenueByDayOfWeek", description: "Revenue per hari (Senin-Minggu) + best/worst day.", parameters: { type: "object", properties: {} } } },
+      getAdminCustomerSegmentation: { type: "function", function: { name: "getAdminCustomerSegmentation", description: "Segmentasi pelanggan: new, regular, VIP, dormant.", parameters: { type: "object", properties: {} } } },
+      getAdminMostProfitableServices: { type: "function", function: { name: "getAdminMostProfitableServices", description: "Service paling cuan (profit margin tertinggi).", parameters: { type: "object", properties: {} } } },
+      getAdminServiceBundles: { type: "function", function: { name: "getAdminServiceBundles", description: "Kombinasi service yang sering dijual bareng.", parameters: { type: "object", properties: {} } } },
+      getAdminRevenueForecast: { type: "function", function: { name: "getAdminRevenueForecast", description: "Prediksi revenue bulan depan.", parameters: { type: "object", properties: {} } } },
     };
 
     const roleTools = {
@@ -647,37 +235,16 @@ Lo bisa lihat data job dan performa LO SENDIRI:
     return (roleTools[role] || []).map((name) => defs[name]).filter(Boolean);
   }
 
-  /**
-   * Cek apakah tool diizinkan untuk role tertentu
-   * @param {string} toolName
-   * @param {string} role
-   * @returns {boolean}
-   * @private
-   */
   #isToolAllowed(toolName, role) {
-    const prefixMap = {
-      ADMIN: "getAdmin",
-      CASHIER: "getCashier",
-      MECHANIC: "getMechanic",
-    };
+    const prefixMap = { ADMIN: "getAdmin", CASHIER: "getCashier", MECHANIC: "getMechanic" };
     const prefix = prefixMap[role];
     return prefix ? toolName.startsWith(prefix) : false;
   }
 
-  /**
-   * Eksekusi tool call dari AI
-   * @param {string} name
-   * @param {string} userId
-   * @param {string} role
-   * @returns {Promise<any>}
-   * @private
-   */
   async #executeToolCall(name, userId, role) {
     if (!this.#isToolAllowed(name, role)) {
       logger.warn("[AGENT] Tool access denied", { name, role, userId });
-      throw ApiError.forbidden({
-        message: `Tool '${name}' tidak diizinkan untuk role '${role}'.`,
-      });
+      throw ApiError.forbidden({ message: `Tool '${name}' tidak diizinkan untuk role '${role}'.` });
     }
 
     logger.info("[AGENT] Executing tool call", { name, userId });
@@ -685,31 +252,22 @@ Lo bisa lihat data job dan performa LO SENDIRI:
     const map = {
       getMechanicActiveJobs: () => this.insight.getMechanicActiveJobs(userId),
       getMechanicPendingJobs: () => this.insight.getMechanicPendingJobs(userId),
-      getMechanicPerformanceSummary: () =>
-        this.insight.getMechanicPerformanceSummary(userId),
+      getMechanicPerformanceSummary: () => this.insight.getMechanicPerformanceSummary(userId),
       getMechanicSpeedStats: () => this.insight.getMechanicSpeedStats(userId),
       getMechanicTopServices: () => this.insight.getMechanicTopServices(userId),
-      getMechanicEarningsBreakdown: () =>
-        this.insight.getMechanicEarningsBreakdown(userId),
-      getMechanicEfficiencyRank: () =>
-        this.insight.getMechanicEfficiencyRank(userId),
+      getMechanicEarningsBreakdown: () => this.insight.getMechanicEarningsBreakdown(userId),
+      getMechanicEfficiencyRank: () => this.insight.getMechanicEfficiencyRank(userId),
       getCashierTodaySummary: () => this.insight.getCashierTodaySummary(userId),
       getCashierActiveShift: () => this.insight.getCashierActiveShift(userId),
-      getCashierPendingOrders: () =>
-        this.insight.getCashierPendingOrders(userId),
-      getCashierCustomerStats: () =>
-        this.insight.getCashierCustomerStats(userId),
+      getCashierPendingOrders: () => this.insight.getCashierPendingOrders(userId),
+      getCashierCustomerStats: () => this.insight.getCashierCustomerStats(userId),
       getCashierShiftHistory: () => this.insight.getCashierShiftHistory(userId),
-      getCashierRecentTransactions: () =>
-        this.insight.getCashierRecentTransactions(userId),
-      getCashierComparisonStats: () =>
-        this.insight.getCashierComparisonStats(userId),
+      getCashierRecentTransactions: () => this.insight.getCashierRecentTransactions(userId),
+      getCashierComparisonStats: () => this.insight.getCashierComparisonStats(userId),
       getAdminDashboardSnapshot: () => this.insight.getAdminDashboardSnapshot(),
       getAdminTodaySummary: () => this.insight.getAdminTodaySummary(),
-      getAdminCashierPerformance: () =>
-        this.insight.getAdminCashierPerformance(),
-      getAdminMechanicComparison: () =>
-        this.insight.getAdminMechanicComparison(),
+      getAdminCashierPerformance: () => this.insight.getAdminCashierPerformance(),
+      getAdminMechanicComparison: () => this.insight.getAdminMechanicComparison(),
       getAdminExpenseOverview: () => this.insight.getAdminExpenseOverview(),
       getAdminInventoryHealth: () => this.insight.getAdminInventoryHealth(),
       getAdminBusinessGrowth: () => this.insight.getAdminBusinessGrowth(),
@@ -717,25 +275,17 @@ Lo bisa lihat data job dan performa LO SENDIRI:
       getAdminPeakHours: () => this.insight.getAdminPeakHours(),
       getAdminStockAlert: () => this.insight.getAdminStockAlert(),
       getAdminRevenueVsTarget: () => this.insight.getAdminRevenueVsTarget(),
-      getAdminTopCustomersByVisit: () =>
-        this.insight.getAdminTopCustomersByVisit(),
-      getAdminOrderCompletionTime: () =>
-        this.insight.getAdminOrderCompletionTime(),
-      getAdminMechanicAvailability: () =>
-        this.insight.getAdminMechanicAvailability(),
+      getAdminTopCustomersByVisit: () => this.insight.getAdminTopCustomersByVisit(),
+      getAdminOrderCompletionTime: () => this.insight.getAdminOrderCompletionTime(),
+      getAdminMechanicAvailability: () => this.insight.getAdminMechanicAvailability(),
       getAdminCustomerRetention: () => this.insight.getAdminCustomerRetention(),
-      getAdminPaymentMethodDistribution: () =>
-        this.insight.getAdminPaymentMethodDistribution(),
+      getAdminPaymentMethodDistribution: () => this.insight.getAdminPaymentMethodDistribution(),
       getAdminAttentionNeeded: () => this.insight.getAdminAttentionNeeded(),
-      getAdminRestockRecommendations: () =>
-        this.insight.getAdminRestockRecommendations(),
+      getAdminRestockRecommendations: () => this.insight.getAdminRestockRecommendations(),
       getAdminOrderTrend: () => this.insight.getAdminOrderTrend(),
-      getAdminRevenueByDayOfWeek: () =>
-        this.insight.getAdminRevenueByDayOfWeek(),
-      getAdminCustomerSegmentation: () =>
-        this.insight.getAdminCustomerSegmentation(),
-      getAdminMostProfitableServices: () =>
-        this.insight.getAdminMostProfitableServices(),
+      getAdminRevenueByDayOfWeek: () => this.insight.getAdminRevenueByDayOfWeek(),
+      getAdminCustomerSegmentation: () => this.insight.getAdminCustomerSegmentation(),
+      getAdminMostProfitableServices: () => this.insight.getAdminMostProfitableServices(),
       getAdminServiceBundles: () => this.insight.getAdminServiceBundles(),
       getAdminRevenueForecast: () => this.insight.getAdminRevenueForecast(),
     };
@@ -754,37 +304,16 @@ Lo bisa lihat data job dan performa LO SENDIRI:
     } catch (err) {
       if (err instanceof ApiError) throw err;
       logger.error("[AGENT] Tool call failed", { name, error: err.message });
-      throw ApiError.internal({
-        message: `Gagal mengambil data untuk '${name}'.`,
-      });
+      throw ApiError.internal({ message: `Gagal mengambil data untuk '${name}'.` });
     }
   }
 
-  /**
-   * Hash pertanyaan untuk deduplikasi cache
-   * @param {string} message
-   * @returns {string}
-   * @private
-   */
   #hashQuestion(message) {
-    return crypto
-      .createHash("sha256")
-      .update(message.toLowerCase().trim().replace(/\s+/g, " "))
-      .digest("hex")
-      .slice(0, 16);
+    return crypto.createHash("sha256").update(message.toLowerCase().trim().replace(/\s+/g, " ")).digest("hex").slice(0, 16);
   }
 
-  /**
-   * Chat dengan AI agent
-   * @param {string} userId
-   * @param {string} message
-   * @returns {Promise<{reply: string, toolCalls: Array, cached: boolean}>}
-   */
   async chat(userId, message) {
-    logger.info("[AGENT] Chat started", {
-      userId,
-      messagePreview: message.slice(0, 100),
-    });
+    logger.info("[AGENT] Chat started", { userId, messagePreview: message.slice(0, 100) });
 
     const user = await this.user.findById(userId);
     if (!user) {
@@ -812,20 +341,14 @@ Lo bisa lihat data job dan performa LO SENDIRI:
         "https://openrouter.ai/api/v1/chat/completions",
         {
           model: "meta-llama/llama-3.1-8b-instruct",
-          messages: [
-            { role: "system", content: systemPrompt },
-            ...history.slice(-15),
-          ],
+          messages: [{ role: "system", content: systemPrompt }, ...history.slice(-15)],
           tools: tools.length ? tools : undefined,
           tool_choice: tools.length ? "auto" : undefined,
           max_tokens,
           temperature,
         },
         {
-          headers: {
-            Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-            "Content-Type": "application/json",
-          },
+          headers: { Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`, "Content-Type": "application/json" },
           timeout: 30000,
         }
       );
@@ -835,34 +358,15 @@ Lo bisa lihat data job dan performa LO SENDIRI:
 
       if (aiMessage.tool_calls?.length) {
         history.push(aiMessage);
-
         for (const tc of aiMessage.tool_calls) {
           try {
-            const result = await this.#executeToolCall(
-              tc.function.name,
-              userId,
-              user.role
-            );
+            const result = await this.#executeToolCall(tc.function.name, userId, user.role);
             toolCalls.push({ name: tc.function.name, result });
-            history.push({
-              role: "tool",
-              tool_call_id: tc.id,
-              content: JSON.stringify(result).slice(0, 2000),
-            });
+            history.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify(result).slice(0, 2000) });
           } catch (toolErr) {
-            logger.error("[AGENT] Tool execution error", {
-              name: tc.function.name,
-              error: toolErr.message,
-            });
-            const errorMsg =
-              toolErr instanceof ApiError
-                ? toolErr.message
-                : `Gagal mengambil data: ${toolErr.message}`;
-            history.push({
-              role: "tool",
-              tool_call_id: tc.id,
-              content: JSON.stringify({ error: errorMsg }),
-            });
+            logger.error("[AGENT] Tool execution error", { name: tc.function.name, error: toolErr.message });
+            const errorMsg = toolErr instanceof ApiError ? toolErr.message : `Gagal mengambil data: ${toolErr.message}`;
+            history.push({ role: "tool", tool_call_id: tc.id, content: JSON.stringify({ error: errorMsg }) });
           }
         }
 
@@ -870,18 +374,12 @@ Lo bisa lihat data job dan performa LO SENDIRI:
           "https://openrouter.ai/api/v1/chat/completions",
           {
             model: "meta-llama/llama-3.1-8b-instruct",
-            messages: [
-              { role: "system", content: systemPrompt },
-              ...history.slice(-25),
-            ],
+            messages: [{ role: "system", content: systemPrompt }, ...history.slice(-25)],
             max_tokens,
             temperature,
           },
           {
-            headers: {
-              Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
-              "Content-Type": "application/json",
-            },
+            headers: { Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`, "Content-Type": "application/json" },
             timeout: 30000,
           }
         );
@@ -890,24 +388,17 @@ Lo bisa lihat data job dan performa LO SENDIRI:
         history.push(finalMessage);
         await this.cache.set(cacheKey, history.slice(-25), 1800);
         await this.qaCache.set(`${userId}:${qHash}`, finalMessage.content, 600);
-
         return { reply: finalMessage.content, toolCalls, cached: false };
       }
 
       history.push(aiMessage);
       await this.cache.set(cacheKey, history.slice(-25), 1800);
       await this.qaCache.set(`${userId}:${qHash}`, aiMessage.content, 600);
-
       return { reply: aiMessage.content, toolCalls: [], cached: false };
     } catch (err) {
       if (err instanceof ApiError) throw err;
-      logger.error("[AGENT] OpenRouter request failed", {
-        error: err.message,
-        status: err.response?.status,
-      });
-      throw ApiError.internal({
-        message: "Gagal menghubungi AI service. Silakan coba lagi.",
-      });
+      logger.error("[AGENT] OpenRouter request failed", { error: err.message, status: err.response?.status });
+      throw ApiError.internal({ message: "Gagal menghubungi AI service. Silakan coba lagi." });
     }
   }
 }

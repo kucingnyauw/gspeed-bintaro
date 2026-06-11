@@ -34,6 +34,12 @@ const labelMap = {
   mechanic_max_tasks: "Maksimal Tugas Mekanik",
   shift_min_starting_cash: "Minimal Saldo Awal Shift",
   stock_low_threshold: "Batas Stok Rendah",
+  daily_order_target: "Target Pesanan Harian",
+  daily_revenue_target: "Target Pendapatan Harian",
+  monthly_order_target: "Target Pesanan Bulanan",
+  monthly_revenue_target: "Target Pendapatan Bulanan",
+  monthly_profit_target: "Target Keuntungan Bulanan",
+  yearly_revenue_target: "Target Pendapatan Tahunan",
 };
 
 /**
@@ -49,6 +55,12 @@ const helperMap = {
   mechanic_max_tasks: "Jumlah maksimal tugas yang bisa dikerjakan satu mekanik secara bersamaan",
   shift_min_starting_cash: "Saldo minimal yang harus disiapkan kasir saat membuka shift",
   stock_low_threshold: "Batas minimum stok sebelum produk dianggap stok rendah",
+  daily_order_target: "Target jumlah pesanan per hari",
+  daily_revenue_target: "Target pendapatan yang harus dicapai per hari",
+  monthly_order_target: "Target jumlah pesanan per bulan",
+  monthly_revenue_target: "Target pendapatan yang harus dicapai per bulan",
+  monthly_profit_target: "Target keuntungan bersih per bulan",
+  yearly_revenue_target: "Target pendapatan yang harus dicapai per tahun",
 };
 
 /**
@@ -79,6 +91,30 @@ const validationRules = {
     required: "Wajib diisi",
     min: { value: 1, message: "Minimal 1" },
   },
+  daily_order_target: {
+    required: "Wajib diisi",
+    min: { value: 1, message: "Minimal 1" },
+  },
+  daily_revenue_target: {
+    required: "Wajib diisi",
+    min: { value: 1000, message: "Minimal Rp 1.000" },
+  },
+  monthly_order_target: {
+    required: "Wajib diisi",
+    min: { value: 1, message: "Minimal 1" },
+  },
+  monthly_revenue_target: {
+    required: "Wajib diisi",
+    min: { value: 1000, message: "Minimal Rp 1.000" },
+  },
+  monthly_profit_target: {
+    required: "Wajib diisi",
+    min: { value: 1000, message: "Minimal Rp 1.000" },
+  },
+  yearly_revenue_target: {
+    required: "Wajib diisi",
+    min: { value: 1000, message: "Minimal Rp 1.000" },
+  },
 };
 
 /**
@@ -86,7 +122,13 @@ const validationRules = {
  *
  * @type {string[]}
  */
-const currencyFields = ["shift_min_starting_cash"];
+const currencyFields = [
+  "shift_min_starting_cash",
+  "daily_revenue_target",
+  "monthly_revenue_target",
+  "monthly_profit_target",
+  "yearly_revenue_target",
+];
 
 /**
  * Daftar field yang menggunakan format persentase.
@@ -103,12 +145,25 @@ const percentageFields = ["ppn_rate", "pph_rate"];
 const booleanFields = ["enable_ppn", "enable_pph"];
 
 /**
- * Daftar key settings yang disembunyikan dari UI (tidak ditampilkan).
- * `tax_rate` dihapus karena redundant dengan `ppn_rate`.
+ * Urutan tampilan settings.
  *
  * @type {string[]}
  */
-const hiddenFields = ["tax_rate"];
+const settingsOrder = [
+  "enable_ppn",
+  "ppn_rate",
+  "enable_pph",
+  "pph_rate",
+  "mechanic_max_tasks",
+  "shift_min_starting_cash",
+  "stock_low_threshold",
+  "daily_order_target",
+  "daily_revenue_target",
+  "monthly_order_target",
+  "monthly_revenue_target",
+  "monthly_profit_target",
+  "yearly_revenue_target",
+];
 
 /**
  * Komponen skeleton untuk tampilan loading halaman settings.
@@ -127,7 +182,7 @@ const SettingsSkeleton = () => (
       <Divider />
       <Box sx={{ p: 3 }}>
         <Stack sx={{ gap: 2 }}>
-          {[1, 2, 3, 4, 5, 6, 7].map((i) => (
+          {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13].map((i) => (
             <Skeleton key={i} variant="rounded" height={80} />
           ))}
         </Stack>
@@ -143,52 +198,25 @@ const SettingsSkeleton = () => (
 /**
  * Halaman Pengaturan Sistem - Form untuk mengkonfigurasi parameter operasional bengkel.
  *
- * Fitur:
- * - Mengelola pengaturan pajak (PPN, PPH)
- * - Mengelola pengaturan operasional (tugas mekanik, shift, stok)
- * - Toggle switch untuk enable/disable fitur
- * - Format input otomatis (currency, percentage, number)
- * - Validasi real-time dengan react-hook-form
- * - Auto-save dengan React Query mutation tanpa reload halaman
- * - Notifikasi sukses/gagal melalui Redux notification slice
- *
  * @component
  * @returns {JSX.Element} Halaman pengaturan sistem
  */
 const Settings = () => {
-  /** @type {import("@tanstack/react-query").QueryClient} */
   const queryClient = useQueryClient();
-
-  /** @type {import("react-redux").Dispatch} */
   const dispatch = useDispatch();
 
-  /**
-   * Query untuk mengambil data settings dari API.
-   *
-   * @type {import("@tanstack/react-query").UseQueryResult}
-   */
   const { data: settings, isLoading } = useQuery({
     queryKey: ["settings"],
     queryFn: getSettings,
     staleTime: STALE_TIME,
   });
 
-  /**
-   * Form instance dari react-hook-form.
-   *
-   * @type {import("react-hook-form").UseFormReturn}
-   */
   const { control, handleSubmit, reset, formState: { isDirty } } = useForm();
 
-  /**
-   * Mutation untuk menyimpan perubahan settings secara bulk.
-   *
-   * @type {import("@tanstack/react-query").UseMutationResult}
-   */
   const bulkUpdate = useMutation({
     mutationFn: bulkUpdateSettings,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["settings"] });
+      queryClient.invalidateQueries();
       dispatch(
         showNotification({
           message: "Pengaturan sistem berhasil diperbarui",
@@ -213,24 +241,26 @@ const Settings = () => {
     },
   });
 
-  /** @type {boolean} Status loading saat submit */
   const isSubmitting = bulkUpdate.isPending;
 
   /**
-   * Settings yang sudah difilter (tanpa hiddenFields).
+   * Settings yang diurutkan sesuai settingsOrder.
+   * Field yang tidak ada di settingsOrder akan muncul di akhir.
    *
    * @type {Array<Object>}
    */
-  const visibleSettings = settings?.filter(
-    (s) => !hiddenFields.includes(s.key)
-  ) || [];
+  const sortedSettings = settings
+    ? [...settings].sort((a, b) => {
+        const indexA = settingsOrder.indexOf(a.key);
+        const indexB = settingsOrder.indexOf(b.key);
+        if (indexA === -1) return 1;
+        if (indexB === -1) return -1;
+        return indexA - indexB;
+      })
+    : [];
 
-  /**
-   * Effect untuk me-reset form saat data settings berubah.
-   */
   useEffect(() => {
     if (settings?.length) {
-      /** @type {Object<string, string|boolean>} */
       const defaults = {};
       settings.forEach((s) => {
         if (booleanFields.includes(s.key)) {
@@ -243,11 +273,6 @@ const Settings = () => {
     }
   }, [settings, reset]);
 
-  /**
-   * Handler submit form untuk menyimpan semua perubahan settings.
-   *
-   * @param {Object} formData - Data form yang akan disimpan
-   */
   const onSubmit = (formData) => {
     const payload = Object.entries(formData).map(([key, value]) => ({
       key,
@@ -261,7 +286,6 @@ const Settings = () => {
   return (
     <Box component="form" onSubmit={handleSubmit(onSubmit)}>
       <Card sx={{ border: "1px solid", borderColor: "divider", boxShadow: "none", borderRadius: 1 }}>
-        {/* Header */}
         <Box sx={{ p: 3 }}>
           <Typography variant="h5" sx={{ fontWeight: 700, letterSpacing: "-0.02em" }}>
             Pengaturan Sistem
@@ -273,10 +297,9 @@ const Settings = () => {
 
         <Divider />
 
-        {/* Content */}
         <Box sx={{ p: 3 }}>
           <Stack divider={<Divider />}>
-            {visibleSettings.map((setting) => (
+            {sortedSettings.map((setting) => (
               <Stack
                 key={setting.id}
                 direction={{ xs: "column", sm: "row" }}
@@ -365,7 +388,6 @@ const Settings = () => {
 
         <Divider />
 
-        {/* Footer */}
         <Box sx={{ p: 3, display: "flex", justifyContent: "flex-end" }}>
           <Button
             type="submit"

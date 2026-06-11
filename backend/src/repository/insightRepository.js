@@ -17,6 +17,43 @@ class InsightRepository {
   }
 
   /**
+   * Ambil semua settings terkait target
+   * @returns {Promise<Object>}
+   * @private
+   */
+  async #getAllTargetSettings() {
+    const settings = await prisma.setting.findMany({
+      where: {
+        key: {
+          in: [
+            "monthly_revenue_target",
+            "daily_revenue_target",
+            "yearly_revenue_target",
+            "monthly_profit_target",
+            "monthly_order_target",
+            "daily_order_target",
+          ],
+        },
+      },
+      select: { key: true, value: true },
+    });
+
+    const targets = {};
+    for (const s of settings) {
+      targets[s.key] = parseInt(s.value, 10) || 0;
+    }
+
+    return {
+      dailyRevenue: targets.daily_revenue_target || 0,
+      monthlyRevenue: targets.monthly_revenue_target || 0,
+      yearlyRevenue: targets.yearly_revenue_target || 0,
+      monthlyProfit: targets.monthly_profit_target || 0,
+      dailyOrder: targets.daily_order_target || 0,
+      monthlyOrder: targets.monthly_order_target || 0,
+    };
+  }
+
+  /**
    * Ambil tanggal 1 tahun yang lalu
    * @returns {Date}
    * @private
@@ -57,14 +94,60 @@ class InsightRepository {
     return new Date(d.getFullYear(), d.getMonth(), d.getDate());
   }
 
+  /**
+   * Generate date ranges untuk metadata
+   * @returns {Object}
+   * @private
+   */
+  #getDateRanges() {
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    const daily = [];
+    for (let i = 0; i < 1; i++) {
+      const d = new Date(today);
+      daily.push(d.toISOString().split("T")[0]);
+    }
+
+    const weekly = [];
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      weekly.push(d.toISOString().split("T")[0]);
+    }
+
+    const monthly = [];
+    for (let i = 29; i >= 0; i--) {
+      const d = new Date(today);
+      d.setDate(d.getDate() - i);
+      monthly.push(d.toISOString().split("T")[0]);
+    }
+
+    const yearly = [];
+    for (let i = 11; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      yearly.push(
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`
+      );
+    }
+
+    return {
+      today: today.toISOString().split("T")[0],
+      daily,
+      weekly,
+      monthly,
+      yearly,
+    };
+  }
+
   // ============================================================================
-  // MEKANIK (9 functions)
+  // MEKANIK (7 functions)
   // ============================================================================
 
   /**
    * Job aktif yang sedang dikerjakan mekanik (IN_PROGRESS)
    * @param {string} mechanicId
-   * @returns {Promise<{jobs: Array, count: number}>}
+   * @returns {Promise<{jobs: Array, count: number, _metadata: Object}>}
    */
   async getMechanicActiveJobs(mechanicId) {
     const jobs = await prisma.mechanicAssignment.findMany({
@@ -107,13 +190,19 @@ class InsightRepository {
         createdAt: i.orderItem.order.createdAt,
       })),
       count: jobs.length,
+      _metadata: {
+        ...this.#getDateRanges(),
+        type: "real-time",
+        description:
+          "Job yang sedang dikerjakan saat ini (real-time, no cache)",
+      },
     };
   }
 
   /**
    * Job antrian yang menunggu dikerjakan mekanik (QUEUED)
    * @param {string} mechanicId
-   * @returns {Promise<{jobs: Array, count: number}>}
+   * @returns {Promise<{jobs: Array, count: number, _metadata: Object}>}
    */
   async getMechanicPendingJobs(mechanicId) {
     const jobs = await prisma.mechanicAssignment.findMany({
@@ -149,6 +238,12 @@ class InsightRepository {
         createdAt: i.orderItem.order.createdAt,
       })),
       count: jobs.length,
+      _metadata: {
+        ...this.#getDateRanges(),
+        type: "real-time",
+        description:
+          "Job antrian yang menunggu dikerjakan (real-time, no cache)",
+      },
     };
   }
 
@@ -170,10 +265,54 @@ class InsightRepository {
 
     const [daily, weekly, monthly, yearly, activeCount, recentJobs] =
       await Promise.all([
-        prisma.$queryRaw`SELECT COUNT(ma."id")::int as completed, COALESCE(SUM(oi."subtotal"), 0)::bigint as earnings FROM "MechanicAssignment" ma INNER JOIN "OrderItem" oi ON ma."orderItemId" = oi."id" INNER JOIN "Order" o ON oi."orderId" = o."id" WHERE ma."mechanicId" = ${mechanicId} AND ma."endAt" >= ${startDay} AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL`,
-        prisma.$queryRaw`SELECT COUNT(ma."id")::int as completed, COALESCE(SUM(oi."subtotal"), 0)::bigint as earnings FROM "MechanicAssignment" ma INNER JOIN "OrderItem" oi ON ma."orderItemId" = oi."id" INNER JOIN "Order" o ON oi."orderId" = o."id" WHERE ma."mechanicId" = ${mechanicId} AND ma."endAt" >= ${startWeek} AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL`,
-        prisma.$queryRaw`SELECT COUNT(ma."id")::int as completed, COALESCE(SUM(oi."subtotal"), 0)::bigint as earnings FROM "MechanicAssignment" ma INNER JOIN "OrderItem" oi ON ma."orderItemId" = oi."id" INNER JOIN "Order" o ON oi."orderId" = o."id" WHERE ma."mechanicId" = ${mechanicId} AND ma."endAt" >= ${startMonth} AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL`,
-        prisma.$queryRaw`SELECT COUNT(ma."id")::int as completed, COALESCE(SUM(oi."subtotal"), 0)::bigint as earnings FROM "MechanicAssignment" ma INNER JOIN "OrderItem" oi ON ma."orderItemId" = oi."id" INNER JOIN "Order" o ON oi."orderId" = o."id" WHERE ma."mechanicId" = ${mechanicId} AND ma."endAt" >= ${startYear} AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL`,
+        prisma.$queryRaw`
+      SELECT 
+        COUNT(ma."id")::int as completed, 
+        COALESCE(SUM(oi."subtotal"), 0)::bigint as earnings 
+      FROM "MechanicAssignment" ma 
+      INNER JOIN "OrderItem" oi ON ma."orderItemId" = oi."id" 
+      INNER JOIN "Order" o ON oi."orderId" = o."id" 
+      WHERE ma."mechanicId" = ${mechanicId} 
+        AND ma."endAt" >= ${startDay} 
+        AND o."status" IN ('COMPLETED','CLOSED') 
+        AND o."deletedAt" IS NULL
+    `,
+        prisma.$queryRaw`
+      SELECT 
+        COUNT(ma."id")::int as completed, 
+        COALESCE(SUM(oi."subtotal"), 0)::bigint as earnings 
+      FROM "MechanicAssignment" ma 
+      INNER JOIN "OrderItem" oi ON ma."orderItemId" = oi."id" 
+      INNER JOIN "Order" o ON oi."orderId" = o."id" 
+      WHERE ma."mechanicId" = ${mechanicId} 
+        AND ma."endAt" >= ${startWeek} 
+        AND o."status" IN ('COMPLETED','CLOSED') 
+        AND o."deletedAt" IS NULL
+    `,
+        prisma.$queryRaw`
+      SELECT 
+        COUNT(ma."id")::int as completed, 
+        COALESCE(SUM(oi."subtotal"), 0)::bigint as earnings 
+      FROM "MechanicAssignment" ma 
+      INNER JOIN "OrderItem" oi ON ma."orderItemId" = oi."id" 
+      INNER JOIN "Order" o ON oi."orderId" = o."id" 
+      WHERE ma."mechanicId" = ${mechanicId} 
+        AND ma."endAt" >= ${startMonth} 
+        AND o."status" IN ('COMPLETED','CLOSED') 
+        AND o."deletedAt" IS NULL
+    `,
+        prisma.$queryRaw`
+      SELECT 
+        COUNT(ma."id")::int as completed, 
+        COALESCE(SUM(oi."subtotal"), 0)::bigint as earnings 
+      FROM "MechanicAssignment" ma 
+      INNER JOIN "OrderItem" oi ON ma."orderItemId" = oi."id" 
+      INNER JOIN "Order" o ON oi."orderId" = o."id" 
+      WHERE ma."mechanicId" = ${mechanicId} 
+        AND ma."endAt" >= ${startYear} 
+        AND o."status" IN ('COMPLETED','CLOSED') 
+        AND o."deletedAt" IS NULL
+    `,
         prisma.mechanicAssignment.count({
           where: {
             mechanicId,
@@ -248,11 +387,32 @@ class InsightRepository {
         earnings: Number(j.orderItem.subtotal),
         startAt: j.startAt,
         endAt: j.endAt,
-        duration:
+        durationMinutes:
           j.startAt && j.endAt
             ? Math.round((new Date(j.endAt) - new Date(j.startAt)) / 60000)
             : null,
       })),
+      _metadata: {
+        ...this.#getDateRanges(),
+        periods: {
+          daily: {
+            start: startDay.toISOString(),
+            description: "Hari ini (sejak jam 00:00)",
+          },
+          weekly: {
+            start: startWeek.toISOString(),
+            description: "Minggu ini (Senin-Minggu)",
+          },
+          monthly: {
+            start: startMonth.toISOString(),
+            description: "Bulan ini (tanggal 1 sampai sekarang)",
+          },
+          yearly: {
+            start: startYear.toISOString(),
+            description: "1 tahun terakhir",
+          },
+        },
+      },
     };
   }
 
@@ -334,34 +494,14 @@ class InsightRepository {
           (new Date(j.endAt) - new Date(j.startAt)) / 60000
         ),
       })),
-    };
-  }
-
-  /**
-   * Service yang paling sering dikerjakan mekanik
-   * @param {string} mechanicId
-   * @returns {Promise<Object>}
-   */
-  async getMechanicTopServices(mechanicId) {
-    const startMonth = this.#getStartOfMonth();
-    const startYear = this.#getOneYearAgo();
-
-    const [monthly, yearly] = await Promise.all([
-      prisma.$queryRaw`SELECT oi."productNameSnapshot" as "serviceName", COUNT(ma."id")::int as count, COALESCE(SUM(oi."subtotal"), 0)::bigint as earnings FROM "MechanicAssignment" ma INNER JOIN "OrderItem" oi ON ma."orderItemId" = oi."id" WHERE ma."mechanicId" = ${mechanicId} AND ma."endAt" >= ${startMonth} GROUP BY oi."productNameSnapshot" ORDER BY count DESC LIMIT 5`,
-      prisma.$queryRaw`SELECT oi."productNameSnapshot" as "serviceName", COUNT(ma."id")::int as count, COALESCE(SUM(oi."subtotal"), 0)::bigint as earnings FROM "MechanicAssignment" ma INNER JOIN "OrderItem" oi ON ma."orderItemId" = oi."id" WHERE ma."mechanicId" = ${mechanicId} AND ma."endAt" >= ${startYear} GROUP BY oi."productNameSnapshot" ORDER BY count DESC LIMIT 5`,
-    ]);
-
-    return {
-      monthly: monthly.map((r) => ({
-        serviceName: r.serviceName,
-        count: Number(r.count),
-        earnings: Number(r.earnings),
-      })),
-      yearly: yearly.map((r) => ({
-        serviceName: r.serviceName,
-        count: Number(r.count),
-        earnings: Number(r.earnings),
-      })),
+      _metadata: {
+        ...this.#getDateRanges(),
+        periods: {
+          weekly: { start: startWeek.toISOString() },
+          monthly: { start: startMonth.toISOString() },
+          yearly: { start: startYear.toISOString() },
+        },
+      },
     };
   }
 
@@ -382,7 +522,10 @@ class InsightRepository {
           mechanicId,
           endAt: { not: null },
           orderItem: {
-            order: { status: { in: ["COMPLETED", "CLOSED"] }, deletedAt: null },
+            order: {
+              status: { in: ["COMPLETED", "CLOSED"] },
+              deletedAt: null,
+            },
           },
         },
         select: {
@@ -425,6 +568,110 @@ class InsightRepository {
         earnings: Number(j.orderItem.subtotal),
         completedAt: j.endAt,
       })),
+      _metadata: {
+        ...this.#getDateRanges(),
+        periods: {
+          monthly: { start: startMonth.toISOString() },
+          yearly: { start: startYear.toISOString() },
+        },
+      },
+    };
+  }
+
+  /**
+   * Pendapatan mekanik: ringkasan + detail job
+   * @param {string} mechanicId
+   * @returns {Promise<Object>}
+   */
+  async getMechanicEarningsBreakdown(mechanicId) {
+    const startMonth = this.#getStartOfMonth();
+    const startYear = this.#getOneYearAgo();
+
+    const [monthly, yearly, topEarningJobs] = await Promise.all([
+      prisma.$queryRaw`
+      SELECT 
+        COUNT(ma."id")::int as jobs, 
+        COALESCE(SUM(oi."subtotal"), 0)::bigint as earnings, 
+        ROUND(AVG(oi."subtotal"))::int as avgPerJob 
+      FROM "MechanicAssignment" ma 
+      INNER JOIN "OrderItem" oi ON ma."orderItemId" = oi."id" 
+      INNER JOIN "Order" o ON oi."orderId" = o."id" 
+      WHERE ma."mechanicId" = ${mechanicId} 
+        AND ma."endAt" >= ${startMonth} 
+        AND o."status" IN ('COMPLETED','CLOSED') 
+        AND o."deletedAt" IS NULL
+    `,
+      prisma.$queryRaw`
+      SELECT 
+        COUNT(ma."id")::int as jobs, 
+        COALESCE(SUM(oi."subtotal"), 0)::bigint as earnings, 
+        ROUND(AVG(oi."subtotal"))::int as avgPerJob 
+      FROM "MechanicAssignment" ma 
+      INNER JOIN "OrderItem" oi ON ma."orderItemId" = oi."id" 
+      INNER JOIN "Order" o ON oi."orderId" = o."id" 
+      WHERE ma."mechanicId" = ${mechanicId} 
+        AND ma."endAt" >= ${startYear} 
+        AND o."status" IN ('COMPLETED','CLOSED') 
+        AND o."deletedAt" IS NULL
+    `,
+      prisma.mechanicAssignment.findMany({
+        where: {
+          mechanicId,
+          endAt: { not: null },
+          orderItem: {
+            order: {
+              status: { in: ["COMPLETED", "CLOSED"] },
+              deletedAt: null,
+            },
+          },
+        },
+        select: {
+          endAt: true,
+          orderItem: {
+            select: {
+              productNameSnapshot: true,
+              subtotal: true,
+              order: {
+                select: {
+                  orderNumber: true,
+                  vehicle: { select: { plateNumber: true } },
+                },
+              },
+            },
+          },
+        },
+        orderBy: { orderItem: { subtotal: "desc" } },
+        take: 10,
+      }),
+    ]);
+
+    return {
+      summary: {
+        monthly: {
+          jobs: Number(monthly[0].jobs),
+          earnings: Number(monthly[0].earnings),
+          avgPerJob: Number(monthly[0].avgPerJob) || 0,
+        },
+        yearly: {
+          jobs: Number(yearly[0].jobs),
+          earnings: Number(yearly[0].earnings),
+          avgPerJob: Number(yearly[0].avgPerJob) || 0,
+        },
+      },
+      topEarningJobs: topEarningJobs.map((j) => ({
+        orderNumber: j.orderItem.order.orderNumber,
+        service: j.orderItem.productNameSnapshot,
+        plateNumber: j.orderItem.order.vehicle?.plateNumber || "-",
+        earnings: Number(j.orderItem.subtotal),
+        completedAt: j.endAt,
+      })),
+      _metadata: {
+        ...this.#getDateRanges(),
+        periods: {
+          monthly: { start: startMonth.toISOString() },
+          yearly: { start: startYear.toISOString() },
+        },
+      },
     };
   }
 
@@ -451,6 +698,7 @@ class InsightRepository {
         topPerformers: [],
         bottomPerformers: [],
         allRankings: [],
+        _metadata: { ...this.#getDateRanges(), type: "all-time" },
       };
 
     return {
@@ -479,6 +727,11 @@ class InsightRepository {
         avgMinutes: Number(r.avg_minutes),
         totalJobs: Number(r.total_jobs),
       })),
+      _metadata: {
+        ...this.#getDateRanges(),
+        type: "all-time",
+        description: "Ranking berdasarkan seluruh history (minimal 5 job)",
+      },
     };
   }
 
@@ -503,6 +756,7 @@ class InsightRepository {
       await this.#getSetting("shift_min_starting_cash", "1000000"),
       10
     );
+    const targets = await this.#getAllTargetSettings();
 
     const [
       todayData,
@@ -613,6 +867,24 @@ class InsightRepository {
         pendingOrders: pendingCount,
         minStartingCash,
       },
+      targets: {
+        daily: {
+          revenue: targets.dailyRevenue,
+          orders: targets.dailyOrder,
+          revenuePct:
+            targets.dailyRevenue > 0
+              ? Math.round((todaySales / targets.dailyRevenue) * 100)
+              : 0,
+          orderPct:
+            targets.dailyOrder > 0
+              ? Math.round((todayData._count / targets.dailyOrder) * 100)
+              : 0,
+        },
+        monthly: {
+          revenue: targets.monthlyRevenue,
+          orders: targets.monthlyOrder,
+        },
+      },
       topTransactions: topTransactions.map((t) => ({
         orderNumber: t.orderNumber,
         customer: t.customer?.name || "Umum",
@@ -620,6 +892,14 @@ class InsightRepository {
         method: t.payment?.method || null,
         createdAt: t.createdAt,
       })),
+      _metadata: {
+        ...this.#getDateRanges(),
+        periods: {
+          daily: { start: startDay.toISOString() },
+          monthly: { start: startMonth.toISOString() },
+          yearly: { start: startYear.toISOString() },
+        },
+      },
     };
   }
 
@@ -652,6 +932,7 @@ class InsightRepository {
         },
         recentExpenses: [],
         recentOrders: [],
+        _metadata: { ...this.#getDateRanges(), type: "real-time" },
       };
 
     const [expenses, paymentBreakdown, recentExpenses, recentOrders] =
@@ -728,6 +1009,11 @@ class InsightRepository {
         method: o.payment?.method || null,
         createdAt: o.createdAt,
       })),
+      _metadata: {
+        ...this.#getDateRanges(),
+        type: "real-time",
+        shiftOpenedAt: shift.openedAt,
+      },
     };
   }
 
@@ -750,6 +1036,7 @@ class InsightRepository {
     return {
       byStatus: raw.map((i) => ({ status: i.status, count: i._count.id })),
       totalPending,
+      _metadata: { ...this.#getDateRanges(), type: "real-time" },
     };
   }
 
@@ -799,6 +1086,7 @@ class InsightRepository {
       monthly: Number(monthly[0].count),
       yearly: Number(yearly[0].count),
       top: topCustomer,
+      _metadata: { ...this.#getDateRanges() },
     };
   }
 
@@ -850,6 +1138,7 @@ class InsightRepository {
         avgCashSales: Math.round(allTime._avg.cashSales || 0),
         totalCashSales: Number(allTime._sum.cashSales || 0),
       },
+      _metadata: { ...this.#getDateRanges(), type: "all-time" },
     };
   }
 
@@ -859,30 +1148,31 @@ class InsightRepository {
    * @returns {Promise<Array>}
    */
   async getCashierRecentTransactions(cashierId) {
-    return prisma.order
-      .findMany({
-        where: { cashierId, deletedAt: null },
-        select: {
-          orderNumber: true,
-          total: true,
-          status: true,
-          createdAt: true,
-          customer: { select: { name: true } },
-          payment: { select: { method: true } },
-        },
-        orderBy: { createdAt: "desc" },
-        take: 20,
-      })
-      .then((r) =>
-        r.map((i) => ({
-          orderNumber: i.orderNumber,
-          total: i.total,
-          status: i.status,
-          customer: i.customer?.name || "Umum",
-          method: i.payment?.method || null,
-          createdAt: i.createdAt,
-        }))
-      );
+    const transactions = await prisma.order.findMany({
+      where: { cashierId, deletedAt: null },
+      select: {
+        orderNumber: true,
+        total: true,
+        status: true,
+        createdAt: true,
+        customer: { select: { name: true } },
+        payment: { select: { method: true } },
+      },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+    });
+    return {
+      transactions: transactions.map((i) => ({
+        orderNumber: i.orderNumber,
+        total: i.total,
+        status: i.status,
+        customer: i.customer?.name || "Umum",
+        method: i.payment?.method || null,
+        createdAt: i.createdAt,
+      })),
+      count: transactions.length,
+      _metadata: { ...this.#getDateRanges(), type: "recent" },
+    };
   }
 
   /**
@@ -932,15 +1222,16 @@ class InsightRepository {
         direction: salesChange > 0 ? "up" : salesChange < 0 ? "down" : "stable",
       },
       rank: rankRaw.length ? Number(rankRaw[0].rank) : null,
+      _metadata: { ...this.#getDateRanges() },
     };
   }
 
   // ============================================================================
-  // ADMIN - DASHBOARD & OVERVIEW (10 functions)
+  // ADMIN - DASHBOARD & OVERVIEW
   // ============================================================================
 
   /**
-   * Dashboard bengkel: ringkasan + recent orders + top mechanics
+   * Dashboard bengkel: ringkasan + recent orders + top mechanics + targets
    * @returns {Promise<Object>}
    */
   async getAdminDashboardSnapshot() {
@@ -948,9 +1239,10 @@ class InsightRepository {
     const startMonth = this.#getStartOfMonth();
     const startYear = this.#getOneYearAgo();
 
-    const [lowThreshold, maxTasks] = await Promise.all([
+    const [lowThreshold, maxTasks, targets] = await Promise.all([
       this.#getSetting("stock_low_threshold", "5"),
       this.#getSetting("mechanic_max_tasks", "5"),
+      this.#getAllTargetSettings(),
     ]);
 
     const [
@@ -962,6 +1254,7 @@ class InsightRepository {
       lowStock,
       recentOrders,
       topMechanics,
+      dailyTargetCheck,
     ] = await Promise.all([
       prisma.order.aggregate({
         where: {
@@ -1018,16 +1311,23 @@ class InsightRepository {
         take: 5,
       }),
       prisma.$queryRaw`SELECT u."fullName", COUNT(ma."id")::int as jobs, COALESCE(SUM(oi."subtotal"), 0)::bigint as earnings FROM "User" u LEFT JOIN "MechanicAssignment" ma ON u."id" = ma."mechanicId" LEFT JOIN "OrderItem" oi ON ma."orderItemId" = oi."id" LEFT JOIN "Order" o ON oi."orderId" = o."id" WHERE u."role" = 'MECHANIC' AND ma."endAt" >= ${startMonth} AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL GROUP BY u."fullName" ORDER BY earnings DESC LIMIT 5`,
+      prisma.order.aggregate({
+        where: { createdAt: { gte: startDay }, deletedAt: null },
+        _count: true,
+      }),
     ]);
+
+    const dailyRevenue = Number(daily._sum.total || 0);
+    const dailyOrders = daily._count;
 
     return {
       revenue: {
-        daily: Number(daily._sum.total || 0),
+        daily: dailyRevenue,
         monthly: Number(monthly._sum.total || 0),
         yearly: Number(yearly._sum.total || 0),
       },
       orders: {
-        daily: daily._count,
+        daily: dailyOrders,
         monthly: monthly._count,
         yearly: yearly._count,
       },
@@ -1039,6 +1339,26 @@ class InsightRepository {
       settings: {
         lowStockThreshold: parseInt(lowThreshold, 10),
         mechanicMaxTasks: parseInt(maxTasks, 10),
+      },
+      targets: {
+        daily: {
+          revenue: targets.dailyRevenue,
+          revenuePct:
+            targets.dailyRevenue > 0
+              ? Math.round((dailyRevenue / targets.dailyRevenue) * 100)
+              : 0,
+          orders: targets.dailyOrder,
+          orderPct:
+            targets.dailyOrder > 0
+              ? Math.round((dailyOrders / targets.dailyOrder) * 100)
+              : 0,
+        },
+        monthly: {
+          revenue: targets.monthlyRevenue,
+          orders: targets.monthlyOrder,
+          profit: targets.monthlyProfit,
+        },
+        yearly: { revenue: targets.yearlyRevenue },
       },
       recentOrders: recentOrders.map((o) => ({
         orderNumber: o.orderNumber,
@@ -1052,6 +1372,7 @@ class InsightRepository {
         jobs: Number(m.jobs),
         earnings: Number(m.earnings),
       })),
+      _metadata: { ...this.#getDateRanges() },
     };
   }
 
@@ -1101,7 +1422,6 @@ class InsightRepository {
     const change = yesterdayRevenue
       ? Math.round(((todayRevenue - yesterdayRevenue) / yesterdayRevenue) * 100)
       : 0;
-
     const cashPayments = paymentBreakdown.find((p) => p.method === "CASH");
     const qrisPayments = paymentBreakdown.find((p) => p.method === "QRIS");
 
@@ -1127,6 +1447,7 @@ class InsightRepository {
           count: qrisPayments?._count.method || 0,
         },
       },
+      _metadata: { ...this.#getDateRanges() },
     };
   }
 
@@ -1156,6 +1477,7 @@ class InsightRepository {
         totalSales: Number(r.totalSales),
         avgDiscrepancy: Number(r.avgDiscrepancy) || 0,
       })),
+      _metadata: { ...this.#getDateRanges() },
     };
   }
 
@@ -1187,6 +1509,7 @@ class InsightRepository {
         completionRate: Number(r.completionRate) || 0,
         totalEarnings: Number(r.totalEarnings),
       })),
+      _metadata: { ...this.#getDateRanges() },
     };
   }
 
@@ -1243,6 +1566,7 @@ class InsightRepository {
         category: e.category,
         date: e.date,
       })),
+      _metadata: { ...this.#getDateRanges() },
     };
   }
 
@@ -1348,6 +1672,11 @@ class InsightRepository {
         cost: p.cost,
         price: p.price,
       })),
+      _metadata: {
+        ...this.#getDateRanges(),
+        lowThreshold,
+        deadStockSince: since90.toISOString().split("T")[0],
+      },
     };
   }
 
@@ -1459,6 +1788,19 @@ class InsightRepository {
         customerGrowth: calc(thisYearCust, lastYearCust),
         orderGrowth: calc(thisYearOrd, lastYearOrd),
       },
+      _metadata: {
+        ...this.#getDateRanges(),
+        periods: {
+          monthly: {
+            thisMonth: thisMonth.toISOString(),
+            lastMonth: lastMonth.toISOString(),
+          },
+          yearly: {
+            thisYear: thisYear.toISOString(),
+            lastYear: lastYear.toISOString(),
+          },
+        },
+      },
     };
   }
 
@@ -1519,6 +1861,7 @@ class InsightRepository {
         stock: Number(r.stock),
         sold90Days: Number(r.sold_90d),
       })),
+      _metadata: { ...this.#getDateRanges() },
     };
   }
 
@@ -1546,12 +1889,18 @@ class InsightRepository {
         peakOrders: Number(yearly[0]?.orders || 0),
         peakRevenue: Number(yearly[0]?.revenue || 0),
       },
+      _metadata: { ...this.#getDateRanges() },
     };
   }
 
   // ============================================================================
-  // P1 - CRITICAL: Attention Needed & Restock (2 functions)
+  // P1 - CRITICAL
   // ============================================================================
+
+  /**
+   * Order yang perlu perhatian: stuck, overdue, unpaid
+   * @returns {Promise<Object>}
+   */
 
   /**
    * Order yang perlu perhatian: stuck, overdue, unpaid
@@ -1665,6 +2014,12 @@ class InsightRepository {
         totalAttentionNeeded:
           stuckOrders.length + overduePayments.length + unpaidOrders.length,
       },
+      _metadata: {
+        ...this.#getDateRanges(),
+        type: "real-time",
+        stuckThreshold: "3 jam",
+        overdueThreshold: "1 hari",
+      },
     };
   }
 
@@ -1702,23 +2057,7 @@ class InsightRepository {
         orderBy: { stock: "asc" },
         take: 20,
       }),
-      prisma.$queryRaw`
-        SELECT p."id", p."sku", p."name", p."stock", p."cost", p."price",
-          COALESCE(SUM(oi."quantity"), 0)::int as sold_90d,
-          ROUND(COALESCE(SUM(oi."quantity"), 0) / 90.0, 1) as avg_daily_sales
-        FROM "Product" p
-        LEFT JOIN "OrderItem" oi ON p."id" = oi."productId"
-        LEFT JOIN "Order" o ON oi."orderId" = o."id"
-          AND o."createdAt" >= ${since90}
-          AND o."status" IN ('COMPLETED','CLOSED')
-          AND o."deletedAt" IS NULL
-        WHERE p."type" = 'SPAREPART' AND p."isActive" = true
-          AND p."stock" <= ${lowThreshold}
-        GROUP BY p."id", p."sku", p."name", p."stock", p."cost", p."price"
-        HAVING COALESCE(SUM(oi."quantity"), 0) > 0
-        ORDER BY avg_daily_sales DESC
-        LIMIT 20
-      `,
+      prisma.$queryRaw`SELECT p."id", p."sku", p."name", p."stock", p."cost", p."price", COALESCE(SUM(oi."quantity"), 0)::int as sold_90d, ROUND(COALESCE(SUM(oi."quantity"), 0) / 90.0, 1) as avg_daily_sales FROM "Product" p LEFT JOIN "OrderItem" oi ON p."id" = oi."productId" LEFT JOIN "Order" o ON oi."orderId" = o."id" AND o."createdAt" >= ${since90} AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL WHERE p."type" = 'SPAREPART' AND p."isActive" = true AND p."stock" <= ${lowThreshold} GROUP BY p."id", p."sku", p."name", p."stock", p."cost", p."price" HAVING COALESCE(SUM(oi."quantity"), 0) > 0 ORDER BY avg_daily_sales DESC LIMIT 20`,
     ]);
 
     const totalRestockCost = [...outOfStock, ...lowStock].reduce(
@@ -1774,11 +2113,12 @@ class InsightRepository {
         estimatedTotalCost: totalRestockCost,
         lowThreshold,
       },
+      _metadata: { ...this.#getDateRanges(), lowThreshold },
     };
   }
 
   // ============================================================================
-  // P2 - HIGH VALUE: Order Trend, Revenue by Day, Customer Segmentation (3 functions)
+  // P2 - HIGH VALUE
   // ============================================================================
 
   /**
@@ -1787,21 +2127,13 @@ class InsightRepository {
    */
   async getAdminOrderTrend() {
     const fourWeeksAgo = new Date(Date.now() - 28 * 86400000);
-
-    const raw = await prisma.$queryRaw`
-      SELECT DATE("createdAt") as date, COUNT("id")::int as orders, COALESCE(SUM("total"), 0)::bigint as revenue
-      FROM "Order"
-      WHERE "createdAt" >= ${fourWeeksAgo} AND "deletedAt" IS NULL
-      GROUP BY DATE("createdAt")
-      ORDER BY date ASC
-    `;
-
+    const raw =
+      await prisma.$queryRaw`SELECT DATE("createdAt") as date, COUNT("id")::int as orders, COALESCE(SUM("total"), 0)::bigint as revenue FROM "Order" WHERE "createdAt" >= ${fourWeeksAgo} AND "deletedAt" IS NULL GROUP BY DATE("createdAt") ORDER BY date ASC`;
     const daily = raw.map((r) => ({
       date: r.date,
       orders: Number(r.orders),
       revenue: Number(r.revenue),
     }));
-
     const firstWeek = daily.slice(0, 7).reduce((s, d) => s + d.orders, 0);
     const lastWeek = daily.slice(-7).reduce((s, d) => s + d.orders, 0);
     const trend =
@@ -1822,6 +2154,10 @@ class InsightRepository {
         trend,
         direction: trend > 0 ? "up" : trend < 0 ? "down" : "stable",
       },
+      _metadata: {
+        ...this.#getDateRanges(),
+        trendStart: fourWeeksAgo.toISOString().split("T")[0],
+      },
     };
   }
 
@@ -1831,15 +2167,8 @@ class InsightRepository {
    */
   async getAdminRevenueByDayOfWeek() {
     const startYear = this.#getOneYearAgo();
-
-    const raw = await prisma.$queryRaw`
-      SELECT EXTRACT(DOW FROM "createdAt")::int as day_of_week, COUNT("id")::int as orders, COALESCE(SUM("total"), 0)::bigint as revenue, ROUND(AVG("total"))::int as avg_order_value
-      FROM "Order"
-      WHERE "createdAt" >= ${startYear} AND "status" IN ('COMPLETED','CLOSED') AND "deletedAt" IS NULL
-      GROUP BY day_of_week
-      ORDER BY day_of_week ASC
-    `;
-
+    const raw =
+      await prisma.$queryRaw`SELECT EXTRACT(DOW FROM "createdAt")::int as day_of_week, COUNT("id")::int as orders, COALESCE(SUM("total"), 0)::bigint as revenue, ROUND(AVG("total"))::int as avg_order_value FROM "Order" WHERE "createdAt" >= ${startYear} AND "status" IN ('COMPLETED','CLOSED') AND "deletedAt" IS NULL GROUP BY day_of_week ORDER BY day_of_week ASC`;
     const dayNames = [
       "Minggu",
       "Senin",
@@ -1849,7 +2178,6 @@ class InsightRepository {
       "Jumat",
       "Sabtu",
     ];
-
     const daily = raw.map((r) => ({
       day: dayNames[Number(r.day_of_week)],
       dayIndex: Number(r.day_of_week),
@@ -1857,7 +2185,6 @@ class InsightRepository {
       revenue: Number(r.revenue),
       avgOrderValue: Number(r.avg_order_value),
     }));
-
     const bestDay = [...daily].sort((a, b) => b.revenue - a.revenue)[0];
     const worstDay = [...daily].sort((a, b) => a.revenue - b.revenue)[0];
 
@@ -1879,6 +2206,7 @@ class InsightRepository {
             }
           : null,
       },
+      _metadata: { ...this.#getDateRanges() },
     };
   }
 
@@ -1887,51 +2215,12 @@ class InsightRepository {
    * @returns {Promise<Object>}
    */
   async getAdminCustomerSegmentation() {
-    const twoVisitsThreshold = 2;
-    const fiveVisitsThreshold = 5;
     const dormantDays = 90;
     const dormantDate = new Date(Date.now() - dormantDays * 86400000);
-
-    const raw = await prisma.$queryRaw`
-      WITH customer_stats AS (
-        SELECT c."id", c."name", c."phone",
-          COUNT(DISTINCT o."id")::int as total_visits,
-          COALESCE(SUM(o."total"), 0)::bigint as total_spent,
-          MAX(o."createdAt") as last_visit,
-          MIN(o."createdAt") as first_visit
-        FROM "Customer" c
-        LEFT JOIN "Order" o ON c."id" = o."customerId"
-          AND o."status" IN ('COMPLETED','CLOSED')
-          AND o."deletedAt" IS NULL
-        GROUP BY c."id", c."name", c."phone"
-      )
-      SELECT 
-        COUNT(*)::int as total_customers,
-        COUNT(*) FILTER (WHERE total_visits = 1)::int as new_customers,
-        COUNT(*) FILTER (WHERE total_visits >= ${twoVisitsThreshold} AND total_visits <= ${fiveVisitsThreshold})::int as regular_customers,
-        COUNT(*) FILTER (WHERE total_visits > ${fiveVisitsThreshold})::int as vip_customers,
-        COUNT(*) FILTER (WHERE total_visits > 0 AND last_visit < ${dormantDate})::int as dormant_customers,
-        COUNT(*) FILTER (WHERE total_visits = 0)::int as no_order_customers,
-        COALESCE(SUM(total_spent), 0)::bigint as total_revenue
-      FROM customer_stats
-    `;
-
-    const topVIP = await prisma.$queryRaw`
-      WITH customer_stats AS (
-        SELECT c."id", c."name", c."phone",
-          COUNT(DISTINCT o."id")::int as total_visits,
-          COALESCE(SUM(o."total"), 0)::bigint as total_spent,
-          MAX(o."createdAt") as last_visit
-        FROM "Customer" c
-        INNER JOIN "Order" o ON c."id" = o."customerId"
-          AND o."status" IN ('COMPLETED','CLOSED')
-          AND o."deletedAt" IS NULL
-        GROUP BY c."id", c."name", c."phone"
-        HAVING COUNT(DISTINCT o."id") > ${fiveVisitsThreshold}
-      )
-      SELECT * FROM customer_stats ORDER BY total_spent DESC LIMIT 10
-    `;
-
+    const raw =
+      await prisma.$queryRaw`WITH customer_stats AS (SELECT c."id", c."name", c."phone", COUNT(DISTINCT o."id")::int as total_visits, COALESCE(SUM(o."total"), 0)::bigint as total_spent, MAX(o."createdAt") as last_visit, MIN(o."createdAt") as first_visit FROM "Customer" c LEFT JOIN "Order" o ON c."id" = o."customerId" AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL GROUP BY c."id", c."name", c."phone") SELECT COUNT(*)::int as total_customers, COUNT(*) FILTER (WHERE total_visits = 1)::int as new_customers, COUNT(*) FILTER (WHERE total_visits >= 2 AND total_visits <= 5)::int as regular_customers, COUNT(*) FILTER (WHERE total_visits > 5)::int as vip_customers, COUNT(*) FILTER (WHERE total_visits > 0 AND last_visit < ${dormantDate})::int as dormant_customers, COUNT(*) FILTER (WHERE total_visits = 0)::int as no_order_customers, COALESCE(SUM(total_spent), 0)::bigint as total_revenue FROM customer_stats`;
+    const topVIP =
+      await prisma.$queryRaw`WITH customer_stats AS (SELECT c."id", c."name", c."phone", COUNT(DISTINCT o."id")::int as total_visits, COALESCE(SUM(o."total"), 0)::bigint as total_spent, MAX(o."createdAt") as last_visit FROM "Customer" c INNER JOIN "Order" o ON c."id" = o."customerId" AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL GROUP BY c."id", c."name", c."phone" HAVING COUNT(DISTINCT o."id") > 5) SELECT * FROM customer_stats ORDER BY total_spent DESC LIMIT 10`;
     const r = raw[0];
     const total = Number(r.total_customers);
 
@@ -1977,11 +2266,12 @@ class InsightRepository {
         totalSpent: Number(c.total_spent),
         lastVisit: c.last_visit,
       })),
+      _metadata: { ...this.#getDateRanges(), dormantDays },
     };
   }
 
   // ============================================================================
-  // P3 - GROWTH: Profitable Services, Service Bundles, Revenue Forecast (3 functions)
+  // P3 - GROWTH
   // ============================================================================
 
   /**
@@ -1990,24 +2280,8 @@ class InsightRepository {
    */
   async getAdminMostProfitableServices() {
     const startYear = this.#getOneYearAgo();
-
-    const raw = await prisma.$queryRaw`
-      SELECT oi."productNameSnapshot" as name,
-        COUNT(DISTINCT o."id")::int as orders,
-        SUM(oi."quantity")::int as quantity,
-        SUM(oi."subtotal")::bigint as revenue,
-        SUM(oi."unitCostSnapshot" * oi."quantity")::bigint as cost,
-        SUM(oi."subtotal" - (oi."unitCostSnapshot" * oi."quantity"))::bigint as profit,
-        CASE WHEN SUM(oi."subtotal") > 0 THEN ROUND((SUM(oi."subtotal" - (oi."unitCostSnapshot" * oi."quantity"))::float / SUM(oi."subtotal") * 100)::numeric, 1) ELSE 0 END as margin_pct
-      FROM "OrderItem" oi
-      INNER JOIN "Product" p ON oi."productId" = p."id"
-      INNER JOIN "Order" o ON oi."orderId" = o."id"
-      WHERE p."type" = 'SERVICE' AND o."createdAt" >= ${startYear} AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL
-      GROUP BY oi."productNameSnapshot"
-      ORDER BY margin_pct DESC
-      LIMIT 15
-    `;
-
+    const raw =
+      await prisma.$queryRaw`SELECT oi."productNameSnapshot" as name, COUNT(DISTINCT o."id")::int as orders, SUM(oi."quantity")::int as quantity, SUM(oi."subtotal")::bigint as revenue, SUM(oi."unitCostSnapshot" * oi."quantity")::bigint as cost, SUM(oi."subtotal" - (oi."unitCostSnapshot" * oi."quantity"))::bigint as profit, CASE WHEN SUM(oi."subtotal") > 0 THEN ROUND((SUM(oi."subtotal" - (oi."unitCostSnapshot" * oi."quantity"))::float / SUM(oi."subtotal") * 100)::numeric, 1) ELSE 0 END as margin_pct FROM "OrderItem" oi INNER JOIN "Product" p ON oi."productId" = p."id" INNER JOIN "Order" o ON oi."orderId" = o."id" WHERE p."type" = 'SERVICE' AND o."createdAt" >= ${startYear} AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL GROUP BY oi."productNameSnapshot" ORDER BY margin_pct DESC LIMIT 15`;
     const services = raw.map((r) => ({
       name: r.name,
       orders: Number(r.orders),
@@ -2017,7 +2291,6 @@ class InsightRepository {
       profit: Number(r.profit),
       marginPct: Number(r.margin_pct),
     }));
-
     const avgMargin =
       services.length > 0
         ? Math.round(
@@ -2033,6 +2306,7 @@ class InsightRepository {
         highestMargin: services[0] || null,
         lowestMargin: services[services.length - 1] || null,
       },
+      _metadata: { ...this.#getDateRanges() },
     };
   }
 
@@ -2042,25 +2316,8 @@ class InsightRepository {
    */
   async getAdminServiceBundles() {
     const startYear = this.#getOneYearAgo();
-
-    const raw = await prisma.$queryRaw`
-      WITH order_services AS (
-        SELECT oi."orderId", oi."productNameSnapshot" as service_name
-        FROM "OrderItem" oi
-        INNER JOIN "Product" p ON oi."productId" = p."id"
-        INNER JOIN "Order" o ON oi."orderId" = o."id"
-        WHERE p."type" = 'SERVICE' AND o."createdAt" >= ${startYear} AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL
-      ),
-      bundles AS (
-        SELECT os1.service_name as service_a, os2.service_name as service_b, COUNT(DISTINCT os1."orderId")::int as frequency
-        FROM order_services os1
-        INNER JOIN order_services os2 ON os1."orderId" = os2."orderId" AND os1.service_name < os2.service_name
-        GROUP BY os1.service_name, os2.service_name
-        HAVING COUNT(DISTINCT os1."orderId") >= 2
-      )
-      SELECT * FROM bundles ORDER BY frequency DESC LIMIT 15
-    `;
-
+    const raw =
+      await prisma.$queryRaw`WITH order_services AS (SELECT oi."orderId", oi."productNameSnapshot" as service_name FROM "OrderItem" oi INNER JOIN "Product" p ON oi."productId" = p."id" INNER JOIN "Order" o ON oi."orderId" = o."id" WHERE p."type" = 'SERVICE' AND o."createdAt" >= ${startYear} AND o."status" IN ('COMPLETED','CLOSED') AND o."deletedAt" IS NULL), bundles AS (SELECT os1.service_name as service_a, os2.service_name as service_b, COUNT(DISTINCT os1."orderId")::int as frequency FROM order_services os1 INNER JOIN order_services os2 ON os1."orderId" = os2."orderId" AND os1.service_name < os2.service_name GROUP BY os1.service_name, os2.service_name HAVING COUNT(DISTINCT os1."orderId") >= 2) SELECT * FROM bundles ORDER BY frequency DESC LIMIT 15`;
     return {
       bundles: raw.map((r) => ({
         serviceA: r.service_a,
@@ -2071,6 +2328,7 @@ class InsightRepository {
         totalBundles: raw.length,
         topBundle: raw[0] ? `${raw[0].service_a} + ${raw[0].service_b}` : null,
       },
+      _metadata: { ...this.#getDateRanges() },
     };
   }
 
@@ -2081,21 +2339,13 @@ class InsightRepository {
   async getAdminRevenueForecast() {
     const threeMonthsAgo = new Date();
     threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
-
-    const raw = await prisma.$queryRaw`
-      SELECT DATE_TRUNC('month', "createdAt")::date as month, COALESCE(SUM("total"), 0)::bigint as revenue, COUNT("id")::int as orders
-      FROM "Order"
-      WHERE "createdAt" >= ${threeMonthsAgo} AND "status" IN ('COMPLETED','CLOSED') AND "deletedAt" IS NULL
-      GROUP BY month
-      ORDER BY month ASC
-    `;
-
+    const raw =
+      await prisma.$queryRaw`SELECT DATE_TRUNC('month', "createdAt")::date as month, COALESCE(SUM("total"), 0)::bigint as revenue, COUNT("id")::int as orders FROM "Order" WHERE "createdAt" >= ${threeMonthsAgo} AND "status" IN ('COMPLETED','CLOSED') AND "deletedAt" IS NULL GROUP BY month ORDER BY month ASC`;
     const months = raw.map((r) => ({
       month: r.month,
       revenue: Number(r.revenue),
       orders: Number(r.orders),
     }));
-
     const avgRevenue =
       months.length > 0
         ? Math.round(months.reduce((s, m) => s + m.revenue, 0) / months.length)
@@ -2104,34 +2354,33 @@ class InsightRepository {
       months.length > 0
         ? Math.round(months.reduce((s, m) => s + m.orders, 0) / months.length)
         : 0;
-
     const growthRate =
       months.length >= 2
         ? (months[months.length - 1].revenue - months[0].revenue) /
           Math.max(months[0].revenue, 1)
         : 0;
-
     const forecastRevenue = Math.round(avgRevenue * (1 + growthRate));
     const forecastOrders = Math.round(avgOrders * (1 + growthRate));
 
     return {
       historical: months,
       forecast: {
-        nextMonth: {
-          revenue: forecastRevenue,
-          orders: forecastOrders,
-        },
+        nextMonth: { revenue: forecastRevenue, orders: forecastOrders },
         confidence:
           growthRate > 0.5 ? "low" : growthRate > 0.2 ? "medium" : "high",
         basedOnMonths: months.length,
         avgMonthlyRevenue: avgRevenue,
         growthRate: Math.round(growthRate * 100),
       },
+      _metadata: {
+        ...this.#getDateRanges(),
+        forecastBasedOn: threeMonthsAgo.toISOString().split("T")[0],
+      },
     };
   }
 
   // ============================================================================
-  // EXISTING METHODS (unchanged)
+  // EXISTING METHODS
   // ============================================================================
 
   async getAdminStockAlert() {
@@ -2160,14 +2409,22 @@ class InsightRepository {
         take: 10,
       }),
     ]);
-    return { outOfStock, lowStock, overStock, lowThreshold };
+    return {
+      outOfStock,
+      lowStock,
+      overStock,
+      lowThreshold,
+      _metadata: { ...this.#getDateRanges(), lowThreshold },
+    };
   }
 
   async getAdminRevenueVsTarget() {
     const now = new Date();
     const startMonth = new Date(now.getFullYear(), now.getMonth(), 1);
     const startYear = new Date(now.getFullYear(), 0, 1);
-    const [monthlyRevenue, yearlyRevenue, targetSetting] = await Promise.all([
+    const targets = await this.#getAllTargetSettings();
+
+    const [monthlyRevenue, yearlyRevenue] = await Promise.all([
       prisma.order.aggregate({
         where: {
           createdAt: { gte: startMonth },
@@ -2175,6 +2432,7 @@ class InsightRepository {
           deletedAt: null,
         },
         _sum: { total: true },
+        _count: true,
       }),
       prisma.order.aggregate({
         where: {
@@ -2183,19 +2441,24 @@ class InsightRepository {
           deletedAt: null,
         },
         _sum: { total: true },
+        _count: true,
       }),
-      this.#getSetting("monthly_revenue_target", "0"),
     ]);
+
     const monthlyRev = Number(monthlyRevenue._sum.total || 0);
     const yearlyRev = Number(yearlyRevenue._sum.total || 0);
-    const target = Number(targetSetting || 0);
-    const yearlyTarget = target * 12;
+    const monthlyTarget = targets.monthlyRevenue;
+    const yearlyTarget = targets.yearlyRevenue;
+
     return {
       monthly: {
         current: monthlyRev,
-        target,
-        percentage: target > 0 ? Math.round((monthlyRev / target) * 100) : 0,
-        remaining: Math.max(target - monthlyRev, 0),
+        target: monthlyTarget,
+        percentage:
+          monthlyTarget > 0
+            ? Math.round((monthlyRev / monthlyTarget) * 100)
+            : 0,
+        remaining: Math.max(monthlyTarget - monthlyRev, 0),
         daysInMonth: new Date(
           now.getFullYear(),
           now.getMonth() + 1,
@@ -2217,6 +2480,8 @@ class InsightRepository {
           yearlyTarget > 0 ? Math.round((yearlyRev / yearlyTarget) * 100) : 0,
         remaining: Math.max(yearlyTarget - yearlyRev, 0),
       },
+      allTargets: targets,
+      _metadata: { ...this.#getDateRanges() },
     };
   }
 
@@ -2252,6 +2517,7 @@ class InsightRepository {
         orderCount: c._count.orders,
         vehicleCount: c._count.vehicles,
       })),
+      _metadata: { ...this.#getDateRanges() },
     };
   }
 
@@ -2271,6 +2537,7 @@ class InsightRepository {
         avgHours: Number(yearly[0].avg_hours) || 0,
         totalOrders: Number(yearly[0].total_orders),
       },
+      _metadata: { ...this.#getDateRanges() },
     };
   }
 
@@ -2281,15 +2548,20 @@ class InsightRepository {
     );
     const raw =
       await prisma.$queryRaw`SELECT u."id", u."fullName", COUNT(ma."id")::int as active_jobs FROM "User" u LEFT JOIN "MechanicAssignment" ma ON u."id" = ma."mechanicId" AND ma."endAt" IS NULL AND EXISTS (SELECT 1 FROM "OrderItem" oi INNER JOIN "Order" o ON oi."orderId" = o."id" WHERE oi."id" = ma."orderItemId" AND o."status" IN ('QUEUED','IN_PROGRESS') AND o."deletedAt" IS NULL) WHERE u."role" = 'MECHANIC' AND u."isActive" = true GROUP BY u."id", u."fullName" ORDER BY active_jobs ASC`;
-    return raw.map((r) => ({
-      mechanicId: r.id,
-      mechanicName: r.fullName,
-      activeJobs: Number(r.active_jobs),
-      maxTasks,
-      available: Math.max(0, maxTasks - Number(r.active_jobs)),
-      utilizationPct:
-        maxTasks > 0 ? Math.round((Number(r.active_jobs) / maxTasks) * 100) : 0,
-    }));
+    return {
+      mechanics: raw.map((r) => ({
+        mechanicId: r.id,
+        mechanicName: r.fullName,
+        activeJobs: Number(r.active_jobs),
+        maxTasks,
+        available: Math.max(0, maxTasks - Number(r.active_jobs)),
+        utilizationPct:
+          maxTasks > 0
+            ? Math.round((Number(r.active_jobs) / maxTasks) * 100)
+            : 0,
+      })),
+      _metadata: { ...this.#getDateRanges(), type: "real-time", maxTasks },
+    };
   }
 
   async getAdminCustomerRetention() {
@@ -2314,6 +2586,7 @@ class InsightRepository {
             ? Math.round((Number(r.returning) / Number(r.total)) * 1000) / 10
             : 0,
       })),
+      _metadata: { ...this.#getDateRanges() },
     };
   }
 
@@ -2324,9 +2597,9 @@ class InsightRepository {
       prisma.$queryRaw`SELECT p."method", COUNT(p."id")::int as count, COALESCE(SUM(p."amountPaid"), 0)::bigint as total FROM "Payment" p INNER JOIN "Order" o ON p."orderId" = o."id" WHERE p."status" = 'PAID' AND p."paidAt" >= ${startMonth} AND o."deletedAt" IS NULL GROUP BY p."method" ORDER BY count DESC`,
       prisma.$queryRaw`SELECT p."method", COUNT(p."id")::int as count, COALESCE(SUM(p."amountPaid"), 0)::bigint as total FROM "Payment" p INNER JOIN "Order" o ON p."orderId" = o."id" WHERE p."status" = 'PAID' AND p."paidAt" >= ${startYear} AND o."deletedAt" IS NULL GROUP BY p."method" ORDER BY count DESC`,
     ]);
-    const formatDistribution = (raw) => {
-      const total = raw.reduce((s, r) => s + Number(r.count), 0);
-      return raw.map((r) => ({
+    const formatDistribution = (rawData) => {
+      const total = rawData.reduce((s, r) => s + Number(r.count), 0);
+      return rawData.map((r) => ({
         method: r.method,
         count: Number(r.count),
         total: Number(r.total),
@@ -2336,6 +2609,7 @@ class InsightRepository {
     return {
       monthly: formatDistribution(monthly),
       yearly: formatDistribution(yearly),
+      _metadata: { ...this.#getDateRanges() },
     };
   }
 }

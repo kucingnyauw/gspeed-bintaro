@@ -49,7 +49,7 @@ const appUrl = process.env.APP_URL || `http://localhost:${process.env.PORT || 30
  * 
  * @constant {string}
  */
-const swaggerPath = path.resolve(__dirname, "../docs/swagger.yml");
+const swaggerPath = path.resolve(__dirname, "../../swagger/swagger.yml");
 
 /**
  * Dokumen Swagger yang sudah di-parse dari file YAML.

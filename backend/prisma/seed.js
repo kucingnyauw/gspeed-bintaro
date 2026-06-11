@@ -229,7 +229,6 @@ const serviceData = [
 ];
 
 const defaultSettings = [
-  { key: "tax_rate", value: "11" },
   { key: "mechanic_max_tasks", value: "5" },
   { key: "shift_min_starting_cash", value: "1000000" },
   { key: "stock_low_threshold", value: "5" },
@@ -237,7 +236,14 @@ const defaultSettings = [
   { key: "enable_pph", value: "true" },
   { key: "pph_rate", value: "0.5" },
   { key: "ppn_rate", value: "11" },
+  { key: "monthly_revenue_target", value: "50000000" },
+  { key: "daily_revenue_target", value: "2000000" },
+  { key: "monthly_profit_target", value: "10000000" },
+  { key: "yearly_revenue_target", value: "600000000" },
+  { key: "monthly_order_target", value: "300" },
+  { key: "daily_order_target", value: "15" },
 ];
+
 
 const userData = [
   { email: ADMIN_EMAIL, fullName: "Admin Utama", phone: "081234500001", role: "ADMIN", isActive: true, isAuthenticated: true },

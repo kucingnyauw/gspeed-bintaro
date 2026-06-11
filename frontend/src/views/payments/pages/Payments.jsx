@@ -12,7 +12,7 @@ import {
 import { alpha } from "@mui/material/styles";
 
 import { AppTable, Invoice } from "@components";
-import { useDebounce } from "@hooks";
+import { useDebounce, usePermission } from "@hooks";
 import { PaymentMethod, paymentStatusColorMap } from "@shared/constant";
 import { downloadPdf, formatDateTime, formatToIdr } from "@shared/utils";
 import {
@@ -28,12 +28,31 @@ import {
   usePaymentsQuery,
 } from "@views/payments/hooks";
 
+/**
+ * Payments - Halaman data pembayaran.
+ * Action refund hanya tersedia untuk kasir.
+ *
+ * @returns {JSX.Element} Halaman pembayaran
+ */
 const Payments = () => {
   const theme = useTheme();
+
+  /** @type {boolean} Apakah user adalah kasir */
+  const isCashier = usePermission({ role: "CASHIER" });
+
+  /** @type {[number, Function]} */
   const [page, setPage] = useState(1);
+
+  /** @type {[number, Function]} */
   const [limit, setLimit] = useState(10);
+
+  /** @type {[string, Function]} */
   const [search, setSearch] = useState("");
+
+  /** @type {[boolean, Function]} */
   const [exportOpen, setExportOpen] = useState(false);
+
+  /** @type {[Array, Function]} */
   const [selectedRows, setSelectedRows] = useState([]);
 
   const debouncedSearch = useDebounce(search);
@@ -65,16 +84,12 @@ const Payments = () => {
 
   const params = useMemo(
     () => ({
-      endDate: activeFilters.endDate
-        ? activeFilters.endDate.toISOString()
-        : undefined,
+      endDate: activeFilters.endDate ? activeFilters.endDate.toISOString() : undefined,
       limit,
       method: activeFilters.method || undefined,
       page,
       search: debouncedSearch,
-      startDate: activeFilters.startDate
-        ? activeFilters.startDate.toISOString()
-        : undefined,
+      startDate: activeFilters.startDate ? activeFilters.startDate.toISOString() : undefined,
       status: activeFilters.status || undefined,
     }),
     [page, limit, debouncedSearch, activeFilters]
@@ -82,9 +97,15 @@ const Payments = () => {
 
   const { data, isLoading, refetch } = usePaymentsQuery(params);
 
+  /** @type {Array} */
   const tableData = data?.data || [];
+
+  /** @type {Object} */
   const metadata = data?.metadata || {};
 
+  /**
+   * Handler cetak invoice.
+   */
   const handlePrintInvoice = useCallback((row) => {
     downloadPdf({
       component: <Invoice data={row} />,
@@ -92,23 +113,33 @@ const Payments = () => {
     });
   }, []);
 
+  /**
+   * Handler apply filter.
+   */
   const handleApplyFilter = useCallback(() => {
     applyFilter();
     setPage(1);
   }, [applyFilter]);
 
+  /**
+   * Handler reset filter.
+   */
   const handleResetFilter = useCallback(() => {
     resetFilter();
     setPage(1);
   }, [resetFilter]);
 
+  /**
+   * Handler double click row.
+   */
   const handleRowDoubleClick = useCallback(
-    (row) => {
-      openDetailDialog(row.id);
-    },
+    (row) => openDetailDialog(row.id),
     [openDetailDialog]
   );
 
+  /**
+   * Handler bulk refund.
+   */
   const handleBulkRefund = useCallback(
     (ids) => {
       openBulkRefundDialog(ids, ids.length);
@@ -116,55 +147,31 @@ const Payments = () => {
     [openBulkRefundDialog]
   );
 
+  /**
+   * Handler close bulk refund.
+   */
   const handleCloseBulkRefund = useCallback(() => {
     closeBulkRefundDialog();
     setSelectedRows([]);
   }, [closeBulkRefundDialog]);
 
+  /**
+   * Handler perubahan seleksi.
+   */
   const handleSelectionChange = useCallback((newSelection) => {
     setSelectedRows(newSelection);
   }, []);
 
-  const renderRow = useCallback(
-    (row) => [
-      <Typography key={`order-${row.id}`} variant="body2" sx={{ fontWeight: 400 }}>
-        {row.order?.orderNumber || "—"}
-      </Typography>,
-
-      <Typography key={`method-${row.id}`} variant="body2" sx={{ fontWeight: 400 }}>
-        {PaymentMethod[row.method] || row.method}
-      </Typography>,
-
-      <Typography key={`paid-${row.id}`} variant="body2" sx={{ fontWeight: 400 }}>
-        {formatToIdr(row.amountPaid)}
-      </Typography>,
-
-      <Typography key={`change-${row.id}`} variant="body2" sx={{ fontWeight: 400 }}>
-        {formatToIdr(row.change)}
-      </Typography>,
-
-      <Chip
-        key={`status-${row.id}`}
-        color={paymentStatusColorMap[row.status] || "default"}
-        label={row.statusLabel}
-        size="small"
-        variant="outlined"
-        sx={{ fontWeight: 400 }}
-      />,
-
-      <Typography key={`cashier-${row.id}`} variant="body2" sx={{ fontWeight: 400 }}>
-        {row.order?.cashier?.fullName || "—"}
-      </Typography>,
-
-      <Typography key={`customer-${row.id}`} variant="body2" sx={{ fontWeight: 400 }}>
-        {row.order?.customer?.name || "—"}
-      </Typography>,
-
-      <Typography key={`date-${row.id}`} variant="body2" color="text.secondary" sx={{ fontWeight: 400 }}>
-        {formatDateTime(row.createdAt)}
-      </Typography>,
-
-      <Stack key={`action-${row.id}`} direction="row" sx={{ gap: 0.5 }}>
+  /**
+   * Mendapatkan action buttons per row.
+   * Refund hanya untuk kasir.
+   *
+   * @param {Object} row - Data pembayaran
+   * @returns {JSX.Element|null}
+   */
+  const getRowActions = useCallback(
+    (row) => (
+      <Stack direction="row" sx={{ gap: 0.5 }}>
         <Tooltip title={row.status === "PAID" ? "Cetak Invoice" : "Invoice belum tersedia"}>
           <Box component="span" sx={{ display: "inline-flex" }}>
             <IconButton
@@ -204,69 +211,165 @@ const Payments = () => {
             </IconButton>
           </Box>
         </Tooltip>
-        <Tooltip title={row.status === "PAID" ? "Refund Pembayaran" : row.status === "REFUNDED" ? "Sudah direfund" : "Pembayaran belum lunas"}>
-  <Box component="span" sx={{ display: "inline-flex" }}>
-    <IconButton
-      onClick={(e) => {
-        e.stopPropagation();
-        if (row.status === "PAID") openRefundDialog(row);
-      }}
-      disabled={row.status !== "PAID"}
-      size="small"
-      aria-label="Refund Pembayaran"
-      sx={{
-        border: "1px solid",
-        borderColor: row.status === "PAID"
-          ? alpha(theme.palette.divider, 0.8)
-          : alpha(theme.palette.divider, 0.4),
-        borderRadius: `${theme.shape.borderRadius}px`,
-        bgcolor: row.status === "PAID"
-          ? alpha(theme.palette.background.paper, 0.6)
-          : "transparent",
-        color: row.status === "PAID"
-          ? theme.palette.text.secondary
-          : theme.palette.action.disabled,
-        transition: theme.transitions.create(
-          ["background-color", "border-color", "color"],
-          { duration: theme.transitions.duration.shorter }
-        ),
-        "&:hover": row.status === "PAID"
-          ? {
-              bgcolor: alpha(theme.palette.error.main, 0.06),
-              borderColor: alpha(theme.palette.error.main, 0.4),
-              color: theme.palette.error.main,
+
+        {isCashier && (
+          <Tooltip
+            title={
+              row.status === "PAID"
+                ? "Refund Pembayaran"
+                : row.status === "REFUNDED"
+                ? "Sudah direfund"
+                : "Pembayaran belum lunas"
             }
-          : {},
-      }}
-    >
-      <Undo2 size={16} strokeWidth={1.5} />
-    </IconButton>
-  </Box>
-</Tooltip>
-      </Stack>,
-    ],
-    [handlePrintInvoice, openRefundDialog, theme]
+          >
+            <Box component="span" sx={{ display: "inline-flex" }}>
+              <IconButton
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (row.status === "PAID") openRefundDialog(row);
+                }}
+                disabled={row.status !== "PAID"}
+                size="small"
+                aria-label="Refund Pembayaran"
+                sx={{
+                  border: "1px solid",
+                  borderColor: row.status === "PAID"
+                    ? alpha(theme.palette.divider, 0.8)
+                    : alpha(theme.palette.divider, 0.4),
+                  borderRadius: `${theme.shape.borderRadius}px`,
+                  bgcolor: row.status === "PAID"
+                    ? alpha(theme.palette.background.paper, 0.6)
+                    : "transparent",
+                  color: row.status === "PAID"
+                    ? theme.palette.text.secondary
+                    : theme.palette.action.disabled,
+                  transition: theme.transitions.create(
+                    ["background-color", "border-color", "color"],
+                    { duration: theme.transitions.duration.shorter }
+                  ),
+                  "&:hover": row.status === "PAID"
+                    ? {
+                        bgcolor: alpha(theme.palette.error.main, 0.06),
+                        borderColor: alpha(theme.palette.error.main, 0.4),
+                        color: theme.palette.error.main,
+                      }
+                    : {},
+                }}
+              >
+                <Undo2 size={16} strokeWidth={1.5} />
+              </IconButton>
+            </Box>
+          </Tooltip>
+        )}
+      </Stack>
+    ),
+    [handlePrintInvoice, openRefundDialog, theme, isCashier]
   );
 
-  const tableActions = useMemo(
-    () => [
+  /**
+   * Render row untuk AppTable.
+   */
+  const renderRow = useCallback(
+    (row) => {
+      const baseColumns = [
+        <Typography key={`order-${row.id}`} variant="body2" sx={{ fontWeight: 400 }}>
+          {row.order?.orderNumber || "—"}
+        </Typography>,
+        <Typography key={`method-${row.id}`} variant="body2" sx={{ fontWeight: 400 }}>
+          {PaymentMethod[row.method] || row.method}
+        </Typography>,
+        <Typography key={`paid-${row.id}`} variant="body2" sx={{ fontWeight: 400 }}>
+          {formatToIdr(row.amountPaid)}
+        </Typography>,
+        <Typography key={`change-${row.id}`} variant="body2" sx={{ fontWeight: 400 }}>
+          {formatToIdr(row.change)}
+        </Typography>,
+        <Chip
+          key={`status-${row.id}`}
+          color={paymentStatusColorMap[row.status] || "default"}
+          label={row.statusLabel}
+          size="small"
+          variant="outlined"
+          sx={{ fontWeight: 400 }}
+        />,
+        <Typography key={`cashier-${row.id}`} variant="body2" sx={{ fontWeight: 400 }}>
+          {row.order?.cashier?.fullName || "—"}
+        </Typography>,
+        <Typography key={`customer-${row.id}`} variant="body2" sx={{ fontWeight: 400 }}>
+          {row.order?.customer?.name || "—"}
+        </Typography>,
+        <Typography key={`date-${row.id}`} variant="body2" color="text.secondary" sx={{ fontWeight: 400 }}>
+          {formatDateTime(row.createdAt)}
+        </Typography>,
+      ];
+
+      const actions = getRowActions(row);
+      if (actions) {
+        baseColumns.push(actions);
+      }
+
+      return baseColumns;
+    },
+    [getRowActions]
+  );
+
+  /**
+   * Header kolom tabel.
+   * Kolom "Aksi" selalu ada (minimal untuk cetak invoice).
+   */
+  const tableHeaders = useMemo(() => [
+    "No. Order",
+    "Metode",
+    "Dibayar",
+    "Kembalian",
+    "Status",
+    "Kasir",
+    "Customer",
+    "Tanggal",
+    "Aksi",
+  ], []);
+
+  /**
+   * Action buttons di header.
+   * "Refund Terpilih" hanya untuk kasir.
+   */
+  const tableActions = useMemo(() => {
+    const baseActions = [
       { icon: Download, label: "Export CSV", onClick: () => setExportOpen(true) },
       { icon: ListFilter, label: "Filter", onClick: openFilter },
       { icon: RotateCcw, label: "Refresh", onClick: () => refetch() },
-      { icon: Undo2, label: "Refund Terpilih", onClick: handleBulkRefund, isBulkAction: true },
-    ],
-    [openFilter, refetch, handleBulkRefund]
-  );
+    ];
 
+    if (isCashier) {
+      baseActions.push({
+        icon: Undo2,
+        label: "Refund Terpilih",
+        onClick: handleBulkRefund,
+        isBulkAction: true,
+      });
+    }
+
+    return baseActions;
+  }, [openFilter, refetch, handleBulkRefund, isCashier]);
+
+  /**
+   * Handler perubahan halaman.
+   */
   const handlePageChange = useCallback((event, newPage) => {
     setPage(newPage);
   }, []);
 
+  /**
+   * Handler perubahan rows per page.
+   */
   const handleRowsPerPageChange = useCallback((newLimit) => {
     setLimit(newLimit);
     setPage(1);
   }, []);
 
+  /**
+   * Handler perubahan pencarian.
+   */
   const onSearchChange = useCallback((e) => {
     setSearch(e.target.value);
     setPage(1);
@@ -279,18 +382,8 @@ const Payments = () => {
         count={metadata.totalPages || 0}
         data={tableData}
         emptyStateMessage="Tidak ada data pembayaran"
-        enableMultiSelect
-        headers={[
-          "No. Order",
-          "Metode",
-          "Dibayar",
-          "Kembalian",
-          "Status",
-          "Kasir",
-          "Customer",
-          "Tanggal",
-          "Aksi",
-        ]}
+        enableMultiSelect={isCashier}
+        headers={tableHeaders}
         isLoading={isLoading}
         onChange={handlePageChange}
         onRowDoubleClick={handleRowDoubleClick}
@@ -308,10 +401,7 @@ const Payments = () => {
         title="Data Pembayaran"
       />
 
-      <PaymentExportDialog
-        open={exportOpen}
-        onClose={() => setExportOpen(false)}
-      />
+      <PaymentExportDialog open={exportOpen} onClose={() => setExportOpen(false)} />
 
       <PaymentFilterDialog
         onApply={handleApplyFilter}

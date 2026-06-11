@@ -3,9 +3,9 @@ import PropTypes from "prop-types";
 import {
   Box,
   Card,
-  
   Divider,
   IconButton,
+  LinearProgress,
   Skeleton,
   Stack,
   Typography,
@@ -23,7 +23,6 @@ import {
   Users,
   AlertCircle,
   Car,
-  
 } from "lucide-react";
 
 import { formatDate, formatToIdr } from "@shared/utils";
@@ -103,6 +102,7 @@ EmptyState.propTypes = {
 
 const AdminDashboard = ({ data, isLoading, refetch }) => {
   const theme = useTheme();
+  const fmt = (val) => formatToIdr(val);
 
   const lowStockData = useMemo(() => {
     if (!data?.inventory?.lowStockProducts?.length)
@@ -127,27 +127,26 @@ const AdminDashboard = ({ data, isLoading, refetch }) => {
     };
   }, [data, theme]);
 
-  const hasData = useMemo(() => {
-    return (
-      (data?.today?.orders > 0) ||
-      (data?.thisMonth?.orders > 0) ||
-      (data?.customers?.totalCustomers > 0)
-    );
-  }, [data]);
-
   if (isLoading) {
     return (
-      <Stack sx={{ gap: 5 }}>
+      <Stack sx={{ gap: 4 }}>
         <Card
           sx={{
             p: 3,
             border: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
-           
             borderRadius: `${theme.shape.borderRadius}px`,
           }}
         >
-          <Skeleton width={240} height={28} />
-          <Skeleton width={300} height={16} sx={{ mt: 1 }} />
+          <Stack
+            direction="row"
+            sx={{ justifyContent: "space-between", alignItems: "center" }}
+          >
+            <Box>
+              <Skeleton width={240} height={28} />
+              <Skeleton width={300} height={16} sx={{ mt: 1 }} />
+            </Box>
+            <Skeleton variant="circular" width={40} height={40} />
+          </Stack>
         </Card>
         <Box
           sx={{
@@ -157,7 +156,7 @@ const AdminDashboard = ({ data, isLoading, refetch }) => {
               sm: "1fr 1fr",
               lg: "repeat(4, 1fr)",
             },
-            gap: 5,
+            gap: 3,
           }}
         >
           {[1, 2, 3, 4].map((i) => (
@@ -166,7 +165,6 @@ const AdminDashboard = ({ data, isLoading, refetch }) => {
               sx={{
                 p: 2.5,
                 border: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
-                boxShadow: "none",
                 borderRadius: `${theme.shape.borderRadius}px`,
               }}
             >
@@ -182,7 +180,7 @@ const AdminDashboard = ({ data, isLoading, refetch }) => {
           sx={{
             display: "grid",
             gridTemplateColumns: { xs: "1fr", lg: "7fr 5fr" },
-            gap: 5,
+            gap: 3,
           }}
         >
           <Card
@@ -190,7 +188,6 @@ const AdminDashboard = ({ data, isLoading, refetch }) => {
               p: 3,
               minHeight: 420,
               border: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
-              boxShadow: "none",
               borderRadius: `${theme.shape.borderRadius}px`,
             }}
           >
@@ -202,14 +199,13 @@ const AdminDashboard = ({ data, isLoading, refetch }) => {
               sx={{ mt: 3 }}
             />
           </Card>
-          <Stack sx={{ gap: 5 }}>
+          <Stack sx={{ gap: 3 }}>
             {[1, 2, 3, 4].map((i) => (
               <Card
                 key={i}
                 sx={{
                   p: 2.5,
                   border: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
-                  boxShadow: "none",
                   borderRadius: `${theme.shape.borderRadius}px`,
                 }}
               >
@@ -226,12 +222,11 @@ const AdminDashboard = ({ data, isLoading, refetch }) => {
   }
 
   return (
-    <Stack sx={{ gap: 5 }}>
-      {/* Header Card */}
+    <Stack sx={{ gap: 4 }}>
+      {/* Header */}
       <Card
         sx={{
           border: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
-          boxShadow: "none",
           borderRadius: `${theme.shape.borderRadius}px`,
         }}
       >
@@ -294,7 +289,7 @@ const AdminDashboard = ({ data, isLoading, refetch }) => {
             sm: "1fr 1fr",
             lg: "repeat(4, 1fr)",
           },
-          gap: 5,
+          gap: 3,
         }}
       >
         <SummaryCard
@@ -302,7 +297,7 @@ const AdminDashboard = ({ data, isLoading, refetch }) => {
           icon={ShoppingCart}
           subtitle={
             data?.today?.orders > 0
-              ? `Rata-rata ${formatToIdr(data.today.averageOrderValue)}`
+              ? `Rata-rata ${fmt(data.today.averageOrderValue)}`
               : "Belum ada pesanan"
           }
           title="Pesanan Hari Ini"
@@ -314,7 +309,7 @@ const AdminDashboard = ({ data, isLoading, refetch }) => {
           icon={DollarSign}
           subtitle="Total pemasukan"
           title="Pendapatan Hari Ini"
-          value={formatToIdr(data?.today?.revenue || 0)}
+          value={fmt(data?.today?.revenue || 0)}
           index={1}
         />
         <SummaryCard
@@ -322,7 +317,7 @@ const AdminDashboard = ({ data, isLoading, refetch }) => {
           icon={TrendingUp}
           subtitle={`Dari ${data?.thisMonth?.orders || 0} pesanan`}
           title="Pendapatan Bulan Ini"
-          value={formatToIdr(data?.thisMonth?.revenue || 0)}
+          value={fmt(data?.thisMonth?.revenue || 0)}
           index={2}
         />
         <SummaryCard
@@ -339,7 +334,7 @@ const AdminDashboard = ({ data, isLoading, refetch }) => {
         />
       </Box>
 
-      {/* Second Row - Additional Metrics */}
+      {/* Summary Row 2 */}
       <Box
         sx={{
           display: "grid",
@@ -348,7 +343,7 @@ const AdminDashboard = ({ data, isLoading, refetch }) => {
             sm: "1fr 1fr",
             lg: "repeat(4, 1fr)",
           },
-          gap: 5,
+          gap: 3,
         }}
       >
         <SummaryCard
@@ -385,19 +380,17 @@ const AdminDashboard = ({ data, isLoading, refetch }) => {
         />
       </Box>
 
-      {/* Asymmetric Bottom */}
+      {/* Stok Chart + Inventory Stats */}
       <Box
         sx={{
           display: "grid",
           gridTemplateColumns: { xs: "1fr", lg: "7fr 5fr" },
-          gap: 5,
+          gap: 3,
         }}
       >
-        {/* Low Stock Section */}
         <Card
           sx={{
             border: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
-            boxShadow: "none",
             borderRadius: `${theme.shape.borderRadius}px`,
             display: "flex",
             flexDirection: "column",
@@ -434,8 +427,7 @@ const AdminDashboard = ({ data, isLoading, refetch }) => {
           </Box>
         </Card>
 
-        {/* Right Stack - Inventory Stats */}
-        <Stack sx={{ gap: 5 }}>
+        <Stack sx={{ gap: 3 }}>
           <SummaryCard
             color="secondary"
             icon={AlertCircle}
@@ -457,49 +449,305 @@ const AdminDashboard = ({ data, isLoading, refetch }) => {
             icon={DollarSign}
             subtitle="Total nilai stok"
             title="Nilai Stok"
-            value={formatToIdr(data?.inventory?.totalStockValue || 0)}
+            value={fmt(data?.inventory?.totalStockValue || 0)}
             index={10}
           />
         </Stack>
       </Box>
+
+      {/* Target: Harian | Bulanan */}
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns: { xs: "1fr", lg: "1fr 1fr" },
+          gap: 3,
+        }}
+      >
+        {/* Harian */}
+        <Card
+          sx={{
+            border: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
+            borderRadius: `${theme.shape.borderRadius}px`,
+          }}
+        >
+          <Box sx={{ p: 3, pb: 2 }}>
+            <Typography variant="h6" sx={{ fontWeight: 600, fontSize: "1rem" }}>
+              Target Harian
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+              Capaian vs target hari ini
+            </Typography>
+          </Box>
+          <Divider />
+          <Box sx={{ p: 3 }}>
+            <Stack sx={{ gap: 4 }}>
+              <Box>
+                <Stack
+                  direction="row"
+                  sx={{ justifyContent: "space-between", mb: 1 }}
+                >
+                  <Typography variant="body2">Pesanan</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {data?.today?.orders || 0}
+                    <Box
+                      component="span"
+                      sx={{ fontWeight: 400, color: "text.disabled" }}
+                    >
+                      /{data?.targets?.daily?.orders?.target || 0}
+                    </Box>
+                  </Typography>
+                </Stack>
+                <LinearProgress
+                  variant="determinate"
+                  value={Math.min(
+                    data?.targets?.daily?.orders?.percentage || 0,
+                    100
+                  )}
+                  sx={{
+                    height: 6,
+                    borderRadius: 3,
+                    bgcolor: alpha(theme.palette.divider, 0.15),
+                    "& .MuiLinearProgress-bar": {
+                      bgcolor: "secondary.main",
+                      borderRadius: 3,
+                    },
+                  }}
+                />
+              </Box>
+              <Box>
+                <Stack
+                  direction="row"
+                  sx={{ justifyContent: "space-between", mb: 1 }}
+                >
+                  <Typography variant="body2">Pendapatan</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {fmt(data?.today?.revenue || 0)}
+                  </Typography>
+                </Stack>
+                <LinearProgress
+                  variant="determinate"
+                  value={Math.min(
+                    data?.targets?.daily?.revenue?.percentage || 0,
+                    100
+                  )}
+                  sx={{
+                    height: 6,
+                    borderRadius: 3,
+                    bgcolor: alpha(theme.palette.divider, 0.15),
+                    "& .MuiLinearProgress-bar": {
+                      bgcolor: "secondary.main",
+                      borderRadius: 3,
+                    },
+                  }}
+                />
+              </Box>
+            </Stack>
+          </Box>
+        </Card>
+
+        {/* Bulanan */}
+        <Card
+          sx={{
+            border: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
+            borderRadius: `${theme.shape.borderRadius}px`,
+          }}
+        >
+          <Box sx={{ p: 3, pb: 2 }}>
+            <Typography variant="h6" sx={{ fontWeight: 600, fontSize: "1rem" }}>
+              Target Bulanan
+            </Typography>
+            <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+              Capaian vs target bulan ini
+            </Typography>
+          </Box>
+          <Divider />
+          <Box sx={{ p: 3 }}>
+            <Stack sx={{ gap: 4 }}>
+              <Box>
+                <Stack
+                  direction="row"
+                  sx={{ justifyContent: "space-between", mb: 1 }}
+                >
+                  <Typography variant="body2">Pesanan</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {data?.thisMonth?.orders || 0}
+                    <Box
+                      component="span"
+                      sx={{ fontWeight: 400, color: "text.disabled" }}
+                    >
+                      /{data?.targets?.monthly?.orders?.target || 0}
+                    </Box>
+                  </Typography>
+                </Stack>
+                <LinearProgress
+                  variant="determinate"
+                  value={Math.min(
+                    data?.targets?.monthly?.orders?.percentage || 0,
+                    100
+                  )}
+                  sx={{
+                    height: 6,
+                    borderRadius: 3,
+                    bgcolor: alpha(theme.palette.divider, 0.15),
+                    "& .MuiLinearProgress-bar": {
+                      bgcolor: "secondary.main",
+                      borderRadius: 3,
+                    },
+                  }}
+                />
+              </Box>
+              <Box>
+                <Stack
+                  direction="row"
+                  sx={{ justifyContent: "space-between", mb: 1 }}
+                >
+                  <Typography variant="body2">Pendapatan</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                    {fmt(data?.thisMonth?.revenue || 0)}
+                  </Typography>
+                </Stack>
+                <LinearProgress
+                  variant="determinate"
+                  value={Math.min(
+                    data?.targets?.monthly?.revenue?.percentage || 0,
+                    100
+                  )}
+                  sx={{
+                    height: 6,
+                    borderRadius: 3,
+                    bgcolor: alpha(theme.palette.divider, 0.15),
+                    "& .MuiLinearProgress-bar": {
+                      bgcolor: "secondary.main",
+                      borderRadius: 3,
+                    },
+                  }}
+                />
+              </Box>
+              <Box>
+                <Stack
+                  direction="row"
+                  sx={{ justifyContent: "space-between", mb: 1 }}
+                >
+                  <Typography variant="body2">Keuntungan</Typography>
+                  <Typography
+                    variant="body2"
+                    sx={{ fontWeight: 600, color: "text.disabled" }}
+                  >
+                    {fmt(0)}
+                  </Typography>
+                </Stack>
+                <LinearProgress
+                  variant="determinate"
+                  value={0}
+                  sx={{
+                    height: 6,
+                    borderRadius: 3,
+                    bgcolor: alpha(theme.palette.divider, 0.15),
+                    "& .MuiLinearProgress-bar": {
+                      bgcolor: "secondary.main",
+                      borderRadius: 3,
+                    },
+                  }}
+                />
+              </Box>
+            </Stack>
+          </Box>
+        </Card>
+      </Box>
+
+      {/* Target Tahunan */}
+      <Card
+        sx={{
+          border: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
+          borderRadius: `${theme.shape.borderRadius}px`,
+        }}
+      >
+        <Box sx={{ p: 3, pb: 2 }}>
+          <Typography variant="h6" sx={{ fontWeight: 600, fontSize: "1rem" }}>
+            Target Tahunan
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+            Capaian vs target tahun ini
+          </Typography>
+        </Box>
+        <Divider />
+        <Box sx={{ p: 3 }}>
+          <Stack
+            direction="row"
+            sx={{
+              justifyContent: "space-between",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: 4,
+            }}
+          >
+            <Box sx={{ flex: 2, minWidth: 280 }}>
+              <Stack
+                direction="row"
+                sx={{ justifyContent: "space-between", mb: 1 }}
+              >
+                <Typography variant="body2">Pendapatan</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                  {fmt(data?.targets?.yearly?.revenue?.actual || 0)}
+                </Typography>
+              </Stack>
+              <LinearProgress
+                variant="determinate"
+                value={Math.min(
+                  data?.targets?.yearly?.revenue?.percentage || 0,
+                  100
+                )}
+                sx={{
+                  height: 6,
+                  borderRadius: 3,
+                  bgcolor: alpha(theme.palette.secondary.main, 0.08),
+                  "& .MuiLinearProgress-bar": {
+                    bgcolor: "secondary.main",
+                    borderRadius: 3,
+                  },
+                }}
+              />
+            </Box>
+
+            <Divider orientation="vertical" flexItem />
+
+            <Box sx={{ flex: 1, minWidth: 140, alignSelf: "center" }}>
+              <Stack sx={{ gap: 3, alignItems: "center", textAlign: "center" }}>
+                <Box>
+                  <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                    {data?.thisYear?.orders || 0}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Pesanan
+                  </Typography>
+                </Box>
+                <Box>
+                  <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                    {fmt(data?.thisYear?.averageOrderValue || 0)}
+                  </Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    Rata-rata
+                  </Typography>
+                </Box>
+              </Stack>
+            </Box>
+          </Stack>
+        </Box>
+      </Card>
     </Stack>
   );
 };
 
 AdminDashboard.propTypes = {
   data: PropTypes.shape({
-    activeShift: PropTypes.shape({
-      cashier: PropTypes.string,
-      orderCount: PropTypes.number,
-      openedAt: PropTypes.string,
-      startingCash: PropTypes.number,
-    }),
-    inventory: PropTypes.shape({
-      activeProducts: PropTypes.number,
-      lowStockCount: PropTypes.number,
-      outOfStockCount: PropTypes.number,
-      totalProducts: PropTypes.number,
-      totalStockValue: PropTypes.number,
-      lowStockProducts: PropTypes.array,
-    }),
-    pending: PropTypes.shape({ orders: PropTypes.number }),
-    thisMonth: PropTypes.shape({
-      orders: PropTypes.number,
-      revenue: PropTypes.number,
-      newCustomers: PropTypes.number,
-      activeCustomers: PropTypes.number,
-    }),
-    today: PropTypes.shape({
-      averageOrderValue: PropTypes.number,
-      orders: PropTypes.number,
-      revenue: PropTypes.number,
-    }),
-    customers: PropTypes.shape({
-      totalCustomers: PropTypes.number,
-      newThisMonth: PropTypes.number,
-      activeThisMonth: PropTypes.number,
-      totalVehicles: PropTypes.number,
-    }),
+    activeShift: PropTypes.object,
+    inventory: PropTypes.object,
+    pending: PropTypes.object,
+    thisMonth: PropTypes.object,
+    thisYear: PropTypes.object,
+    today: PropTypes.object,
+    customers: PropTypes.object,
+    targets: PropTypes.object,
   }),
   isLoading: PropTypes.bool,
   refetch: PropTypes.func,
