@@ -9,6 +9,8 @@
  * - Tombol "Muat Ulang" untuk reload halaman
  * - Ikon AlertTriangle sebagai indikator visual error
  * - Stack trace ditampilkan dengan font monospace di dev mode
+ * - Animasi fade-in untuk transisi yang halus
+ * - Responsive layout untuk mobile dan desktop
  *
  * @component
  * @returns {JSX.Element} Rendered error boundary route
@@ -25,27 +27,47 @@ import {
   Typography,
   useTheme,
 } from "@mui/material";
-import { alpha } from "@mui/material/styles";
+import { alpha, keyframes } from "@mui/material/styles";
 import { isDev } from "@config/env.js";
 
+/**
+ * Keyframe animasi fade-in dari bawah.
+ *
+ * @type {Object}
+ */
+const fadeInUp = keyframes`
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+`;
+
+/**
+ * Keyframe animasi pulse untuk ikon error.
+ *
+ * @type {Object}
+ */
+const pulse = keyframes`
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+`;
+
+/**
+ * ErrorBoundary - Menampilkan halaman error dengan informasi yang membantu user.
+ *
+ * @component
+ * @returns {JSX.Element}
+ */
 const ErrorBoundary = () => {
   const theme = useTheme();
 
   /**
    * Object error dari React Router.
-   * Berisi status, statusText, message, dan stack.
    *
    * @type {Object}
-   * @property {number} [status] - HTTP status code
-   * @property {string} [statusText] - Status text
-   * @property {string} [message] - Error message
-   * @property {string} [stack] - Stack trace (dev only)
    */
   const error = useRouteError();
 
   /**
    * Pesan error yang akan ditampilkan ke user.
-   * Prioritas: statusText > message > default message.
    *
    * @type {string}
    */
@@ -53,11 +75,14 @@ const ErrorBoundary = () => {
     error?.statusText || error?.message || "Terjadi kesalahan yang tidak terduga";
 
   /**
-   * HTTP status code dari error (jika ada).
+   * HTTP status code dari error.
    *
    * @type {number|undefined}
    */
   const statusCode = error?.status;
+
+  /** @type {string} */
+  const br = `${theme.shape.borderRadius}px`;
 
   return (
     <Box
@@ -67,17 +92,18 @@ const ErrorBoundary = () => {
         alignItems: "center",
         justifyContent: "center",
         p: { xs: 2, sm: 4 },
-        bgcolor: alpha(theme.palette.background.default, 0.98),
+        bgcolor: "background.default",
       }}
     >
       <Card
         sx={{
           maxWidth: 520,
           width: "100%",
-          borderRadius: `${theme.shape.borderRadius}px`,
+          borderRadius: br,
           border: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
           boxShadow: `0 8px 32px ${alpha(theme.palette.common.black, 0.06)}`,
           overflow: "hidden",
+          animation: `${fadeInUp} 0.4s ${theme.transitions.easing.easeOut}`,
         }}
       >
         <CardContent sx={{ p: 0 }}>
@@ -85,22 +111,23 @@ const ErrorBoundary = () => {
           <Stack
             sx={{
               alignItems: "center",
-              pt: 5,
-              pb: 4,
-              px: 4,
+              pt: { xs: 4, sm: 5 },
+              pb: { xs: 3, sm: 4 },
+              px: { xs: 3, sm: 4 },
             }}
           >
             <Box
               sx={{
-                width: 72,
-                height: 72,
+                width: { xs: 64, sm: 72 },
+                height: { xs: 64, sm: 72 },
                 borderRadius: "50%",
                 bgcolor: alpha(theme.palette.error.main, 0.08),
                 color: "error.main",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                mb: 3,
+                mb: { xs: 2.5, sm: 3 },
+                animation: `${pulse} 3s ease-in-out infinite`,
               }}
             >
               <AlertTriangle size={32} strokeWidth={1.5} />
@@ -115,20 +142,33 @@ const ErrorBoundary = () => {
                   letterSpacing: "-0.04em",
                   lineHeight: 1,
                   mb: 0.5,
+                  fontSize: { xs: "3rem", sm: "3.75rem" },
                 }}
               >
                 {statusCode}
               </Typography>
             )}
 
-            <Typography variant="h5" sx={{ fontWeight: 600, mb: 1 }}>
+            <Typography
+              variant="h5"
+              sx={{
+                fontWeight: 600,
+                mb: 1,
+                fontSize: { xs: "1.125rem", sm: "1.25rem" },
+              }}
+            >
               Terjadi Kesalahan
             </Typography>
 
             <Typography
               variant="body2"
               color="text.secondary"
-              sx={{ textAlign: "center", maxWidth: 360, lineHeight: 1.6 }}
+              sx={{
+                textAlign: "center",
+                maxWidth: 360,
+                lineHeight: 1.6,
+                fontSize: { xs: "0.8125rem", sm: "0.875rem" },
+              }}
             >
               Maaf, terjadi kesalahan yang tidak terduga. Silakan coba muat ulang halaman
               atau kembali ke halaman sebelumnya.
@@ -140,7 +180,7 @@ const ErrorBoundary = () => {
           {/* Dev Error Detail */}
           {isDev && error && (
             <>
-              <Box sx={{ px: 4, py: 3 }}>
+              <Box sx={{ px: { xs: 3, sm: 4 }, py: 3 }}>
                 <Typography
                   variant="caption"
                   sx={{
@@ -157,11 +197,17 @@ const ErrorBoundary = () => {
                 <Box
                   sx={{
                     p: 2,
-                    borderRadius: `${theme.shape.borderRadius}px`,
+                    borderRadius: br,
                     bgcolor: alpha(theme.palette.error.main, 0.04),
                     border: `1px solid ${alpha(theme.palette.error.main, 0.1)}`,
                     maxHeight: 240,
                     overflow: "auto",
+                    "&::-webkit-scrollbar": { width: 4 },
+                    "&::-webkit-scrollbar-track": { bgcolor: "transparent" },
+                    "&::-webkit-scrollbar-thumb": {
+                      bgcolor: alpha(theme.palette.divider, 0.5),
+                      borderRadius: 10,
+                    },
                   }}
                 >
                   <Typography
@@ -196,7 +242,7 @@ const ErrorBoundary = () => {
           )}
 
           {/* Action Buttons */}
-          <Box sx={{ px: 4, py: 3 }}>
+          <Box sx={{ px: { xs: 3, sm: 4 }, py: 3 }}>
             <Stack
               direction={{ xs: "column", sm: "row" }}
               sx={{ gap: 1.5 }}
@@ -208,7 +254,7 @@ const ErrorBoundary = () => {
                 sx={{
                   fontWeight: 600,
                   textTransform: "none",
-                  borderRadius: `${theme.shape.borderRadius}px`,
+                  borderRadius: br,
                   py: 1.25,
                   color: "text.secondary",
                   borderColor: alpha(theme.palette.divider, 0.8),
@@ -228,7 +274,7 @@ const ErrorBoundary = () => {
                 sx={{
                   fontWeight: 600,
                   textTransform: "none",
-                  borderRadius: `${theme.shape.borderRadius}px`,
+                  borderRadius: br,
                   py: 1.25,
                   boxShadow: "none",
                   "&:hover": {

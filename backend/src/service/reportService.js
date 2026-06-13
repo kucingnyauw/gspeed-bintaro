@@ -133,8 +133,8 @@ class ReportService {
         totalSales: salesData.totalSales,
         totalSubtotal: salesData.totalSubtotal,
         totalTax: salesData.totalTax,
-        totalPPH: salesData.totalPPH, // ✅ PPh UMKM dari repository
-        pphRate: salesData.pphRate, // ✅ Rate PPh dari settings
+        totalPPH: salesData.totalPPH, 
+        pphRate: salesData.pphRate, 
         averageOrderValue: salesData.averageOrderValue,
       },
       breakdown: period === "daily" ? hourlySales : dailySales,

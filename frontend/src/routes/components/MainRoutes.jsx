@@ -4,6 +4,7 @@ import { AppLoadable } from "@components";
 import { Role } from "@shared/constant";
 import MainLayout from "@layout/MainLayout.jsx";
 
+
 const Dashboard = AppLoadable(
   lazy(() => import("@views/dashboard/pages/Dashboard.jsx"))
 );

@@ -80,7 +80,6 @@ const componentsOverride = (theme) => ({
         color: theme.palette.background.paper,
         boxShadow: "none",
         backgroundImage: "none",
-        border: "1px solid transparent",
         "&:hover": {
           backgroundColor: alpha(theme.palette.text.primary, 0.88),
           boxShadow: "none",
@@ -89,7 +88,6 @@ const componentsOverride = (theme) => ({
         "&:disabled": {
           backgroundColor: theme.palette.action.disabledBackground,
           color: theme.palette.action.disabled,
-          borderColor: "transparent",
         },
       },
       outlined: {
@@ -155,11 +153,9 @@ const componentsOverride = (theme) => ({
       root: {
         borderRadius: `${theme.shape.borderRadius}px`,
         transition: "all 0.15s ease",
-        border: "1px solid transparent",
         color: theme.palette.text.primary,
         "&:hover": {
           backgroundColor: theme.palette.action.hover,
-          borderColor: theme.palette.divider,
         },
         "&:active": { transform: "scale(0.95)" },
         "&:focus-visible": {
@@ -178,15 +174,13 @@ const componentsOverride = (theme) => ({
       root: {
         backgroundImage: "none",
         borderRadius: `${theme.shape.borderRadius}px`,
-        border: `1px solid ${theme.palette.divider}`,
-        transition: "box-shadow 0.2s ease, border-color 0.2s ease",
+        transition: "box-shadow 0.2s ease",
         backgroundColor: theme.palette.background.paper,
       },
       elevation1: { boxShadow: theme.shadows[1] },
       elevation2: { boxShadow: theme.shadows[2] },
       elevation3: { boxShadow: theme.shadows[3] },
       elevation4: { boxShadow: theme.shadows[4] },
-      outlined: { borderWidth: "1px", borderColor: theme.palette.divider },
     },
   },
 
@@ -197,7 +191,6 @@ const componentsOverride = (theme) => ({
       root: {
         borderRadius: `${theme.shape.borderRadius}px`,
         backgroundColor: theme.palette.background.paper,
-        border: `1px solid ${theme.palette.divider}`,
         boxShadow: theme.shadows[1],
       },
     },
@@ -242,7 +235,6 @@ const componentsOverride = (theme) => ({
       root: {
         borderRadius: 0,
         boxShadow: "none",
-        borderBottom: `1px solid ${theme.palette.divider}`,
         backgroundColor: theme.palette.background.paper,
         color: theme.palette.text.primary,
       },
@@ -265,7 +257,6 @@ const componentsOverride = (theme) => ({
     styleOverrides: {
       paper: {
         borderRadius: 0,
-        borderRight: `1px solid ${theme.palette.divider}`,
         backgroundColor: theme.palette.background.paper,
         transition: "width 0.2s ease",
         boxShadow: "none",
@@ -412,7 +403,6 @@ const componentsOverride = (theme) => ({
       paper: {
         borderRadius: `${theme.shape.borderRadius}px`,
         boxShadow: theme.shadows[3],
-        border: `1px solid ${theme.palette.divider}`,
         marginTop: 4,
         padding: 4,
         backgroundColor: theme.palette.background.paper,
@@ -440,56 +430,117 @@ const componentsOverride = (theme) => ({
   },
 
   // ==================== TABLE ====================
-  MuiTableContainer: {
-    styleOverrides: {
-      root: {
-        border: `1px solid ${theme.palette.divider}`,
-        overflowX: "scroll",
-        overflowY: "hidden",
-      },
+MuiTableContainer: {
+  styleOverrides: {
+    root: {
+      overflowX: "auto",
+      overflowY: "hidden",
     },
   },
+},
 
-  MuiTableHead: {
-    styleOverrides: {
-      root: {
-        "& .MuiTableCell-root": {
-          borderBottom: `1px solid ${theme.palette.divider}`,
-          backgroundColor: "transparent",
-        },
-      },
+MuiTable: {
+  styleOverrides: {
+    root: {
+      borderCollapse: "collapse",
     },
   },
+},
 
-  MuiTableRow: {
-    styleOverrides: {
-      root: {
-        transition: "background-color 0.15s ease",
-        "&:hover": {
-          backgroundColor: alpha(theme.palette.secondary.main, 0.04),
-        },
-        "&:last-child td": { borderBottom: 0 },
-      },
-    },
-  },
-
-  MuiTableCell: {
-    styleOverrides: {
-      root: {
-        borderBottom: `1px solid ${theme.palette.divider}`,
-        padding: "12px 16px",
-        fontSize: "0.875rem",
-        fontWeight: 400,
-      },
-      head: {
-        fontWeight: 500,
+MuiTableHead: {
+  styleOverrides: {
+    root: {
+      "& .MuiTableCell-root": {
+        borderBottom: `2px solid ${theme.palette.divider}`,
+        fontWeight: 600,
         fontSize: "0.75rem",
         color: theme.palette.text.secondary,
         textTransform: "uppercase",
         letterSpacing: "0.05em",
+        whiteSpace: "nowrap",
+        py: 1.5,
       },
     },
   },
+},
+
+MuiTableBody: {
+  styleOverrides: {
+    root: {
+      "& .MuiTableRow-root:last-child .MuiTableCell-root": {
+        borderBottom: `1px solid ${theme.palette.divider}`,
+      },
+    },
+  },
+},
+
+MuiTableRow: {
+  styleOverrides: {
+    root: {
+      transition: "background-color 0.15s ease",
+      "&:hover": {
+        backgroundColor: alpha(theme.palette.secondary.main, 0.04),
+      },
+      "&.Mui-selected": {
+        backgroundColor: alpha(theme.palette.secondary.main, 0.08),
+        "&:hover": {
+          backgroundColor: alpha(theme.palette.secondary.main, 0.12),
+        },
+      },
+    },
+  },
+},
+
+MuiTableCell: {
+  styleOverrides: {
+    root: {
+      borderBottom: `1px solid ${theme.palette.divider}`,
+      padding: "12px 16px",
+      fontSize: "0.875rem",
+      fontWeight: 400,
+      color: theme.palette.text.primary,
+    },
+    head: {
+      borderBottom: `2px solid ${theme.palette.divider}`,
+      fontWeight: 600,
+      fontSize: "0.75rem",
+      color: theme.palette.text.secondary,
+      textTransform: "uppercase",
+      letterSpacing: "0.05em",
+      whiteSpace: "nowrap",
+      py: 1.5,
+    },
+  },
+},
+
+MuiTableFooter: {
+  styleOverrides: {
+    root: {
+      "& .MuiTableCell-root": {
+        borderTop: `2px solid ${theme.palette.divider}`,
+        borderBottom: "none",
+        fontWeight: 600,
+        fontSize: "0.8125rem",
+        color: theme.palette.text.secondary,
+        py: 1.5,
+      },
+    },
+  },
+},
+
+MuiTablePagination: {
+  styleOverrides: {
+    root: {
+      borderTop: `1px solid ${theme.palette.divider}`,
+      "& .MuiTablePagination-toolbar": {
+        minHeight: 52,
+        paddingLeft: 16,
+        paddingRight: 16,
+        fontSize: "0.875rem",
+      },
+    },
+  },
+},
 
   // ==================== DIVIDER ====================
   MuiDivider: {
@@ -541,7 +592,6 @@ const componentsOverride = (theme) => ({
         height: 18,
         minWidth: 18,
         padding: "0 4px",
-        border: `2px solid ${theme.palette.background.paper}`,
         borderRadius: `${theme.shape.borderRadius}px`,
         boxShadow: "none",
         backgroundColor: theme.palette.secondary.main,
@@ -598,10 +648,6 @@ const componentsOverride = (theme) => ({
   MuiDialogContent: {
     styleOverrides: {
       root: { padding: "8px 24px 20px" },
-      dividers: {
-        borderTop: `1px solid ${theme.palette.divider}`,
-        borderBottom: `1px solid ${theme.palette.divider}`,
-      },
     },
   },
 
@@ -625,28 +671,23 @@ const componentsOverride = (theme) => ({
         padding: "12px 16px",
         fontSize: "0.875rem",
         alignItems: "center",
-        border: "1px solid",
         backgroundColor: theme.palette.background.paper,
         fontWeight: 400,
       },
       standardSuccess: {
         color: theme.palette.success.dark,
-        borderColor: alpha(theme.palette.success.main, 0.3),
         backgroundColor: alpha(theme.palette.success.main, 0.05),
       },
       standardInfo: {
         color: theme.palette.info.dark,
-        borderColor: alpha(theme.palette.info.main, 0.3),
         backgroundColor: alpha(theme.palette.info.main, 0.05),
       },
       standardWarning: {
         color: theme.palette.warning.dark,
-        borderColor: alpha(theme.palette.warning.main, 0.3),
         backgroundColor: alpha(theme.palette.warning.main, 0.05),
       },
       standardError: {
         color: theme.palette.error.dark,
-        borderColor: alpha(theme.palette.error.main, 0.3),
         backgroundColor: alpha(theme.palette.error.main, 0.05),
       },
       message: { padding: 0, fontWeight: 400 },
@@ -706,7 +747,6 @@ const componentsOverride = (theme) => ({
     styleOverrides: {
       root: {
         minHeight: 44,
-        borderBottom: `1px solid ${theme.palette.divider}`,
       },
       indicator: {
         height: 2,
@@ -826,7 +866,6 @@ const componentsOverride = (theme) => ({
     styleOverrides: {
       paper: {
         borderRadius: `${theme.shape.borderRadius}px`,
-        border: `1px solid ${theme.palette.divider}`,
         boxShadow: theme.shadows[3],
       },
     },
@@ -839,7 +878,6 @@ const componentsOverride = (theme) => ({
         "& .MuiAlert-root": {
           borderRadius: `${theme.shape.borderRadius}px`,
           boxShadow: theme.shadows[3],
-          border: `1px solid ${theme.palette.divider}`,
         },
       },
     },
@@ -850,7 +888,6 @@ const componentsOverride = (theme) => ({
     styleOverrides: {
       root: {
         borderRadius: `${theme.shape.borderRadius}px`,
-        border: `1px solid ${theme.palette.divider}`,
         boxShadow: "none",
         transition: "all 0.2s ease",
         "&:before": { display: "none" },
@@ -866,10 +903,6 @@ const componentsOverride = (theme) => ({
         minHeight: 48,
         borderRadius: `${theme.shape.borderRadius}px`,
         fontWeight: 500,
-        "&.Mui-expanded": {
-          minHeight: 48,
-          borderBottom: `1px solid ${theme.palette.divider}`,
-        },
       },
       content: { "&.Mui-expanded": { margin: "12px 0" } },
     },
@@ -885,7 +918,6 @@ const componentsOverride = (theme) => ({
       root: {
         borderRadius: 0,
         backgroundColor: theme.palette.background.paper,
-        borderTop: `1px solid ${theme.palette.divider}`,
         height: 64,
       },
     },
@@ -909,7 +941,6 @@ const componentsOverride = (theme) => ({
     styleOverrides: {
       root: {
         borderRadius: `${theme.shape.borderRadius}px`,
-        border: `1px solid ${theme.palette.divider}`,
         padding: 4,
         backgroundColor: theme.palette.background.paper,
         gap: 3,
@@ -953,7 +984,6 @@ const componentsOverride = (theme) => ({
           backgroundColor: alpha(theme.palette.secondary.main, 0.12),
           color: theme.palette.secondary.main,
           boxShadow: "none",
-          border: `1px solid ${theme.palette.divider}`,
           "&:hover": {
             backgroundColor: alpha(theme.palette.secondary.main, 0.2),
           },
@@ -1010,7 +1040,6 @@ const componentsOverride = (theme) => ({
       paper: {
         borderRadius: `${theme.shape.borderRadius}px`,
         boxShadow: theme.shadows[3],
-        border: `1px solid ${theme.palette.divider}`,
         marginTop: 4,
       },
       listbox: { padding: 4 },
@@ -1033,13 +1062,11 @@ const componentsOverride = (theme) => ({
   MuiDataGrid: {
     styleOverrides: {
       root: {
-        border: `1px solid ${theme.palette.divider}`,
         borderRadius: `${theme.shape.borderRadius}px`,
         overflow: "hidden",
       },
       columnHeaders: {
         backgroundColor: alpha(theme.palette.action.hover, 0.5),
-        borderBottom: `1px solid ${theme.palette.divider}`,
       },
       columnHeader: {
         fontWeight: 500,
@@ -1055,12 +1082,10 @@ const componentsOverride = (theme) => ({
         },
       },
       cell: {
-        borderBottom: `1px solid ${theme.palette.divider}`,
         fontSize: "0.875rem",
         fontWeight: 400,
       },
       footerContainer: {
-        borderTop: `1px solid ${theme.palette.divider}`,
         backgroundColor: theme.palette.background.paper,
       },
     },
@@ -1098,7 +1123,6 @@ const componentsOverride = (theme) => ({
       root: {
         borderRadius: `${theme.shape.borderRadius}px`,
         boxShadow: "none",
-        border: `1px solid ${theme.palette.divider}`,
         backgroundColor: theme.palette.background.paper,
       },
     },
@@ -1140,7 +1164,6 @@ const componentsOverride = (theme) => ({
       root: {
         fontSize: "0.875rem",
         fontWeight: 500,
-        border: `1px solid ${theme.palette.divider}`,
         boxShadow: "none",
         borderRadius: `${theme.shape.borderRadius}px`,
       },

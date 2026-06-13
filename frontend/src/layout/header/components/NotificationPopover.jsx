@@ -1,6 +1,18 @@
 /**
  * NotificationPopover - Komponen popover notifikasi dengan infinite scroll, read/unread status, dan bulk actions.
  *
+ * Fitur:
+ * - Infinite scroll untuk load more notifikasi
+ * - Animasi fade-in untuk notifikasi baru
+ * - Indikator unread dengan garis warna di kiri
+ * - Mark as read (single & bulk)
+ * - Delete notifikasi (single & bulk)
+ * - Detail notifikasi dalam dialog
+ * - Empty state dengan ilustrasi
+ * - Loading skeleton
+ * - Optimistic delete dengan animasi fade-out
+ * - Scroll position preservation saat load more
+ *
  * @module NotificationPopover
  */
 import { useRef, useCallback, useState, useEffect } from "react";
@@ -30,7 +42,7 @@ import { notificationTypeColorMap } from "@shared/constant";
 
 /**
  * Keyframe animasi fade in dari bawah.
- * Digunakan untuk animasi notifikasi baru yang masuk.
+ *
  * @type {Object}
  */
 const fadeInUp = keyframes`
@@ -40,8 +52,8 @@ const fadeInUp = keyframes`
 
 /**
  * EmptyNotificationSvg - Ilustrasi untuk state kosong notifikasi.
- * Menampilkan ikon lonceng dalam lingkaran.
  *
+ * @component
  * @param {Object} props - Props komponen
  * @param {number} [props.opacity=0.2] - Tingkat opacity ilustrasi
  * @returns {JSX.Element} Ilustrasi SVG
@@ -67,8 +79,8 @@ const EmptyNotificationSvg = ({ opacity = 0.2 }) => (
 
 /**
  * NotificationSkeleton - Komponen skeleton loading untuk daftar notifikasi.
- * Menampilkan 4 item placeholder saat data dimuat.
  *
+ * @component
  * @returns {JSX.Element} Skeleton notifikasi
  */
 const NotificationSkeleton = () => (
@@ -108,18 +120,7 @@ const getNotifColor = (type) => {
 /**
  * NotificationPopover - Popover yang menampilkan daftar notifikasi dengan fitur lengkap.
  *
- * Fitur:
- * - Infinite scroll untuk load more notifikasi
- * - Animasi fade-in untuk notifikasi baru
- * - Indikator unread dengan garis warna di kiri
- * - Mark as read (single & bulk)
- * - Delete notifikasi (single & bulk)
- * - Detail notifikasi dalam dialog
- * - Empty state dengan ilustrasi
- * - Loading skeleton
- * - Optimistic delete dengan animasi fade-out
- * - Scroll position preservation saat load more
- *
+ * @component
  * @param {Object} props - Props komponen
  * @param {boolean} props.open - Status popover terbuka/tutup
  * @param {HTMLElement|null} props.anchorEl - Element anchor untuk popover
@@ -155,36 +156,39 @@ const NotificationPopover = ({
 }) => {
   const theme = useTheme();
 
-  /** @type {React.RefObject<HTMLDivElement>} Ref untuk kontainer scroll */
+  /** @type {React.RefObject<HTMLDivElement>} */
   const scrollRef = useRef(null);
 
-  /** @type {React.MutableRefObject<number>} Ref untuk menyimpan tinggi scroll sebelumnya */
+  /** @type {React.MutableRefObject<number>} */
   const prevScrollHeight = useRef(0);
 
-  /** @type {[number, Function]} State panjang notifikasi sebelumnya */
+  /** @type {[number, Function]} */
   const [prevLength, setPrevLength] = useState(0);
 
-  /** @type {[string[], Function]} State ID notifikasi baru untuk animasi */
+  /** @type {[string[], Function]} */
   const [newItemIds, setNewItemIds] = useState([]);
 
-  /** @type {[Object|null, Function]} State notifikasi yang dipilih untuk detail */
+  /** @type {[Object|null, Function]} */
   const [selectedNotif, setSelectedNotif] = useState(null);
 
-  /** @type {[string[], Function]} State ID notifikasi yang sedang dihapus */
+  /** @type {[string[], Function]} */
   const [deletingIds, setDeletingIds] = useState([]);
 
   /**
    * Semua notifikasi yang sudah di-flat dari struktur infinite query pages.
+   *
    * @type {Array<Object>}
    */
   const allNotifications = notifications?.pages?.flatMap((page) => page.data) || [];
 
-  /** @type {boolean} Apakah ada notifikasi yang sedang dalam proses hapus */
+  /** @type {boolean} */
   const isAnyDeleting = deletingIds.length > 0;
+
+  /** @type {string} */
+  const br = `${theme.shape.borderRadius}px`;
 
   /**
    * Effect: Deteksi notifikasi baru untuk animasi fade-in.
-   * Membandingkan panjang array sebelumnya dengan yang baru.
    */
   useEffect(() => {
     if (allNotifications.length > prevLength) {
@@ -194,10 +198,10 @@ const NotificationPopover = ({
       return () => clearTimeout(timer);
     }
     setPrevLength(allNotifications.length);
-  }, [allNotifications.length]);
+  }, [allNotifications.length, prevLength]);
 
   /**
-   * Effect: Bersihkan deleting IDs jika notifikasi sudah benar-benar hilang dari list.
+   * Effect: Bersihkan deleting IDs jika notifikasi sudah benar-benar hilang.
    */
   useEffect(() => {
     if (deletingIds.length > 0) {
@@ -208,7 +212,7 @@ const NotificationPopover = ({
   }, [allNotifications, deletingIds]);
 
   /**
-   * Effect: Timeout fallback untuk membersihkan deleting IDs setelah 3 detik.
+   * Effect: Timeout fallback untuk membersihkan deleting IDs.
    */
   useEffect(() => {
     let timer;
@@ -219,8 +223,7 @@ const NotificationPopover = ({
   }, [deletingIds]);
 
   /**
-   * Effect: Preserve scroll position saat load more (infinite scroll).
-   * Menghitung perbedaan tinggi dan menyesuaikan posisi scroll.
+   * Effect: Preserve scroll position saat load more.
    */
   useEffect(() => {
     if (!isFetchingNextPage && prevScrollHeight.current > 0 && scrollRef.current) {
@@ -236,7 +239,6 @@ const NotificationPopover = ({
 
   /**
    * Handler scroll untuk infinite scroll.
-   * Memicu fetch next page saat mendekati bottom.
    *
    * @param {React.UIEvent<HTMLDivElement>} e - Event scroll
    */
@@ -254,7 +256,6 @@ const NotificationPopover = ({
 
   /**
    * Handler klik notifikasi.
-   * Mark as read jika belum dibaca, lalu buka detail.
    *
    * @param {Object} notif - Data notifikasi
    */
@@ -266,7 +267,6 @@ const NotificationPopover = ({
 
   /**
    * Handler hapus satu notifikasi.
-   * Optimistic delete dengan menambahkan ID ke deletingIds.
    *
    * @param {React.MouseEvent} e - Event klik
    * @param {string} id - ID notifikasi
@@ -278,10 +278,7 @@ const NotificationPopover = ({
     onDelete?.(id);
   };
 
-  /**
-   * Handler hapus semua notifikasi.
-   * Optimistic delete semua dengan menambahkan semua ID ke deletingIds.
-   */
+  /** Handler hapus semua notifikasi. */
   const handleDeleteAll = () => {
     if (isAnyDeleting) return;
     const allIds = allNotifications.map((n) => n.id);
@@ -289,8 +286,31 @@ const NotificationPopover = ({
     onDeleteAll?.();
   };
 
-  /** Handler tutup dialog detail */
+  /** Handler tutup dialog detail. */
   const handleCloseDetail = () => setSelectedNotif(null);
+
+  /**
+   * Style untuk icon button di header — konsisten dengan header app.
+   *
+   * @type {Object}
+   */
+  const iconBtnSx = {
+    color: "text.secondary",
+    borderRadius: br,
+    minWidth: 38,
+    minHeight: 38,
+    p: 0,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    border: "1px solid",
+    borderColor: alpha(theme.palette.divider, 0.8),
+    "&:hover": {
+      bgcolor: alpha(theme.palette.secondary.main, 0.08),
+      borderColor: alpha(theme.palette.secondary.main, 0.4),
+      color: theme.palette.secondary.main,
+    },
+  };
 
   return (
     <>
@@ -307,13 +327,13 @@ const NotificationPopover = ({
               width: 380,
               maxWidth: "100%",
               maxHeight: `calc(100vh - ${theme.spacing(12)})`,
-              borderRadius: `${theme.shape.borderRadius}px`,
+              borderRadius: br,
               border: `1px solid ${theme.palette.divider}`,
               boxShadow: theme.shadows[4],
               overflow: "hidden",
               display: "flex",
               flexDirection: "column",
-              bgcolor: theme.palette.background.paper,
+              bgcolor: "background.paper",
               backgroundImage: "none",
             },
           },
@@ -352,22 +372,15 @@ const NotificationPopover = ({
           </Stack>
 
           {/* Action Buttons */}
-          <Stack direction="row" sx={{ gap: 0.5, alignItems: "center" }}>
+          <Stack direction="row" sx={{ gap: "8px", alignItems: "center" }}>
             {onRefresh && (
               <Tooltip title="Segarkan" placement="bottom">
                 <IconButton
                   size="small"
                   onClick={onRefresh}
                   disabled={isAnyDeleting}
-                  sx={{
-                    color: "text.secondary",
-                    p: 0.75,
-                    borderRadius: 1,
-                    "&:hover": {
-                      bgcolor: alpha(theme.palette.secondary.main, 0.08),
-                      color: theme.palette.secondary.main,
-                    },
-                  }}
+                  aria-label="Segarkan notifikasi"
+                  sx={iconBtnSx}
                 >
                   <RotateCcw size={16} strokeWidth={2} />
                 </IconButton>
@@ -379,39 +392,20 @@ const NotificationPopover = ({
                   size="small"
                   onClick={onMarkAllRead}
                   disabled={isAnyDeleting}
-                  sx={{
-                    color: "text.secondary",
-                    p: 0.75,
-                    borderRadius: 1,
-                    "&:hover": {
-                      bgcolor: alpha(theme.palette.secondary.main, 0.08),
-                      color: theme.palette.secondary.main,
-                    },
-                  }}
+                  aria-label="Tandai semua notifikasi dibaca"
+                  sx={iconBtnSx}
                 >
                   <CheckCheck size={16} strokeWidth={2} />
                 </IconButton>
               </Tooltip>
             )}
-            <Divider
-              orientation="vertical"
-              flexItem
-              sx={{ mx: 0.5, height: 16, alignSelf: "center" }}
-            />
             <Tooltip title="Tutup" placement="bottom">
               <IconButton
                 size="small"
                 onClick={onClose}
                 disabled={isAnyDeleting}
-                sx={{
-                  color: "text.secondary",
-                  p: 0.75,
-                  borderRadius: 1,
-                  "&:hover": {
-                    bgcolor: alpha(theme.palette.secondary.main, 0.08),
-                    color: theme.palette.secondary.main,
-                  },
-                }}
+                aria-label="Tutup notifikasi"
+                sx={iconBtnSx}
               >
                 <X size={16} strokeWidth={2} />
               </IconButton>
@@ -428,12 +422,17 @@ const NotificationPopover = ({
             overflowY: "auto",
             overflowX: "hidden",
             p: 1,
+            "&::-webkit-scrollbar": { width: 4 },
+            "&::-webkit-scrollbar-track": { bgcolor: "transparent" },
+            "&::-webkit-scrollbar-thumb": {
+              bgcolor: alpha(theme.palette.divider, 0.5),
+              borderRadius: 10,
+            },
           }}
         >
           {isLoading ? (
             <NotificationSkeleton />
           ) : allNotifications.length === 0 ? (
-            /* Empty State */
             <Box
               sx={{
                 display: "flex",
@@ -443,6 +442,7 @@ const NotificationPopover = ({
                 py: 8,
                 px: 3,
                 textAlign: "center",
+                minHeight: 280,
               }}
             >
               <EmptyNotificationSvg opacity={0.4} />
@@ -454,7 +454,6 @@ const NotificationPopover = ({
               </Typography>
             </Box>
           ) : (
-            /* Notification List */
             <Stack spacing={0.5}>
               {allNotifications.map((notif) => {
                 const isDeleting = deletingIds.includes(notif.id);
@@ -469,7 +468,7 @@ const NotificationPopover = ({
                       position: "relative",
                       p: 1.5,
                       pl: isUnread ? 2 : 1.5,
-                      borderRadius: `${theme.shape.borderRadius}px`,
+                      borderRadius: br,
                       cursor: isAnyDeleting ? "default" : "pointer",
                       transition: "all 0.2s ease",
                       bgcolor: isUnread
@@ -484,7 +483,7 @@ const NotificationPopover = ({
                       "&:hover": {
                         bgcolor: isAnyDeleting
                           ? undefined
-                          : alpha(theme.palette.secondary.main, 0.08),
+                          : alpha(theme.palette.secondary.main, 0.06),
                         borderColor: isAnyDeleting
                           ? "transparent"
                           : alpha(theme.palette.secondary.main, 0.1),
@@ -493,7 +492,6 @@ const NotificationPopover = ({
                           visibility: "visible",
                         },
                       },
-                      // Indikator unread di kiri
                       ...(isUnread && {
                         "&::before": {
                           content: '""',
@@ -674,6 +672,13 @@ const NotificationPopover = ({
         onClose={handleCloseDetail}
         maxWidth="xs"
         fullWidth
+        slotProps={{
+          paper: {
+            sx: {
+              borderRadius: br,
+            },
+          },
+        }}
       >
         <DialogTitle sx={{ pb: 1.5 }}>
           <Stack

@@ -1,6 +1,8 @@
 /**
- * Header - Application header dengan branding, search, notifikasi, dan action icons
- * Mobile/tablet: search menutupi seluruh header dengan icon dalam TextField, X button bg danger alpha
+ * Header - Application header dengan branding, search, notifikasi, dan action icons.
+ * Mobile/tablet: search menutupi seluruh header dengan icon dalam TextField.
+ * Sepenuhnya mengandalkan nilai dari theme MUI untuk styling.
+ *
  * @component
  * @returns {JSX.Element} Rendered header component
  */
@@ -31,6 +33,7 @@ import {
   Maximize,
   Minimize,
   X,
+  ChevronDown,
 } from "lucide-react";
 
 import { selectCartItems } from "@store/cart/cartSelector.js";
@@ -118,6 +121,9 @@ const Header = () => {
     };
   }, []);
 
+  /**
+   * Toggle fullscreen mode.
+   */
   const handleToggleFullscreen = () => {
     if (!document.fullscreenElement) {
       document.documentElement.requestFullscreen().catch((err) => {
@@ -130,9 +136,21 @@ const Header = () => {
     }
   };
 
+  /**
+   * Mark single notification as read.
+   *
+   * @param {string} id - Notification ID
+   */
   const handleMarkRead = (id) => markAsRead.mutate(id);
+
+  /** Mark all notifications as read. */
   const handleMarkAllRead = () => markAllAsRead.mutate();
 
+  /**
+   * Delete single notification.
+   *
+   * @param {string} id - Notification ID
+   */
   const handleDelete = (id) => {
     deleteOne.mutate(id, {
       onSuccess: () =>
@@ -158,6 +176,7 @@ const Header = () => {
     });
   };
 
+  /** Delete all notifications. */
   const handleDeleteAll = () => {
     deleteAll.mutate(undefined, {
       onSuccess: () =>
@@ -183,31 +202,61 @@ const Header = () => {
     });
   };
 
+  /** Toggle sidebar visibility. */
   const handleToggleSidebar = () => dispatch(toggleSidebar());
+
+  /**
+   * Toggle cart drawer (cashier only).
+   */
   const handleToggleCart = useCallback(() => {
     if (isCashier) setCartOpen((prev) => !prev);
   }, [isCashier]);
+
+  /** Toggle theme between light and dark mode. */
   const handleToggleTheme = () => dispatch(toggleTheme());
+
+  /**
+   * Open profile popover.
+   *
+   * @param {React.MouseEvent<HTMLElement>} e - Mouse event
+   */
   const handleProfileOpen = (e) => setProfileAnchorEl(e.currentTarget);
+
+  /** Close profile popover. */
   const handleProfileClose = () => setProfileAnchorEl(null);
+
+  /**
+   * Open notification popover.
+   *
+   * @param {React.MouseEvent<HTMLElement>} e - Mouse event
+   */
   const handleNotifOpen = (e) => {
     setNotifAnchorEl(e.currentTarget);
     setNotifOpen(true);
   };
+
+  /** Close notification popover. */
   const handleNotifClose = () => {
     setNotifAnchorEl(null);
     setNotifOpen(false);
   };
+
+  /** Refresh notifications. */
   const handleRefresh = () => refetch();
 
   /**
-   * Buka/tutup search overlay (mobile & tablet)
+   * Toggle mobile/tablet search overlay.
    */
   const handleToggleMobileSearch = () => {
     setShowMobileSearch((prev) => !prev);
     setSearchVal("");
   };
 
+  /**
+   * Style untuk icon button konsisten.
+   *
+   * @type {Object}
+   */
   const iconBtnStyle = {
     border: "1px solid",
     borderColor: alpha(theme.palette.divider, 0.8),
@@ -215,14 +264,16 @@ const Header = () => {
     color: "text.secondary",
     padding: { xs: "6px", sm: "8px" },
     "&:hover": {
-      bgcolor: alpha(theme.palette.secondary.main, 0.06),
+      bgcolor: alpha(theme.palette.secondary.main, 0.08),
       borderColor: alpha(theme.palette.secondary.main, 0.4),
       color: theme.palette.secondary.main,
     },
   };
 
   /**
-   * Style untuk icon wrapper di dalam TextField (search & close)
+   * Style untuk icon wrapper di dalam TextField (search & close).
+   *
+   * @type {Object}
    */
   const adornmentIconWrapperStyle = {
     display: "flex",
@@ -234,10 +285,42 @@ const Header = () => {
   };
 
   /**
-   * Padding left logo/menu header agar sejajar dengan menu items collapsed sidebar
+   * Padding left logo/menu header agar sejajar dengan menu items collapsed sidebar.
+   *
+   * @type {string}
    */
   const logoPl = `${3 * 8 - 4}px`;
+
+  /**
+   * Padding left untuk menu toggle button.
+   *
+   * @type {string}
+   */
   const menuPl = `${2 * 8 - 4}px`;
+
+  /**
+   * Style wrapper profil.
+   *
+   * @type {Object}
+   */
+  const profileWrapperStyle = {
+    display: "flex",
+    alignItems: "center",
+    gap: { xs: 0, md: 1.5 },
+    cursor: "pointer",
+    px: { xs: 0, md: 1.5 },
+    py: 0.5,
+    borderRadius: `${theme.shape.borderRadius}px`,
+    border: { xs: "none", md: `1px solid ${alpha(theme.palette.divider, 0.8)}` },
+    transition: "all 0.15s ease",
+    "&:hover": {
+      bgcolor: {
+        xs: "transparent",
+        md: alpha(theme.palette.secondary.main, 0.06),
+      },
+      borderColor: alpha(theme.palette.secondary.main, 0.4),
+    },
+  };
 
   return (
     <>
@@ -249,7 +332,6 @@ const Header = () => {
           height: isSmallDevice ? HEADER.MOBILE_HEIGHT : HEADER.DESKTOP_HEIGHT,
           justifyContent: "center",
           bgcolor: "background.paper",
-          border: "none",
           zIndex: theme.zIndex.appBar,
         }}
       >
@@ -258,7 +340,7 @@ const Header = () => {
           <Toolbar
             sx={{
               minHeight: `${HEADER.MOBILE_HEIGHT}px !important`,
-              px: 6,
+              px: { xs: 2, sm: 3 },
               display: "flex",
               alignItems: "center",
               bgcolor: "background.paper",
@@ -338,8 +420,8 @@ const Header = () => {
             minHeight: `${
               isSmallDevice ? HEADER.MOBILE_HEIGHT : HEADER.DESKTOP_HEIGHT
             }px !important`,
-            pl: { xs: 3, sm: 2, md: 0 },
-            pr: { xs: 3, sm: 2, md: 2 },
+            pl: { xs: 2, sm: 2, md: 0 },
+            pr: { xs: 2, sm: 4, md: 6 },
             display: isSmallDevice && showMobileSearch ? "none" : "flex",
             gap: { xs: 1, sm: 2 },
           }}
@@ -503,7 +585,7 @@ const Header = () => {
               display: "flex",
               alignItems: "center",
               justifyContent: "flex-end",
-              gap: "10px",
+              gap: { xs: "6px", sm: "10px" },
               flexShrink: 0,
             }}
           >
@@ -618,22 +700,75 @@ const Header = () => {
 
             {/* Profil */}
             <Tooltip title="Profil Pengguna" enterDelay={300} leaveDelay={0}>
-              <Avatar
-                onClick={handleProfileOpen}
-                src={getAvatarUrl(user?.fullName)}
-                sx={{
-                  width: { xs: 32, sm: 36 },
-                  height: { xs: 32, sm: 36 },
-                  cursor: "pointer",
-                  border: "1px solid",
-                  borderRadius: "50%",
-                  borderColor: alpha(theme.palette.divider, 0.8),
-                  flexShrink: 0,
-                  "&:hover": {
-                    borderColor: alpha(theme.palette.secondary.main, 0.4),
-                  },
-                }}
-              />
+              <Box onClick={handleProfileOpen} sx={profileWrapperStyle}>
+                <Avatar
+                  src={getAvatarUrl(user?.fullName)}
+                  variant="circular"
+                  sx={{
+                    width: { xs: 32, sm: 36 },
+                    height: { xs: 32, sm: 36 },
+                    flexShrink: 0,
+                    fontSize: "0.875rem",
+                    fontWeight: 500,
+                    borderRadius : "50%",
+                    border: "2px solid",
+                    borderColor: alpha(theme.palette.divider, 0.6),
+                    "&:hover": {
+                      borderColor: alpha(theme.palette.secondary.main, 0.4),
+                    },
+                  }}
+                />
+
+                {/* Name & Role — Desktop only */}
+                <Box
+                  sx={{
+                    display: { xs: "none", md: "flex" },
+                    flexDirection: "column",
+                    minWidth: 0,
+                    maxWidth: 140,
+                    
+                  }}
+                >
+                  <Typography
+                    variant="body2"
+                    noWrap
+                    sx={{
+                      lineHeight: 1.3,
+                      fontSize: "0.8125rem",
+                      fontWeight: 600,
+                      color: "text.primary",
+                      letterSpacing: "-0.01em",
+                    }}
+                  >
+                    {user?.fullName || "Pengguna"}
+                  </Typography>
+                  <Typography
+                    variant="caption"
+                    noWrap
+                    sx={{
+                      lineHeight: 1.3,
+                      fontSize: "0.6875rem",
+                      color: "text.secondary",
+                      textTransform: "capitalize",
+                      fontWeight: 400,
+                    }}
+                  >
+                    {user?.role?.toLowerCase() || "user"}
+                  </Typography>
+                </Box>
+
+                {/* Chevron Down — Desktop only */}
+                <ChevronDown
+                  size={14}
+                  strokeWidth={2}
+                  style={{
+                    display: isSmallDevice ? "none" : "block",
+                    color: theme.palette.text.secondary,
+                    marginLeft: 4,
+                    flexShrink: 0,
+                  }}
+                />
+              </Box>
             </Tooltip>
           </Box>
         </Toolbar>

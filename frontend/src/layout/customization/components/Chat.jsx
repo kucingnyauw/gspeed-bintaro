@@ -14,9 +14,11 @@
  * - Error state untuk pesan gagal
  * - Desain minimalis dengan spacing yang lega
  *
+ * @component
  * @param {Object} props
  * @param {boolean} props.open - Status dialog terbuka/tutup
  * @param {Function} props.onClose - Handler untuk menutup dialog
+ * @returns {JSX.Element} Dialog chatbot
  */
 import { useEffect, useRef, useState } from "react";
 import { useSelector } from "react-redux";
@@ -27,16 +29,16 @@ import {
   TextField,
   Typography,
   useTheme,
-  Avatar,
   InputAdornment,
 } from "@mui/material";
 import { alpha, keyframes } from "@mui/material/styles";
-import { X, Send, Bot, Sparkles } from "lucide-react";
+import { X, Send, Sparkles } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 import { useChat } from "@layout/customization/hooks";
 import { selectUser } from "@store/auth/authSelector.js";
+import { useDevice } from "@hooks";
 
 /**
  * Keyframe animasi fade-in dari bawah.
@@ -61,6 +63,7 @@ const jumpDots = keyframes`
 /**
  * TypewriterMessage - Menampilkan teks dengan efek ketik karakter per karakter.
  *
+ * @component
  * @param {Object} props
  * @param {string} props.content - Konten teks yang akan dianimasikan
  * @returns {JSX.Element} Komponen typewriter
@@ -88,15 +91,22 @@ const TypewriterMessage = ({ content }) => {
 /**
  * MarkdownContent - Render markdown dengan styling minimalis.
  *
+ * @component
  * @param {Object} props
  * @param {string} props.content - Konten markdown
  * @returns {JSX.Element} Konten markdown yang sudah dirender
  */
 const MarkdownContent = ({ content }) => {
   const theme = useTheme();
+  const { isMobile } = useDevice();
 
   const markdownStyles = {
-    "& p": { m: 0, lineHeight: 1.65, color: "inherit", fontSize: "0.9375rem" },
+    "& p": {
+      m: 0,
+      lineHeight: 1.65,
+      color: "inherit",
+      fontSize: isMobile ? "0.875rem" : "0.9375rem",
+    },
     "& p:not(:last-child)": { mb: 1.25 },
     "& ul, & ol": { m: 0, pl: 2.5, lineHeight: 1.65, color: "inherit" },
     "& li:not(:last-child)": { mb: 0.25 },
@@ -128,7 +138,11 @@ const MarkdownContent = ({ content }) => {
       opacity: 0.85,
       fontStyle: "italic",
     },
-    "& hr": { my: 1.5, border: "none", borderTop: `1px solid ${theme.palette.divider}` },
+    "& hr": {
+      my: 1.5,
+      border: "none",
+      borderTop: `1px solid ${theme.palette.divider}`,
+    },
     "& h1, & h2, & h3, & h4, & h5, & h6": {
       m: 0,
       mt: 1.25,
@@ -152,6 +166,7 @@ const MarkdownContent = ({ content }) => {
 /**
  * Chat - Dialog chatbot fullscreen di mobile, minimalis di desktop.
  *
+ * @component
  * @param {Object} props
  * @param {boolean} props.open - Status dialog
  * @param {Function} props.onClose - Handler tutup dialog
@@ -159,6 +174,7 @@ const MarkdownContent = ({ content }) => {
  */
 const Chat = ({ open, onClose }) => {
   const theme = useTheme();
+  const { isMobile } = useDevice();
   const user = useSelector(selectUser);
 
   const {
@@ -186,6 +202,11 @@ const Chat = ({ open, onClose }) => {
     }
   }, [open, initChat]);
 
+  /**
+   * Handle key down event untuk mengirim pesan dengan Enter.
+   *
+   * @param {React.KeyboardEvent} e - Keyboard event
+   */
   const handleKeyDown = (e) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -206,7 +227,10 @@ const Chat = ({ open, onClose }) => {
         display: open ? "flex" : "none",
         alignItems: "center",
         justifyContent: "center",
-        bgcolor: { xs: "background.paper", sm: alpha(theme.palette.common.black, 0.35) },
+        bgcolor: {
+          xs: "background.paper",
+          sm: alpha(theme.palette.common.black, 0.35),
+        },
         backdropFilter: { xs: "none", sm: "blur(4px)" },
       }}
     >
@@ -221,29 +245,35 @@ const Chat = ({ open, onClose }) => {
           flexDirection: "column",
           borderRadius: { xs: 0, sm: borderRadius },
           bgcolor: "background.paper",
-          border: { xs: "none", sm: `1px solid ${theme.palette.divider}` },
-          boxShadow: { xs: "none", sm: `0 24px 64px ${alpha(theme.palette.common.black, 0.12)}` },
+          border: {
+            xs: "none",
+            sm: `1px solid ${theme.palette.divider}`,
+          },
+          boxShadow: {
+            xs: "none",
+            sm: `0 24px 64px ${alpha(theme.palette.common.black, 0.12)}`,
+          },
           overflow: "hidden",
           animation: `${fadeInUp} 0.3s ${theme.transitions.easing.easeOut}`,
         }}
       >
-        {/* HEADER - Minimalis */}
+        {/* HEADER */}
         <Stack
           direction="row"
           sx={{
             alignItems: "center",
             justifyContent: "space-between",
-            px: 3,
-            py: 2,
+            px: { xs: 2.5, sm: 3 },
+            py: { xs: 1.5, sm: 2 },
             borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
             flexShrink: 0,
           }}
         >
-          <Stack direction="row" sx={{ gap: 1.5, alignItems: "center" }}>
+          <Stack direction="row" sx={{ gap: { xs: 1, sm: 1.5 }, alignItems: "center" }}>
             <Box
               sx={{
-                width: 36,
-                height: 36,
+                width: { xs: 32, sm: 36 },
+                height: { xs: 32, sm: 36 },
                 borderRadius: borderRadius,
                 bgcolor: alpha(theme.palette.secondary.main, 0.08),
                 color: "secondary.main",
@@ -252,13 +282,24 @@ const Chat = ({ open, onClose }) => {
                 justifyContent: "center",
               }}
             >
-              <Sparkles size={18} strokeWidth={1.5} />
+              <Sparkles size={isMobile ? 16 : 18} strokeWidth={1.5} />
             </Box>
             <Box>
-              <Typography variant="subtitle2" sx={{ fontWeight: 600, lineHeight: 1.3, fontSize: "0.9375rem" }}>
+              <Typography
+                variant="subtitle2"
+                sx={{
+                  fontWeight: 600,
+                  lineHeight: 1.3,
+                  fontSize: isMobile ? "0.875rem" : "0.9375rem",
+                }}
+              >
                 G-Speed Copilot
               </Typography>
-              <Typography variant="caption" color="text.secondary">
+              <Typography
+                variant="caption"
+                color="text.secondary"
+                sx={{ fontSize: isMobile ? "0.6875rem" : "0.75rem" }}
+              >
                 AI Assistant
               </Typography>
             </Box>
@@ -283,11 +324,11 @@ const Chat = ({ open, onClose }) => {
           sx={{
             flex: 1,
             overflowY: "auto",
-            px: { xs: 2.5, sm: 3 },
-            py: 3,
+            px: { xs: 2, sm: 3 },
+            py: { xs: 2.5, sm: 3 },
             display: "flex",
             flexDirection: "column",
-            gap: 2.5,
+            gap: { xs: 2, sm: 2.5 },
             "&::-webkit-scrollbar": { width: 4 },
             "&::-webkit-scrollbar-track": { bgcolor: "transparent" },
             "&::-webkit-scrollbar-thumb": {
@@ -303,15 +344,15 @@ const Chat = ({ open, onClose }) => {
                 flex: 1,
                 alignItems: "center",
                 justifyContent: "center",
-                gap: 4,
-                py: 6,
+                gap: { xs: 3, sm: 4 },
+                py: { xs: 4, sm: 6 },
                 textAlign: "center",
               }}
             >
               <Box
                 sx={{
-                  width: 64,
-                  height: 64,
+                  width: { xs: 56, sm: 64 },
+                  height: { xs: 56, sm: 64 },
                   borderRadius: "50%",
                   bgcolor: alpha(theme.palette.secondary.main, 0.06),
                   color: "secondary.main",
@@ -320,13 +361,20 @@ const Chat = ({ open, onClose }) => {
                   justifyContent: "center",
                 }}
               >
-                <Sparkles size={28} strokeWidth={1.5} />
+                <Sparkles size={isMobile ? 24 : 28} strokeWidth={1.5} />
               </Box>
-              <Box sx={{ maxWidth: 300 }}>
-                <Typography variant="h6" sx={{ fontWeight: 600, mb: 1, fontSize: "1.125rem" }}>
+              <Box sx={{ maxWidth: 300, px: { xs: 2, sm: 0 } }}>
+                <Typography
+                  variant={isMobile ? "subtitle1" : "h6"}
+                  sx={{ fontWeight: 600, mb: 1, fontSize: isMobile ? "1rem" : "1.125rem" }}
+                >
                   Hai, {firstName}!
                 </Typography>
-                <Typography variant="body2" color="text.secondary" sx={{ lineHeight: 1.7 }}>
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{ lineHeight: 1.7, fontSize: isMobile ? "0.8125rem" : "0.875rem" }}
+                >
                   Tanyakan apapun seputar performa, penjualan, stok, atau progress pekerjaan bengkel.
                 </Typography>
               </Box>
@@ -345,15 +393,15 @@ const Chat = ({ open, onClose }) => {
                 sx={{
                   justifyContent: isAgent ? "flex-start" : "flex-end",
                   alignItems: "flex-end",
-                  gap: 1,
+                  gap: { xs: 0.75, sm: 1 },
                   animation: `${fadeInUp} 0.25s ${theme.transitions.easing.easeOut}`,
                 }}
               >
                 {isAgent && (
                   <Box
                     sx={{
-                      width: 28,
-                      height: 28,
+                      width: { xs: 24, sm: 28 },
+                      height: { xs: 24, sm: 28 },
                       borderRadius: borderRadius,
                       bgcolor: alpha(theme.palette.secondary.main, 0.08),
                       color: "secondary.main",
@@ -364,15 +412,15 @@ const Chat = ({ open, onClose }) => {
                       mb: 0.25,
                     }}
                   >
-                    <Sparkles size={14} strokeWidth={1.5} />
+                    <Sparkles size={isMobile ? 12 : 14} strokeWidth={1.5} />
                   </Box>
                 )}
 
                 <Box
                   sx={{
-                    maxWidth: isAgent ? "80%" : "70%",
-                    px: 2,
-                    py: 1.5,
+                    maxWidth: isAgent ? { xs: "85%", sm: "80%" } : { xs: "75%", sm: "70%" },
+                    px: { xs: 1.5, sm: 2 },
+                    py: { xs: 1.25, sm: 1.5 },
                     borderRadius: isAgent
                       ? `${borderRadius} ${borderRadius} ${borderRadius} 4px`
                       : `${borderRadius} ${borderRadius} 4px ${borderRadius}`,
@@ -410,14 +458,14 @@ const Chat = ({ open, onClose }) => {
               direction="row"
               sx={{
                 alignItems: "flex-end",
-                gap: 1,
+                gap: { xs: 0.75, sm: 1 },
                 animation: `${fadeInUp} 0.25s ${theme.transitions.easing.easeOut}`,
               }}
             >
               <Box
                 sx={{
-                  width: 28,
-                  height: 28,
+                  width: { xs: 24, sm: 28 },
+                  height: { xs: 24, sm: 28 },
                   borderRadius: borderRadius,
                   bgcolor: alpha(theme.palette.secondary.main, 0.08),
                   color: "secondary.main",
@@ -428,12 +476,12 @@ const Chat = ({ open, onClose }) => {
                   mb: 0.25,
                 }}
               >
-                <Sparkles size={14} strokeWidth={1.5} />
+                <Sparkles size={isMobile ? 12 : 14} strokeWidth={1.5} />
               </Box>
               <Box
                 sx={{
-                  px: 2.5,
-                  py: 2,
+                  px: { xs: 2, sm: 2.5 },
+                  py: { xs: 1.75, sm: 2 },
                   borderRadius: `${borderRadius} ${borderRadius} ${borderRadius} 4px`,
                   bgcolor: alpha(theme.palette.secondary.main, 0.04),
                   border: `1px solid ${alpha(theme.palette.divider, 0.4)}`,
@@ -463,14 +511,14 @@ const Chat = ({ open, onClose }) => {
           <Box sx={{ height: 4, flexShrink: 0 }} />
         </Box>
 
-        {/* INPUT AREA - Minimalis */}
+        {/* INPUT AREA */}
         <Stack
           direction="row"
           sx={{
             alignItems: "flex-end",
-            gap: 1.5,
-            px: { xs: 2.5, sm: 3 },
-            py: { xs: 2, sm: 2.5 },
+            gap: { xs: 1, sm: 1.5 },
+            px: { xs: 2, sm: 3 },
+            py: { xs: 1.5, sm: 2.5 },
             borderTop: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
             flexShrink: 0,
           }}
@@ -490,16 +538,18 @@ const Chat = ({ open, onClose }) => {
               "& .MuiOutlinedInput-root": {
                 borderRadius: borderRadius,
                 bgcolor: alpha(theme.palette.secondary.main, 0.03),
-                fontSize: "0.9375rem",
+                fontSize: isMobile ? "0.875rem" : "0.9375rem",
                 "& fieldset": { borderColor: "transparent" },
-                "&:hover fieldset": { borderColor: alpha(theme.palette.secondary.main, 0.2) },
+                "&:hover fieldset": {
+                  borderColor: alpha(theme.palette.secondary.main, 0.2),
+                },
                 "&.Mui-focused fieldset": {
                   borderColor: alpha(theme.palette.secondary.main, 0.3),
                   borderWidth: 1,
                 },
               },
               "& .MuiOutlinedInput-input": {
-                py: 1.25,
+                py: { xs: 1, sm: 1.25 },
                 "&::placeholder": {
                   color: "text.disabled",
                   opacity: 0.7,
@@ -517,17 +567,22 @@ const Chat = ({ open, onClose }) => {
                       size="small"
                       aria-label="Kirim pesan"
                       sx={{
-                        width: 36,
-                        height: 36,
+                        width: { xs: 32, sm: 36 },
+                        height: { xs: 32, sm: 36 },
                         bgcolor: input.trim() ? "secondary.main" : "transparent",
-                        color: input.trim() ? "secondary.contrastText" : "text.disabled",
+                        color: input.trim()
+                          ? "secondary.contrastText"
+                          : "text.disabled",
                         borderRadius: borderRadius,
                         transition: (t) =>
-                          t.transitions.create(["background-color", "transform", "color"], {
-                            duration: t.transitions.duration.shorter,
-                          }),
+                          t.transitions.create(
+                            ["background-color", "transform", "color"],
+                            { duration: t.transitions.duration.shorter }
+                          ),
                         "&:hover": {
-                          bgcolor: input.trim() ? "secondary.dark" : "action.hover",
+                          bgcolor: input.trim()
+                            ? "secondary.dark"
+                            : "action.hover",
                           transform: input.trim() ? "scale(1.05)" : "none",
                         },
                         "&.Mui-disabled": {
@@ -536,7 +591,7 @@ const Chat = ({ open, onClose }) => {
                         },
                       }}
                     >
-                      <Send size={16} strokeWidth={2} />
+                      <Send size={isMobile ? 14 : 16} strokeWidth={2} />
                     </IconButton>
                   </InputAdornment>
                 ),

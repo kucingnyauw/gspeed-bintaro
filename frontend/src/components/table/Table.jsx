@@ -47,14 +47,7 @@ import {
   useMemo,
 } from "react";
 import PropTypes from "prop-types";
-import {
-  Copy,
-  Search,
-  Rows,
-  Columns,
-  ChevronRight,
-  X,
-} from "lucide-react";
+import { Copy, Search, Rows, Columns, ChevronRight, X } from "lucide-react";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   Alert,
@@ -470,7 +463,7 @@ const AppTable = memo(
      *
      * @returns {JSX.Element}
      */
-  
+
     const renderedHeaders = (
       <TableRow>
         {hasExpandable && (
@@ -550,7 +543,6 @@ const AppTable = memo(
         })}
       </TableRow>
     );
-    
 
     /**
      * Render skeleton rows.
@@ -561,9 +553,7 @@ const AppTable = memo(
       (_, idx) => (
         <TableRow key={`skeleton-${idx}`}>
           {hasExpandable && (
-            <TableCell
-              sx={{ py: { xs: 1.75, sm: 2 }, px: { xs: 2, sm: 2.5 } }}
-            >
+            <TableCell sx={{ py: { xs: 1.75, sm: 2 }, px: { xs: 2, sm: 2.5 } }}>
               <Skeleton variant="circular" width={20} height={20} />
             </TableCell>
           )}
@@ -572,7 +562,12 @@ const AppTable = memo(
               padding="checkbox"
               sx={{ py: { xs: 1.75, sm: 2 }, px: { xs: 1, sm: 1.5 } }}
             >
-              <Skeleton variant="rounded" width={20} height={20} sx={{ borderRadius: `${theme.shape.borderRadius / 2}px` }} />
+              <Skeleton
+                variant="rounded"
+                width={20}
+                height={20}
+                sx={{ borderRadius: `${theme.shape.borderRadius / 2}px` }}
+              />
             </TableCell>
           )}
           {headers.map((_, i) => {
@@ -820,7 +815,7 @@ const AppTable = memo(
               "&:hover":
                 hasTransitions && !disabled
                   ? {
-                      bgcolor: alpha(theme.palette.secondary.main, 0.06),
+                      bgcolor: alpha(theme.palette.secondary.main, 0.08),
                       borderColor: alpha(theme.palette.secondary.main, 0.4),
                       color: theme.palette.secondary.main,
                     }
@@ -833,7 +828,15 @@ const AppTable = memo(
               onClick={onClick}
               size="small"
               aria-label={label}
-              sx={{ borderRadius: "inherit", p: { xs: 1, sm: 0.75 } }}
+              sx={{
+                borderRadius: "inherit",
+                minWidth: 38,
+                minHeight: 38,
+                p: 0,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
             >
               <Icon size={18} strokeWidth={1.5} />
             </IconButton>
@@ -841,7 +844,6 @@ const AppTable = memo(
         </Tooltip>
       );
     });
-
     return (
       <Card
         sx={{
@@ -865,7 +867,10 @@ const AppTable = memo(
                 px: { xs: 2.5, sm: 3 },
                 py: { xs: 1.5, sm: 1.5 },
                 bgcolor: alpha(theme.palette.secondary.main, 0.06),
-                borderBottom: `1px solid ${alpha(theme.palette.secondary.main, 0.12)}`,
+                borderBottom: `1px solid ${alpha(
+                  theme.palette.secondary.main,
+                  0.12
+                )}`,
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "space-between",
@@ -873,12 +878,21 @@ const AppTable = memo(
                 gap: 1,
               }}
             >
-              <Typography variant="body2" color="text.secondary" fontWeight={600}>
+              <Typography
+                variant="body2"
+                color="text.secondary"
+                fontWeight={600}
+              >
                 {selectedRows.length} baris dipilih
               </Typography>
               <Stack direction="row" spacing={1}>
                 {bulkActions.map((action, idx) => {
-                  const { color = "error", disabled, icon: Icon, label } = action;
+                  const {
+                    color = "error",
+                    disabled,
+                    icon: Icon,
+                    label,
+                  } = action;
 
                   return (
                     <Tooltip key={idx} arrow placement="top" title={label}>
@@ -925,7 +939,11 @@ const AppTable = memo(
                   </Typography>
                 )}
                 {subtitle && (
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                  <Typography
+                    variant="body2"
+                    color="text.secondary"
+                    sx={{ mt: 0.5 }}
+                  >
                     {subtitle}
                   </Typography>
                 )}
@@ -964,7 +982,7 @@ const AppTable = memo(
                             ? theme.palette.secondary.main
                             : theme.palette.text.secondary,
                           bgcolor: Boolean(colToggleAnchor)
-                            ? alpha(theme.palette.secondary.main, 0.06)
+                            ? alpha(theme.palette.secondary.main, 0.08)
                             : "transparent",
                           transition: theme.transitions.create([
                             "background-color",
@@ -972,8 +990,11 @@ const AppTable = memo(
                             "color",
                           ]),
                           "&:hover": {
-                            bgcolor: alpha(theme.palette.secondary.main, 0.06),
-                            borderColor: alpha(theme.palette.secondary.main, 0.4),
+                            bgcolor: alpha(theme.palette.secondary.main, 0.08),
+                            borderColor: alpha(
+                              theme.palette.secondary.main,
+                              0.4
+                            ),
                             color: theme.palette.secondary.main,
                           },
                         }}
@@ -984,7 +1005,12 @@ const AppTable = memo(
                           aria-label="Toggle Columns"
                           sx={{
                             borderRadius: "inherit",
-                            p: { xs: 1, sm: 0.75 },
+                            minWidth: 38,
+                            minHeight: 38,
+                            p: 0,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
                           }}
                         >
                           <Columns size={18} strokeWidth={1.5} />
@@ -1019,7 +1045,10 @@ const AppTable = memo(
                                 width: 32,
                                 height: 26,
                                 borderRadius: `${theme.shape.borderRadius}px`,
-                                bgcolor: alpha(theme.palette.secondary.main, 0.08),
+                                bgcolor: alpha(
+                                  theme.palette.secondary.main,
+                                  0.08
+                                ),
                                 color: theme.palette.secondary.main,
                                 mr: 1,
                               }}
@@ -1168,7 +1197,12 @@ const AppTable = memo(
                         bgcolor: theme.palette.background.paper,
                         color: theme.palette.text.secondary,
                         transition: theme.transitions.create(
-                          ["background-color", "border-color", "color", "box-shadow"],
+                          [
+                            "background-color",
+                            "border-color",
+                            "color",
+                            "box-shadow",
+                          ],
                           { duration: theme.transitions.duration.shorter }
                         ),
                         "&:hover": {
@@ -1181,7 +1215,10 @@ const AppTable = memo(
                           color: theme.palette.secondary.contrastText,
                           borderColor: theme.palette.secondary.main,
                           fontWeight: 600,
-                          boxShadow: `0 2px 8px ${alpha(theme.palette.secondary.main, 0.3)}`,
+                          boxShadow: `0 2px 8px ${alpha(
+                            theme.palette.secondary.main,
+                            0.3
+                          )}`,
                           "&:hover": {
                             bgcolor: theme.palette.secondary.dark,
                           },
@@ -1212,8 +1249,14 @@ const AppTable = memo(
               sx: {
                 mt: 1,
                 borderRadius: `${theme.shape.borderRadius}px`,
-                border: `1px solid ${alpha(theme.palette.secondary.main, 0.15)}`,
-                boxShadow: `0 4px 20px ${alpha(theme.palette.secondary.main, 0.12)}`,
+                border: `1px solid ${alpha(
+                  theme.palette.secondary.main,
+                  0.15
+                )}`,
+                boxShadow: `0 4px 20px ${alpha(
+                  theme.palette.secondary.main,
+                  0.12
+                )}`,
                 minWidth: 180,
                 py: 2,
               },
@@ -1267,8 +1310,14 @@ const AppTable = memo(
             paper: {
               sx: {
                 borderRadius: `${theme.shape.borderRadius}px`,
-                border: `1px solid ${alpha(theme.palette.secondary.main, 0.15)}`,
-                boxShadow: `0 4px 20px ${alpha(theme.palette.secondary.main, 0.12)}`,
+                border: `1px solid ${alpha(
+                  theme.palette.secondary.main,
+                  0.15
+                )}`,
+                boxShadow: `0 4px 20px ${alpha(
+                  theme.palette.secondary.main,
+                  0.12
+                )}`,
                 minWidth: 160,
                 py: 0.5,
               },
@@ -1378,7 +1427,10 @@ const AppTable = memo(
                     sx={{
                       minWidth: { xs: 280, sm: 340 },
                       borderRadius: `${theme.shape.borderRadius}px`,
-                      boxShadow: `0 8px 32px ${alpha(theme.palette.common.black, 0.12)}`,
+                      boxShadow: `0 8px 32px ${alpha(
+                        theme.palette.common.black,
+                        0.12
+                      )}`,
                       border: "1px solid",
                       borderColor: alpha(theme.palette.success.main, 0.15),
                       bgcolor: theme.palette.background.paper,

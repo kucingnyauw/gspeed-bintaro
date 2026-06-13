@@ -40,11 +40,10 @@ const HeaderSkeleton = ({ theme, isMobile, isOpen }) => {
         width: "100%",
         height: headerHeight,
         bgcolor: "background.paper",
-        borderBottom: `1px solid ${theme.palette.divider}`,
         display: "flex",
         alignItems: "center",
-        px: { xs: 2, sm: 3 },
-        gap: 2,
+        px: { xs: 2, sm: 2, md: 0 },
+        gap: { xs: 1, sm: 2 },
         flexShrink: 0,
         position: "fixed",
         top: 0,
@@ -57,17 +56,14 @@ const HeaderSkeleton = ({ theme, isMobile, isOpen }) => {
         sx={{
           display: "flex",
           alignItems: "center",
-          gap: 1.5,
+          justifyContent: { xs: "flex-start", md: "space-between" },
           width: { xs: "auto", md: `${sidebarWidth}px` },
+          pl: { xs: 0, md: isOpen ? `${3 * 8 - 4}px` : `${2 * 8 - 4}px` },
+          pr: { xs: 0, md: isOpen ? 3 : 0 },
           transition: theme.transitions.create("width", {
-            duration: theme.transitions.duration.standard,
+            duration: "0.3s",
             easing: theme.transitions.easing.easeInOut,
           }),
-          justifyContent: {
-            xs: "flex-start",
-            md: isOpen ? "flex-start" : "center",
-          },
-          pl: { xs: 0, md: isOpen ? 3 : 0 },
           flexShrink: 0,
         }}
       >
@@ -89,6 +85,7 @@ const HeaderSkeleton = ({ theme, isMobile, isOpen }) => {
           sx={{
             borderRadius: `${theme.shape.borderRadius}px`,
             flexShrink: 0,
+            ml: { xs: `${2 * 8 - 4}px`, md: `${2 * 8 - 4}px` },
           }}
         />
       </Box>
@@ -120,7 +117,7 @@ const HeaderSkeleton = ({ theme, isMobile, isOpen }) => {
         sx={{
           display: "flex",
           alignItems: "center",
-          gap: "10px",
+          gap: { xs: "6px", sm: "10px" },
           flexShrink: 0,
         }}
       >
@@ -198,7 +195,7 @@ const HeaderSkeleton = ({ theme, isMobile, isOpen }) => {
 
 /**
  * SidebarSkeleton - Skeleton untuk sidebar navigasi.
- * Meniru struktur sidebar asli dengan group label dan menu items.
+ * Meniru struktur sidebar asli dengan group label, menu items, dan divider.
  *
  * @param {Object} props
  * @param {Object} props.theme - MUI theme
@@ -214,7 +211,6 @@ const SidebarSkeleton = ({ theme, isOpen }) => (
       top: HEADER.DESKTOP_HEIGHT,
       left: 0,
       height: `calc(100vh - ${HEADER.DESKTOP_HEIGHT}px)`,
-      borderRight: `1px solid ${theme.palette.divider}`,
       bgcolor: "background.paper",
       display: { xs: "none", md: "flex" },
       flexDirection: "column",
@@ -222,53 +218,141 @@ const SidebarSkeleton = ({ theme, isOpen }) => (
       py: 1.5,
       gap: 0,
       transition: theme.transitions.create("width", {
-        duration: theme.transitions.duration.standard,
+        duration: "0.3s",
         easing: theme.transitions.easing.easeInOut,
       }),
       overflow: "hidden",
     }}
   >
-    {[1, 2, 3].map((section) => (
-      <Box key={section} sx={{ mb: section < 3 ? 0 : 0 }}>
-        {/* Group label skeleton */}
-        {isOpen && (
-          <Skeleton
-            width={section === 1 ? 60 : section === 2 ? 80 : 50}
-            height={10}
-            sx={{
-              mb: 1.5,
-              mt: section === 1 ? 0 : 2,
-              ml: 2,
-              borderRadius: `${theme.shape.borderRadius / 2}px`,
-            }}
-          />
-        )}
+    {/* Section 1: Main Menu */}
+    <Box>
+      {/* Group label */}
+      {isOpen && (
+        <Skeleton
+          width={60}
+          height={10}
+          sx={{
+            mb: 1.5,
+            mt: 0,
+            ml: 2,
+            borderRadius: `${theme.shape.borderRadius / 2}px`,
+          }}
+        />
+      )}
 
-        {/* Menu item skeletons */}
-        {Array.from({
-          length: section === 3 ? 2 : section === 2 ? 4 : 3,
-        }).map((_, i) => (
-          <Skeleton
-            key={i}
-            variant="rounded"
-            height={44}
-            sx={{
-              borderRadius: `${theme.shape.borderRadius}px`,
-              mb: 0.5,
-              ...(isOpen ? {} : { mx: "auto", width: 36 }),
-            }}
-          />
-        ))}
+      {/* Menu items - 4 items */}
+      {[1, 2, 3, 4].map((i) => (
+        <Skeleton
+          key={`main-${i}`}
+          variant="rounded"
+          height={44}
+          sx={{
+            borderRadius: `${theme.shape.borderRadius}px`,
+            mb: 0.5,
+            ...(isOpen ? {} : { mx: "auto", width: 36 }),
+          }}
+        />
+      ))}
+    </Box>
 
-        {/* Divider antar section (kecuali section terakhir) */}
-        {section < 3 && (
-          <Skeleton
-            height={1}
-            sx={{ mx: 1, my: 2, opacity: 0.3 }}
-          />
-        )}
-      </Box>
-    ))}
+    {/* Divider */}
+    <Skeleton height={1} sx={{ mx: 1, my: 2, opacity: 0.3 }} />
+
+    {/* Section 2: Management */}
+    <Box>
+      {/* Group label */}
+      {isOpen && (
+        <Skeleton
+          width={80}
+          height={10}
+          sx={{
+            mb: 1.5,
+            ml: 2,
+            borderRadius: `${theme.shape.borderRadius / 2}px`,
+          }}
+        />
+      )}
+
+      {/* Menu items - 4 items */}
+      {[1, 2, 3, 4].map((i) => (
+        <Skeleton
+          key={`mgmt-${i}`}
+          variant="rounded"
+          height={44}
+          sx={{
+            borderRadius: `${theme.shape.borderRadius}px`,
+            mb: 0.5,
+            ...(isOpen ? {} : { mx: "auto", width: 36 }),
+          }}
+        />
+      ))}
+    </Box>
+
+    {/* Divider */}
+    <Skeleton height={1} sx={{ mx: 1, my: 2, opacity: 0.3 }} />
+
+    {/* Section 3: Reports */}
+    <Box>
+      {/* Group label */}
+      {isOpen && (
+        <Skeleton
+          width={70}
+          height={10}
+          sx={{
+            mb: 1.5,
+            ml: 2,
+            borderRadius: `${theme.shape.borderRadius / 2}px`,
+          }}
+        />
+      )}
+
+      {/* Menu items - 5 items */}
+      {[1, 2, 3, 4, 5].map((i) => (
+        <Skeleton
+          key={`report-${i}`}
+          variant="rounded"
+          height={44}
+          sx={{
+            borderRadius: `${theme.shape.borderRadius}px`,
+            mb: 0.5,
+            ...(isOpen ? {} : { mx: "auto", width: 36 }),
+          }}
+        />
+      ))}
+    </Box>
+
+    {/* Divider */}
+    <Skeleton height={1} sx={{ mx: 1, my: 2, opacity: 0.3 }} />
+
+    {/* Section 4: Settings */}
+    <Box>
+      {/* Group label */}
+      {isOpen && (
+        <Skeleton
+          width={50}
+          height={10}
+          sx={{
+            mb: 1.5,
+            ml: 2,
+            borderRadius: `${theme.shape.borderRadius / 2}px`,
+          }}
+        />
+      )}
+
+      {/* Menu items - 2 items */}
+      {[1, 2].map((i) => (
+        <Skeleton
+          key={`settings-${i}`}
+          variant="rounded"
+          height={44}
+          sx={{
+            borderRadius: `${theme.shape.borderRadius}px`,
+            mb: 0.5,
+            ...(isOpen ? {} : { mx: "auto", width: 36 }),
+          }}
+        />
+      ))}
+    </Box>
   </Box>
 );
 
@@ -281,31 +365,33 @@ const SidebarSkeleton = ({ theme, isOpen }) => (
  * @returns {JSX.Element} Content skeleton
  */
 const ContentSkeleton = ({ theme }) => (
-  <Stack sx={{ gap: 4 }}>
+  <Stack sx={{ gap: { xs: 3, sm: 4 } }}>
     {/* Page Header Card */}
     <Card
       sx={{
-        p: 3,
-        border: `1px solid ${theme.palette.divider}`,
-        boxShadow: "none",
         borderRadius: `${theme.shape.borderRadius}px`,
       }}
     >
-      <Stack
-        direction="row"
-        sx={{ justifyContent: "space-between", alignItems: "flex-start" }}
-      >
-        <Box>
-          <Skeleton variant="text" width={220} height={32} />
-          <Skeleton variant="text" width={300} height={18} sx={{ mt: 0.75 }} />
-        </Box>
-        <Skeleton
-          variant="rounded"
-          width={38}
-          height={38}
-          sx={{ borderRadius: `${theme.shape.borderRadius}px` }}
-        />
-      </Stack>
+      <Box sx={{ p: { xs: 2.5, sm: 3 } }}>
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          sx={{
+            justifyContent: "space-between",
+            alignItems: { xs: "flex-start", sm: "center" },
+            gap: 2.5,
+          }}
+        >
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Skeleton variant="text" width="40%" height={32} />
+            <Skeleton variant="text" width="55%" height={18} sx={{ mt: 0.5 }} />
+          </Box>
+          <Stack direction="row" sx={{ gap: 1, flexShrink: 0, alignSelf: { xs: "flex-end", sm: "center" } }}>
+            <Skeleton variant="rounded" width={38} height={38} sx={{ borderRadius: `${theme.shape.borderRadius}px` }} />
+            <Skeleton variant="rounded" width={38} height={38} sx={{ borderRadius: `${theme.shape.borderRadius}px` }} />
+            <Skeleton variant="rounded" width={38} height={38} sx={{ borderRadius: `${theme.shape.borderRadius}px` }} />
+          </Stack>
+        </Stack>
+      </Box>
     </Card>
 
     {/* Summary Cards Grid */}
@@ -317,32 +403,36 @@ const ContentSkeleton = ({ theme }) => (
           sm: "1fr 1fr",
           lg: "repeat(4, 1fr)",
         },
-        gap: 3,
+        gap: { xs: 2.5, sm: 3 },
       }}
     >
       {[1, 2, 3, 4].map((i) => (
         <Card
           key={i}
           sx={{
-            p: 2.5,
-            border: `1px solid ${theme.palette.divider}`,
-            boxShadow: "none",
             borderRadius: `${theme.shape.borderRadius}px`,
+            height: "100%",
+            display: "flex",
+            flexDirection: "column",
           }}
         >
-          <Stack sx={{ gap: 1.5 }}>
-            <Skeleton
-              variant="rounded"
-              width={40}
-              height={40}
-              sx={{ borderRadius: `${theme.shape.borderRadius}px` }}
-            />
+          <Box
+            sx={{
+              p: { xs: 2, sm: 2.5 },
+              display: "flex",
+              flexDirection: "column",
+              flexGrow: 1,
+              justifyContent: "center",
+              gap: 1.5,
+            }}
+          >
+            <Skeleton variant="rounded" width={40} height={40} sx={{ borderRadius: `${theme.shape.borderRadius}px` }} />
             <Box>
               <Skeleton width="60%" height={20} />
               <Skeleton width="40%" height={32} sx={{ mt: 0.5 }} />
             </Box>
             <Skeleton width="70%" height={14} />
-          </Stack>
+          </Box>
         </Card>
       ))}
     </Box>
@@ -352,65 +442,69 @@ const ContentSkeleton = ({ theme }) => (
       sx={{
         display: "grid",
         gridTemplateColumns: { xs: "1fr", lg: "7fr 5fr" },
-        gap: 3,
+        gap: { xs: 2.5, sm: 3 },
       }}
     >
       {/* Chart Card */}
       <Card
         sx={{
-          p: 3,
-          minHeight: 420,
-          border: `1px solid ${theme.palette.divider}`,
-          boxShadow: "none",
           borderRadius: `${theme.shape.borderRadius}px`,
           display: "flex",
           flexDirection: "column",
+          minHeight: { xs: 300, sm: 360, md: 420 },
         }}
       >
-        <Box>
-          <Skeleton width={180} height={28} />
-          <Skeleton width={240} height={16} sx={{ mt: 0.75 }} />
+        <Box sx={{ p: { xs: 2, sm: 2.5, md: 3 }, pb: 2 }}>
+          <Skeleton width="40%" height={28} />
+          <Skeleton width="50%" height={16} sx={{ mt: 0.5 }} />
         </Box>
-        <Skeleton
-          variant="rounded"
-          width="100%"
-          height={300}
+        <Box
           sx={{
-            mt: 3,
-            flex: 1,
-            borderRadius: `${theme.shape.borderRadius}px`,
+            p: { xs: 2, sm: 2.5, md: 3 },
+            flexGrow: 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            minHeight: { xs: 200, sm: 260, md: 320 },
           }}
-        />
+        >
+          <Skeleton
+            variant="rounded"
+            width="100%"
+            height="100%"
+            sx={{
+              borderRadius: `${theme.shape.borderRadius}px`,
+              minHeight: { xs: 180, sm: 240, md: 280 },
+            }}
+          />
+        </Box>
       </Card>
 
       {/* Detail Cards */}
-      <Stack sx={{ gap: 3 }}>
+      <Stack sx={{ gap: { xs: 2.5, sm: 3 } }}>
         {[1, 2, 3].map((i) => (
           <Card
             key={i}
             sx={{
-              p: 2.5,
-              border: `1px solid ${theme.palette.divider}`,
-              boxShadow: "none",
               borderRadius: `${theme.shape.borderRadius}px`,
+              minHeight: { xs: 120, sm: 140 },
             }}
           >
-            <Stack direction="row" sx={{ gap: 2, alignItems: "center" }}>
-              <Skeleton
-                variant="rounded"
-                width={44}
-                height={44}
-                sx={{
-                  borderRadius: `${theme.shape.borderRadius}px`,
-                  flexShrink: 0,
-                }}
-              />
-              <Box sx={{ flex: 1 }}>
-                <Skeleton width="50%" height={18} />
-                <Skeleton width="35%" height={28} sx={{ mt: 0.5 }} />
-                <Skeleton width="60%" height={14} sx={{ mt: 0.5 }} />
-              </Box>
-            </Stack>
+            <Box sx={{ p: { xs: 2, sm: 2.5 } }}>
+              <Stack direction="row" sx={{ gap: 2, alignItems: "center" }}>
+                <Skeleton
+                  variant="rounded"
+                  width={44}
+                  height={44}
+                  sx={{ borderRadius: `${theme.shape.borderRadius}px`, flexShrink: 0 }}
+                />
+                <Box sx={{ flex: 1, minWidth: 0 }}>
+                  <Skeleton width="50%" height={20} />
+                  <Skeleton width="35%" height={32} sx={{ mt: 0.5 }} />
+                  <Skeleton width="60%" height={16} sx={{ mt: 0.5 }} />
+                </Box>
+              </Stack>
+            </Box>
           </Card>
         ))}
       </Stack>
@@ -432,6 +526,7 @@ const MainLayoutLoader = ({ isLoading }) => {
 
   if (!isLoading) return null;
 
+  const headerHeight = isMobile ? HEADER.MOBILE_HEIGHT : HEADER.DESKTOP_HEIGHT;
 
   return (
     <Box
@@ -439,7 +534,7 @@ const MainLayoutLoader = ({ isLoading }) => {
         display: "flex",
         flexDirection: "column",
         minHeight: "100vh",
-        bgcolor: alpha(theme.palette.background.default, 0.6),
+        bgcolor: "background.default",
       }}
     >
       {/* Header - Fixed top */}
@@ -450,7 +545,7 @@ const MainLayoutLoader = ({ isLoading }) => {
         sx={{
           display: "flex",
           flex: 1,
-    
+
         }}
       >
         {/* Sidebar - Fixed left, desktop only */}
@@ -458,7 +553,7 @@ const MainLayoutLoader = ({ isLoading }) => {
 
         {/* Main Content Area */}
         <MainContentStyled open={isOpen} isMobile={isMobile}>
-          <Box sx={{ p: { xs: 2.5, sm: 4 } }}>
+          <Box sx={{ p: { xs: 2.5, sm: 3, md: 4 } }}>
             <ContentSkeleton theme={theme} />
           </Box>
         </MainContentStyled>

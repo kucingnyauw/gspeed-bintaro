@@ -76,36 +76,19 @@ const SummaryCard = memo(
           height: "100%",
           position: "relative",
           overflow: "hidden",
-          background: `linear-gradient(135deg, ${theme.palette.background.paper} 30%, ${alpha(
-            mainColor,
-            0.04
-          )} 100%)`,
+          boxShadow: theme.shadows[1],
+    
           transition: theme.transitions.create(
-            ["transform", "box-shadow", "border-color"],
+            ["transform", "box-shadow"],
             { duration: theme.transitions.duration.short }
           ),
           "&:hover": {
             transform: "translateY(-4px)",
-            borderColor: alpha(mainColor, 0.5),
             boxShadow: theme.shadows[4],
+
           },
         }}
       >
-        <Box
-          sx={{
-            position: "absolute",
-            top: 0,
-            left: 0,
-            right: 0,
-            height: 2,
-            background: `linear-gradient(90deg, ${mainColor}, ${alpha(
-              mainColor,
-              0.1
-            )})`,
-            opacity: 0.8,
-          }}
-        />
-
         <CardContent
           sx={{
             display: "flex",
@@ -182,12 +165,6 @@ const SummaryCard = memo(
                           : theme.palette.error.main,
                         0.12
                       ),
-                      border: `1px solid ${alpha(
-                        trend === "up"
-                          ? theme.palette.success.main
-                          : theme.palette.error.main,
-                        0.2
-                      )}`,
                     }}
                   >
                     <Box
@@ -243,7 +220,6 @@ const SummaryCard = memo(
                 borderRadius: `${theme.shape.borderRadius}px`,
                 backgroundColor: alpha(mainColor, 0.1),
                 color: mainColor,
-                border: `1px solid ${alpha(mainColor, 0.15)}`,
                 boxShadow: `inset 0px 2px 4px ${alpha(
                   theme.palette.background.paper,
                   0.3

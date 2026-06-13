@@ -4,8 +4,9 @@ import ErrorBoundary from "@routes/ErrorBoundary.jsx";
 
 const rootRouter = {
   path: "/",
-  errorElement: <ErrorBoundary/>,
+  errorElement: <ErrorBoundary />,
   children: [
+
     ...(Array.isArray(MainRoutes) ? MainRoutes : [MainRoutes]),
     ...(Array.isArray(AuthRoutes) ? AuthRoutes : [AuthRoutes]),
   ],
