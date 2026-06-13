@@ -2612,6 +2612,1347 @@ class InsightRepository {
       _metadata: { ...this.#getDateRanges() },
     };
   }
+
+  // ============================================================================
+// ADDITIONAL MECHANIC FUNCTIONS
+// ============================================================================
+
+/**
+ * Riwayat assignment mekanik per hari (calendar view)
+ * @param {string} mechanicId
+ * @param {Date} [startDate]
+ * @param {Date} [endDate]
+ * @returns {Promise<Object>}
+ */
+async getMechanicDailyCalendar(mechanicId, startDate = null, endDate = null) {
+  const start = startDate || this.#getStartOfMonth();
+  const end = endDate || new Date();
+  end.setHours(23, 59, 59, 999);
+
+  const assignments = await prisma.mechanicAssignment.findMany({
+    where: {
+      mechanicId,
+      createdAt: { gte: start, lte: end },
+    },
+    select: {
+      id: true,
+      startAt: true,
+      endAt: true,
+      createdAt: true,
+      orderItem: {
+        select: {
+          productNameSnapshot: true,
+          quantity: true,
+          order: {
+            select: {
+              orderNumber: true,
+              status: true,
+              vehicle: { select: { plateNumber: true } },
+              customer: { select: { name: true } },
+            },
+          },
+        },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  const calendarMap = {};
+  for (const a of assignments) {
+    const dateKey = a.createdAt.toISOString().split("T")[0];
+    if (!calendarMap[dateKey]) {
+      calendarMap[dateKey] = [];
+    }
+    calendarMap[dateKey].push({
+      assignmentId: a.id,
+      orderNumber: a.orderItem.order.orderNumber,
+      service: a.orderItem.productNameSnapshot,
+      quantity: a.orderItem.quantity,
+      status: a.orderItem.order.status,
+      plateNumber: a.orderItem.order.vehicle?.plateNumber || "-",
+      customer: a.orderItem.order.customer?.name || "Umum",
+      startAt: a.startAt,
+      endAt: a.endAt,
+      durationMinutes:
+        a.startAt && a.endAt
+          ? Math.round((new Date(a.endAt) - new Date(a.startAt)) / 60000)
+          : null,
+    });
+  }
+
+  const dailySummaries = Object.entries(calendarMap).map(([date, jobs]) => ({
+    date,
+    totalJobs: jobs.length,
+    completedJobs: jobs.filter((j) => j.endAt).length,
+    pendingJobs: jobs.filter((j) => !j.endAt).length,
+    totalDurationMinutes: jobs.reduce(
+      (sum, j) => sum + (j.durationMinutes || 0),
+      0
+    ),
+    jobs,
+  }));
+
+  return {
+    daily: dailySummaries.sort(
+      (a, b) => new Date(b.date) - new Date(a.date)
+    ),
+    summary: {
+      totalDays: dailySummaries.length,
+      totalAssignments: assignments.length,
+      avgJobsPerDay:
+        dailySummaries.length > 0
+          ? Math.round(assignments.length / dailySummaries.length)
+          : 0,
+    },
+    _metadata: {
+      ...this.#getDateRanges(),
+      startDate: start.toISOString(),
+      endDate: end.toISOString(),
+    },
+  };
+}
+
+/**
+ * Workload distribution mekanik (per jam kerja)
+ * @param {string} mechanicId
+ * @returns {Promise<Object>}
+ */
+async getMechanicWorkloadDistribution(mechanicId) {
+  const startMonth = this.#getStartOfMonth();
+
+  const hourlyRaw = await prisma.$queryRaw`
+    SELECT 
+      EXTRACT(HOUR FROM ma."startAt")::int as hour,
+      COUNT(ma."id")::int as jobs_started,
+      COUNT(CASE WHEN ma."endAt" IS NOT NULL THEN 1 END)::int as jobs_completed
+    FROM "MechanicAssignment" ma
+    WHERE ma."mechanicId" = ${mechanicId}
+      AND ma."createdAt" >= ${startMonth}
+    GROUP BY hour
+    ORDER BY hour ASC
+  `;
+
+  const hourlyDistribution = Array.from({ length: 24 }, (_, i) => {
+    const found = hourlyRaw.find((r) => Number(r.hour) === i);
+    return {
+      hour: i,
+      hourFormatted: `${String(i).padStart(2, "0")}:00`,
+      jobsStarted: found ? Number(found.jobs_started) : 0,
+      jobsCompleted: found ? Number(found.jobs_completed) : 0,
+    };
+  });
+
+  const peakHour = [...hourlyDistribution].sort(
+    (a, b) => b.jobsStarted - a.jobsStarted
+  )[0];
+
+  return {
+    hourlyDistribution,
+    peakHour: peakHour
+      ? { hour: peakHour.hourFormatted, jobs: peakHour.jobsStarted }
+      : null,
+    _metadata: {
+      ...this.#getDateRanges(),
+      period: "Bulan ini",
+      totalHours: 24,
+    },
+  };
+}
+
+/**
+ * Service types yang sering dikerjakan mekanik
+ * @param {string} mechanicId
+ * @returns {Promise<Object>}
+ */
+async getMechanicServiceBreakdown(mechanicId) {
+  const startMonth = this.#getStartOfMonth();
+  const startYear = this.#getOneYearAgo();
+
+  const [monthly, yearly] = await Promise.all([
+    prisma.$queryRaw`
+      SELECT 
+        oi."productNameSnapshot" as service_name,
+        COUNT(ma."id")::int as times_assigned,
+        ROUND(AVG(
+          CASE WHEN ma."endAt" IS NOT NULL AND ma."startAt" IS NOT NULL 
+          THEN EXTRACT(EPOCH FROM (ma."endAt" - ma."startAt")) / 60 
+          ELSE NULL END
+        ))::int as avg_minutes
+      FROM "MechanicAssignment" ma
+      INNER JOIN "OrderItem" oi ON ma."orderItemId" = oi."id"
+      INNER JOIN "Order" o ON oi."orderId" = o."id"
+      WHERE ma."mechanicId" = ${mechanicId}
+        AND ma."createdAt" >= ${startMonth}
+        AND o."deletedAt" IS NULL
+      GROUP BY oi."productNameSnapshot"
+      ORDER BY times_assigned DESC
+      LIMIT 10
+    `,
+    prisma.$queryRaw`
+      SELECT 
+        oi."productNameSnapshot" as service_name,
+        COUNT(ma."id")::int as times_assigned,
+        ROUND(AVG(
+          CASE WHEN ma."endAt" IS NOT NULL AND ma."startAt" IS NOT NULL 
+          THEN EXTRACT(EPOCH FROM (ma."endAt" - ma."startAt")) / 60 
+          ELSE NULL END
+        ))::int as avg_minutes
+      FROM "MechanicAssignment" ma
+      INNER JOIN "OrderItem" oi ON ma."orderItemId" = oi."id"
+      INNER JOIN "Order" o ON oi."orderId" = o."id"
+      WHERE ma."mechanicId" = ${mechanicId}
+        AND ma."createdAt" >= ${startYear}
+        AND o."deletedAt" IS NULL
+      GROUP BY oi."productNameSnapshot"
+      ORDER BY times_assigned DESC
+      LIMIT 10
+    `,
+  ]);
+
+  return {
+    monthly: monthly.map((r) => ({
+      serviceName: r.service_name,
+      timesAssigned: Number(r.times_assigned),
+      avgMinutes: Number(r.avg_minutes) || 0,
+    })),
+    yearly: yearly.map((r) => ({
+      serviceName: r.service_name,
+      timesAssigned: Number(r.times_assigned),
+      avgMinutes: Number(r.avg_minutes) || 0,
+    })),
+    _metadata: {
+      ...this.#getDateRanges(),
+      periods: {
+        monthly: { start: startMonth.toISOString() },
+        yearly: { start: startYear.toISOString() },
+      },
+    },
+  };
+}
+
+// ============================================================================
+// ADDITIONAL CASHIER FUNCTIONS
+// ============================================================================
+
+/**
+ * Breakdown penjualan kasir per jam
+ * @param {string} cashierId
+ * @returns {Promise<Object>}
+ */
+async getCashierHourlySalesBreakdown(cashierId) {
+  const startDay = this.#getStartOfDay();
+  const endDay = new Date();
+  endDay.setHours(23, 59, 59, 999);
+
+  const hourlyRaw = await prisma.$queryRaw`
+    SELECT 
+      EXTRACT(HOUR FROM o."createdAt")::int as hour,
+      COUNT(o."id")::int as orders,
+      COALESCE(SUM(o."total"), 0)::bigint as revenue,
+      COALESCE(SUM(CASE WHEN p."method" = 'CASH' THEN p."amountPaid" ELSE 0 END), 0)::bigint as cash,
+      COALESCE(SUM(CASE WHEN p."method" = 'QRIS' THEN p."amountPaid" ELSE 0 END), 0)::bigint as qris
+    FROM "Order" o
+    LEFT JOIN "Payment" p ON o."id" = p."orderId"
+    WHERE o."cashierId" = ${cashierId}
+      AND o."createdAt" >= ${startDay}
+      AND o."createdAt" <= ${endDay}
+      AND o."deletedAt" IS NULL
+    GROUP BY hour
+    ORDER BY hour ASC
+  `;
+
+  const hourlyDistribution = Array.from({ length: 24 }, (_, i) => {
+    const found = hourlyRaw.find((r) => Number(r.hour) === i);
+    return {
+      hour: i,
+      hourFormatted: `${String(i).padStart(2, "0")}:00`,
+      orders: found ? Number(found.orders) : 0,
+      revenue: found ? Number(found.revenue) : 0,
+      cash: found ? Number(found.cash) : 0,
+      qris: found ? Number(found.qris) : 0,
+    };
+  });
+
+  const peakHour = [...hourlyDistribution].sort(
+    (a, b) => b.revenue - a.revenue
+  )[0];
+
+  return {
+    hourlyDistribution,
+    peakHour: peakHour
+      ? {
+          hour: peakHour.hourFormatted,
+          revenue: peakHour.revenue,
+          orders: peakHour.orders,
+        }
+      : null,
+    summary: {
+      totalHours: 24,
+      totalRevenue: hourlyDistribution.reduce((s, h) => s + h.revenue, 0),
+      totalOrders: hourlyDistribution.reduce((s, h) => s + h.orders, 0),
+    },
+    _metadata: { ...this.#getDateRanges(), type: "daily" },
+  };
+}
+
+/**
+ * Performance metrics kasir (Key Performance Indicators)
+ * @param {string} cashierId
+ * @returns {Promise<Object>}
+ */
+async getCashierKPIMetrics(cashierId) {
+  const startMonth = this.#getStartOfMonth();
+  const startYear = this.#getOneYearAgo();
+
+  const [monthlyOrders, monthlyShifts, yearlyOrders, yearlyShifts, avgOrderProcessing] = await Promise.all([
+    prisma.order.aggregate({
+      where: {
+        cashierId,
+        createdAt: { gte: startMonth },
+        status: { in: ["COMPLETED", "CLOSED"] },
+        deletedAt: null,
+      },
+      _sum: { total: true },
+      _count: true,
+      _avg: { total: true },
+    }),
+    prisma.shift.aggregate({
+      where: {
+        cashierId,
+        openedAt: { gte: startMonth },
+      },
+      _sum: { cashSales: true },
+      _count: true,
+      _avg: { discrepancy: true },
+    }),
+    prisma.order.aggregate({
+      where: {
+        cashierId,
+        createdAt: { gte: startYear },
+        status: { in: ["COMPLETED", "CLOSED"] },
+        deletedAt: null,
+      },
+      _sum: { total: true },
+      _count: true,
+      _avg: { total: true },
+    }),
+    prisma.shift.aggregate({
+      where: {
+        cashierId,
+        openedAt: { gte: startYear },
+      },
+      _sum: { cashSales: true },
+      _count: true,
+      _avg: { discrepancy: true },
+    }),
+    prisma.$queryRaw`
+      SELECT ROUND(AVG(EXTRACT(EPOCH FROM (o."completedAt" - o."createdAt")) / 60))::int as avg_minutes
+      FROM "Order" o
+      WHERE o."cashierId" = ${cashierId}
+        AND o."completedAt" IS NOT NULL
+        AND o."createdAt" >= ${startMonth}
+        AND o."deletedAt" IS NULL
+    `,
+  ]);
+
+  const monthlyRev = Number(monthlyOrders._sum.total || 0);
+  const monthlyShiftCount = monthlyShifts._count;
+  const avgShiftRevenue = monthlyShiftCount > 0 ? Math.round(monthlyRev / monthlyShiftCount) : 0;
+
+  return {
+    monthly: {
+      totalRevenue: monthlyRev,
+      totalOrders: monthlyOrders._count,
+      avgOrderValue: Math.round(monthlyOrders._avg.total || 0),
+      totalShifts: monthlyShiftCount,
+      avgDiscrepancy: Math.round(monthlyShifts._avg.discrepancy || 0),
+      avgShiftRevenue,
+      revenuePerShift: avgShiftRevenue,
+    },
+    yearly: {
+      totalRevenue: Number(yearlyOrders._sum.total || 0),
+      totalOrders: yearlyOrders._count,
+      avgOrderValue: Math.round(yearlyOrders._avg.total || 0),
+      totalShifts: yearlyShifts._count,
+      avgDiscrepancy: Math.round(yearlyShifts._avg.discrepancy || 0),
+    },
+    operational: {
+      avgOrderProcessingMinutes: Number(avgOrderProcessing[0]?.avg_minutes || 0),
+      discrepancyScore:
+        Math.round(monthlyShifts._avg.discrepancy || 0) < 10000
+          ? "excellent"
+          : Math.round(monthlyShifts._avg.discrepancy || 0) < 50000
+          ? "good"
+          : "needs_improvement",
+    },
+    _metadata: {
+      ...this.#getDateRanges(),
+      periods: {
+        monthly: { start: startMonth.toISOString() },
+        yearly: { start: startYear.toISOString() },
+      },
+    },
+  };
+}
+
+/**
+ * Ringkasan customer yang dilayani kasir
+ * @param {string} cashierId
+ * @returns {Promise<Object>}
+ */
+async getCashierCustomerSummary(cashierId) {
+  const startDay = this.#getStartOfDay();
+  const startMonth = this.#getStartOfMonth();
+
+  const [todayCustomers, monthlyCustomers, returningToday, topCustomerToday] = await Promise.all([
+    prisma.$queryRaw`
+      SELECT COUNT(DISTINCT o."customerId")::int as count
+      FROM "Order" o
+      WHERE o."cashierId" = ${cashierId}
+        AND o."createdAt" >= ${startDay}
+        AND o."deletedAt" IS NULL
+        AND o."customerId" IS NOT NULL
+    `,
+    prisma.$queryRaw`
+      SELECT COUNT(DISTINCT o."customerId")::int as count
+      FROM "Order" o
+      WHERE o."cashierId" = ${cashierId}
+        AND o."createdAt" >= ${startMonth}
+        AND o."deletedAt" IS NULL
+        AND o."customerId" IS NOT NULL
+    `,
+    prisma.$queryRaw`
+      WITH today_customers AS (
+        SELECT DISTINCT o."customerId"
+        FROM "Order" o
+        WHERE o."cashierId" = ${cashierId}
+          AND o."createdAt" >= ${startDay}
+          AND o."deletedAt" IS NULL
+          AND o."customerId" IS NOT NULL
+      )
+      SELECT COUNT(*)::int as count
+      FROM today_customers tc
+      WHERE EXISTS (
+        SELECT 1 FROM "Order" o2
+        WHERE o2."customerId" = tc."customerId"
+          AND o2."cashierId" = ${cashierId}
+          AND o2."createdAt" < ${startDay}
+          AND o2."deletedAt" IS NULL
+      )
+    `,
+    prisma.$queryRaw`
+      SELECT c."name", c."phone", COUNT(o."id")::int as visits, COALESCE(SUM(o."total"), 0)::bigint as total_spent
+      FROM "Order" o
+      INNER JOIN "Customer" c ON o."customerId" = c."id"
+      WHERE o."cashierId" = ${cashierId}
+        AND o."createdAt" >= ${startDay}
+        AND o."deletedAt" IS NULL
+      GROUP BY c."id", c."name", c."phone"
+      ORDER BY total_spent DESC
+      LIMIT 1
+    `,
+  ]);
+
+  return {
+    today: {
+      total: Number(todayCustomers[0].count),
+      returning: Number(returningToday[0].count),
+      new: Number(todayCustomers[0].count) - Number(returningToday[0].count),
+      topCustomer: topCustomerToday[0]
+        ? {
+            name: topCustomerToday[0].name,
+            phone: topCustomerToday[0].phone,
+            visits: Number(topCustomerToday[0].visits),
+            totalSpent: Number(topCustomerToday[0].total_spent),
+          }
+        : null,
+    },
+    monthly: {
+      total: Number(monthlyCustomers[0].count),
+    },
+    _metadata: { ...this.#getDateRanges() },
+  };
+}
+
+/**
+ * Ringkasan shift terakhir kasir
+ * @param {string} cashierId
+ * @returns {Promise<Object>}
+ */
+async getCashierLastShiftSummary(cashierId) {
+  const lastShift = await prisma.shift.findFirst({
+    where: { cashierId, status: "CLOSED" },
+    select: {
+      id: true,
+      openedAt: true,
+      closedAt: true,
+      startingCash: true,
+      endingCash: true,
+      expectedCash: true,
+      cashSales: true,
+      cashIn: true,
+      cashOut: true,
+      discrepancy: true,
+      _count: { select: { orders: true, expenses: true } },
+    },
+    orderBy: { closedAt: "desc" },
+  });
+
+  if (!lastShift) {
+    return {
+      shift: null,
+      message: "Belum ada shift yang ditutup",
+      _metadata: { ...this.#getDateRanges() },
+    };
+  }
+
+  const [payments, topOrder, expenses] = await Promise.all([
+    prisma.payment.groupBy({
+      by: ["method"],
+      where: {
+        order: {
+          shiftId: lastShift.id,
+          deletedAt: null,
+        },
+        status: "PAID",
+      },
+      _sum: { amountPaid: true },
+      _count: { method: true },
+    }),
+    prisma.order.findFirst({
+      where: {
+        shiftId: lastShift.id,
+        deletedAt: null,
+        status: { in: ["COMPLETED", "CLOSED"] },
+      },
+      select: {
+        orderNumber: true,
+        total: true,
+        customer: { select: { name: true } },
+        payment: { select: { method: true } },
+      },
+      orderBy: { total: "desc" },
+    }),
+    prisma.expense.groupBy({
+      by: ["category"],
+      where: { shiftId: lastShift.id },
+      _sum: { amount: true },
+      orderBy: { _sum: { amount: "desc" } },
+    }),
+  ]);
+
+  const cashPayments = payments.find((p) => p.method === "CASH");
+  const qrisPayments = payments.find((p) => p.method === "QRIS");
+
+  return {
+    shift: {
+      id: lastShift.id,
+      openedAt: lastShift.openedAt,
+      closedAt: lastShift.closedAt,
+      durationHours: lastShift.closedAt
+        ? Math.round(
+            (new Date(lastShift.closedAt) - new Date(lastShift.openedAt)) /
+              3600000
+          )
+        : 0,
+      startingCash: lastShift.startingCash,
+      endingCash: lastShift.endingCash,
+      expectedCash: lastShift.expectedCash,
+      cashSales: lastShift.cashSales,
+      cashIn: lastShift.cashIn,
+      cashOut: lastShift.cashOut,
+      discrepancy: lastShift.discrepancy,
+      orderCount: lastShift._count.orders,
+      expenseCount: lastShift._count.expenses,
+    },
+    payments: {
+      cash: {
+        total: cashPayments?._sum.amountPaid || 0,
+        count: cashPayments?._count.method || 0,
+      },
+      qris: {
+        total: qrisPayments?._sum.amountPaid || 0,
+        count: qrisPayments?._count.method || 0,
+      },
+    },
+    topOrder: topOrder
+      ? {
+          orderNumber: topOrder.orderNumber,
+          total: topOrder.total,
+          customer: topOrder.customer?.name || "Umum",
+          method: topOrder.payment?.method || null,
+        }
+      : null,
+    expensesByCategory: expenses.map((e) => ({
+      category: e.category,
+      total: Number(e._sum.amount),
+    })),
+    _metadata: {
+      ...this.#getDateRanges(),
+      shiftId: lastShift.id,
+      closedAt: lastShift.closedAt,
+    },
+  };
+}
+
+// ============================================================================
+// ADDITIONAL ADMIN - FINANCIAL
+// ============================================================================
+
+/**
+ * Laporan profit & loss bulanan
+ * @returns {Promise<Object>}
+ */
+async getAdminProfitLossStatement() {
+  const startMonth = this.#getStartOfMonth();
+  const startYear = this.#getOneYearAgo();
+
+  const [monthlyRevenue, yearlyRevenue, monthlyExpenses, yearlyExpenses, monthlyCOGS, yearlyCOGS] =
+    await Promise.all([
+      prisma.order.aggregate({
+        where: {
+          createdAt: { gte: startMonth },
+          status: { in: ["COMPLETED", "CLOSED"] },
+          deletedAt: null,
+        },
+        _sum: { total: true },
+        _count: true,
+      }),
+      prisma.order.aggregate({
+        where: {
+          createdAt: { gte: startYear },
+          status: { in: ["COMPLETED", "CLOSED"] },
+          deletedAt: null,
+        },
+        _sum: { total: true },
+        _count: true,
+      }),
+      prisma.expense.aggregate({
+        where: { date: { gte: startMonth } },
+        _sum: { amount: true },
+        _count: true,
+      }),
+      prisma.expense.aggregate({
+        where: { date: { gte: startYear } },
+        _sum: { amount: true },
+        _count: true,
+      }),
+      prisma.$queryRaw`
+        SELECT COALESCE(SUM(oi."unitCostSnapshot" * oi."quantity"), 0)::bigint as cogs
+        FROM "OrderItem" oi
+        INNER JOIN "Order" o ON oi."orderId" = o."id"
+        WHERE o."createdAt" >= ${startMonth}
+          AND o."status" IN ('COMPLETED','CLOSED')
+          AND o."deletedAt" IS NULL
+      `,
+      prisma.$queryRaw`
+        SELECT COALESCE(SUM(oi."unitCostSnapshot" * oi."quantity"), 0)::bigint as cogs
+        FROM "OrderItem" oi
+        INNER JOIN "Order" o ON oi."orderId" = o."id"
+        WHERE o."createdAt" >= ${startYear}
+          AND o."status" IN ('COMPLETED','CLOSED')
+          AND o."deletedAt" IS NULL
+      `,
+    ]);
+
+  const mRev = Number(monthlyRevenue._sum.total || 0);
+  const mCOGS = Number(monthlyCOGS[0].cogs);
+  const mExp = Number(monthlyExpenses._sum.amount || 0);
+  const mGross = mRev - mCOGS;
+  const mNet = mGross - mExp;
+
+  const yRev = Number(yearlyRevenue._sum.total || 0);
+  const yCOGS = Number(yearlyCOGS[0].cogs);
+  const yExp = Number(yearlyExpenses._sum.amount || 0);
+  const yGross = yRev - yCOGS;
+  const yNet = yGross - yExp;
+
+  return {
+    monthly: {
+      revenue: mRev,
+      cogs: mCOGS,
+      grossProfit: mGross,
+      grossMargin: mRev > 0 ? Math.round((mGross / mRev) * 10000) / 100 : 0,
+      expenses: mExp,
+      netProfit: mNet,
+      netMargin: mRev > 0 ? Math.round((mNet / mRev) * 10000) / 100 : 0,
+      orderCount: monthlyRevenue._count,
+      expenseCount: monthlyExpenses._count,
+    },
+    yearly: {
+      revenue: yRev,
+      cogs: yCOGS,
+      grossProfit: yGross,
+      grossMargin: yRev > 0 ? Math.round((yGross / yRev) * 10000) / 100 : 0,
+      expenses: yExp,
+      netProfit: yNet,
+      netMargin: yRev > 0 ? Math.round((yNet / yRev) * 10000) / 100 : 0,
+      orderCount: yearlyRevenue._count,
+      expenseCount: yearlyExpenses._count,
+    },
+    _metadata: {
+      ...this.#getDateRanges(),
+      periods: {
+        monthly: { start: startMonth.toISOString() },
+        yearly: { start: startYear.toISOString() },
+      },
+    },
+  };
+}
+
+/**
+ * Revenue per kategori sparepart
+ * @returns {Promise<Object>}
+ */
+async getAdminRevenueByProductCategory() {
+  const startMonth = this.#getStartOfMonth();
+  const startYear = this.#getOneYearAgo();
+
+  const [monthly, yearly] = await Promise.all([
+    prisma.$queryRaw`
+      SELECT 
+        p."type" as product_type,
+        COUNT(DISTINCT o."id")::int as orders,
+        SUM(oi."quantity")::int as quantity_sold,
+        SUM(oi."subtotal")::bigint as revenue,
+        SUM(oi."subtotal" - (oi."unitCostSnapshot" * oi."quantity"))::bigint as profit
+      FROM "OrderItem" oi
+      INNER JOIN "Product" p ON oi."productId" = p."id"
+      INNER JOIN "Order" o ON oi."orderId" = o."id"
+      WHERE o."createdAt" >= ${startMonth}
+        AND o."status" IN ('COMPLETED','CLOSED')
+        AND o."deletedAt" IS NULL
+      GROUP BY p."type"
+      ORDER BY revenue DESC
+    `,
+    prisma.$queryRaw`
+      SELECT 
+        p."type" as product_type,
+        COUNT(DISTINCT o."id")::int as orders,
+        SUM(oi."quantity")::int as quantity_sold,
+        SUM(oi."subtotal")::bigint as revenue,
+        SUM(oi."subtotal" - (oi."unitCostSnapshot" * oi."quantity"))::bigint as profit
+      FROM "OrderItem" oi
+      INNER JOIN "Product" p ON oi."productId" = p."id"
+      INNER JOIN "Order" o ON oi."orderId" = o."id"
+      WHERE o."createdAt" >= ${startYear}
+        AND o."status" IN ('COMPLETED','CLOSED')
+        AND o."deletedAt" IS NULL
+      GROUP BY p."type"
+      ORDER BY revenue DESC
+    `,
+  ]);
+
+  return {
+    monthly: monthly.map((r) => ({
+      type: r.product_type,
+      orders: Number(r.orders),
+      quantitySold: Number(r.quantity_sold),
+      revenue: Number(r.revenue),
+      profit: Number(r.profit),
+    })),
+    yearly: yearly.map((r) => ({
+      type: r.product_type,
+      orders: Number(r.orders),
+      quantitySold: Number(r.quantity_sold),
+      revenue: Number(r.revenue),
+      profit: Number(r.profit),
+    })),
+    _metadata: {
+      ...this.#getDateRanges(),
+      periods: {
+        monthly: { start: startMonth.toISOString() },
+        yearly: { start: startYear.toISOString() },
+      },
+    },
+  };
+}
+
+/**
+ * Daily cash flow (arus kas harian)
+ * @returns {Promise<Object>}
+ */
+async getAdminDailyCashFlow(days = 30) {
+  const sinceDate = new Date(Date.now() - days * 86400000);
+
+  const [dailyRevenue, dailyExpenses] = await Promise.all([
+    prisma.$queryRaw`
+      SELECT 
+        DATE(o."createdAt") as date,
+        COALESCE(SUM(CASE WHEN p."method" = 'CASH' THEN p."amountPaid" ELSE 0 END), 0)::bigint as cash_in,
+        COALESCE(SUM(CASE WHEN p."method" = 'QRIS' THEN p."amountPaid" ELSE 0 END), 0)::bigint as qris_in,
+        COALESCE(SUM(o."total"), 0)::bigint as total_revenue,
+        COUNT(o."id")::int as order_count
+      FROM "Order" o
+      LEFT JOIN "Payment" p ON o."id" = p."orderId" AND p."status" = 'PAID'
+      WHERE o."createdAt" >= ${sinceDate}
+        AND o."status" IN ('COMPLETED','CLOSED')
+        AND o."deletedAt" IS NULL
+      GROUP BY DATE(o."createdAt")
+      ORDER BY date ASC
+    `,
+    prisma.$queryRaw`
+      SELECT 
+        DATE(e."date") as date,
+        COALESCE(SUM(e."amount"), 0)::bigint as total_expenses,
+        COUNT(e."id")::int as expense_count
+      FROM "Expense" e
+      WHERE e."date" >= ${sinceDate}
+      GROUP BY DATE(e."date")
+      ORDER BY date ASC
+    `,
+  ]);
+
+  const expenseMap = {};
+  for (const e of dailyExpenses) {
+    expenseMap[e.date] = {
+      totalExpenses: Number(e.total_expenses),
+      expenseCount: Number(e.expense_count),
+    };
+  }
+
+  const daily = dailyRevenue.map((r) => {
+    const exp = expenseMap[r.date] || { totalExpenses: 0, expenseCount: 0 };
+    const netCash = Number(r.cash_in) + Number(r.qris_in) - exp.totalExpenses;
+    return {
+      date: r.date,
+      cashIn: Number(r.cash_in),
+      qrisIn: Number(r.qris_in),
+      totalRevenue: Number(r.total_revenue),
+      orderCount: Number(r.order_count),
+      expenses: exp.totalExpenses,
+      expenseCount: exp.expenseCount,
+      netCashFlow: netCash,
+    };
+  });
+
+  const totalInflow = daily.reduce((s, d) => s + d.totalRevenue, 0);
+  const totalOutflow = daily.reduce((s, d) => s + d.expenses, 0);
+
+  return {
+    daily,
+    summary: {
+      totalDays: daily.length,
+      totalInflow,
+      totalOutflow,
+      netCashFlow: totalInflow - totalOutflow,
+      avgDailyInflow: daily.length > 0 ? Math.round(totalInflow / daily.length) : 0,
+      avgDailyOutflow: daily.length > 0 ? Math.round(totalOutflow / daily.length) : 0,
+    },
+    _metadata: {
+      ...this.#getDateRanges(),
+      sinceDate: sinceDate.toISOString().split("T")[0],
+      days,
+    },
+  };
+}
+
+// ============================================================================
+// ADDITIONAL ADMIN - OPERATIONS
+// ============================================================================
+
+/**
+ * Status order real-time dashboard
+ * @returns {Promise<Object>}
+ */
+async getAdminOrderStatusOverview() {
+  const [statusCounts, recentStatusChanges] = await Promise.all([
+    prisma.order.groupBy({
+      by: ["status"],
+      where: { deletedAt: null },
+      _count: { id: true },
+      _sum: { total: true },
+    }),
+    prisma.orderStatusHistory.findMany({
+      select: {
+        order: { select: { orderNumber: true } },
+        status: true,
+        note: true,
+        changedBy: { select: { fullName: true } },
+        createdAt: true,
+      },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+    }),
+  ]);
+
+  const statusMap = {};
+  let totalOrders = 0;
+  let totalValue = 0;
+  for (const s of statusCounts) {
+    statusMap[s.status] = {
+      count: s._count.id,
+      value: Number(s._sum.total || 0),
+    };
+    totalOrders += s._count.id;
+    totalValue += Number(s._sum.total || 0);
+  }
+
+  return {
+    byStatus: {
+      DRAFT: statusMap.DRAFT || { count: 0, value: 0 },
+      QUEUED: statusMap.QUEUED || { count: 0, value: 0 },
+      IN_PROGRESS: statusMap.IN_PROGRESS || { count: 0, value: 0 },
+      COMPLETED: statusMap.COMPLETED || { count: 0, value: 0 },
+      CLOSED: statusMap.CLOSED || { count: 0, value: 0 },
+      CANCELLED: statusMap.CANCELLED || { count: 0, value: 0 },
+    },
+    summary: {
+      totalOrders,
+      totalValue,
+      activeOrders:
+        (statusMap.DRAFT?.count || 0) +
+        (statusMap.QUEUED?.count || 0) +
+        (statusMap.IN_PROGRESS?.count || 0),
+      completionRate:
+        totalOrders > 0
+          ? Math.round(
+              (((statusMap.COMPLETED?.count || 0) +
+                (statusMap.CLOSED?.count || 0)) /
+                totalOrders) *
+                10000
+            ) / 100
+          : 0,
+    },
+    recentStatusChanges: recentStatusChanges.map((h) => ({
+      orderNumber: h.order.orderNumber,
+      status: h.status,
+      note: h.note,
+      changedBy: h.changedBy?.fullName || "System",
+      createdAt: h.createdAt,
+    })),
+    _metadata: { ...this.#getDateRanges(), type: "real-time" },
+  };
+}
+
+/**
+ * Vehicle service history (per kendaraan)
+ * @param {string} plateNumber
+ * @returns {Promise<Object>}
+ */
+async getVehicleServiceHistory(plateNumber) {
+  const vehicle = await prisma.vehicle.findUnique({
+    where: { plateNumber },
+    select: {
+      id: true,
+      plateNumber: true,
+      brand: true,
+      model: true,
+      customer: { select: { name: true, phone: true } },
+    },
+  });
+
+  if (!vehicle) {
+    return {
+      vehicle: null,
+      history: [],
+      summary: { totalOrders: 0, totalSpent: 0 },
+      _metadata: { ...this.#getDateRanges() },
+    };
+  }
+
+  const orders = await prisma.order.findMany({
+    where: {
+      vehicleId: vehicle.id,
+      deletedAt: null,
+      status: { in: ["COMPLETED", "CLOSED"] },
+    },
+    select: {
+      orderNumber: true,
+      total: true,
+      status: true,
+      createdAt: true,
+      completedAt: true,
+      items: {
+        select: {
+          productNameSnapshot: true,
+          quantity: true,
+          unitPrice: true,
+          subtotal: true,
+        },
+      },
+      payment: { select: { method: true } },
+    },
+    orderBy: { createdAt: "desc" },
+  });
+
+  return {
+    vehicle: {
+      plateNumber: vehicle.plateNumber,
+      brand: vehicle.brand,
+      model: vehicle.model,
+      customerName: vehicle.customer?.name || "Umum",
+      customerPhone: vehicle.customer?.phone || "-",
+    },
+    history: orders.map((o) => ({
+      orderNumber: o.orderNumber,
+      total: o.total,
+      status: o.status,
+      items: o.items.map((i) => ({
+        product: i.productNameSnapshot,
+        quantity: i.quantity,
+        unitPrice: i.unitPrice,
+        subtotal: i.subtotal,
+      })),
+      paymentMethod: o.payment?.method || null,
+      createdAt: o.createdAt,
+      completedAt: o.completedAt,
+    })),
+    summary: {
+      totalOrders: orders.length,
+      totalSpent: orders.reduce((sum, o) => sum + o.total, 0),
+      avgPerVisit:
+        orders.length > 0
+          ? Math.round(orders.reduce((sum, o) => sum + o.total, 0) / orders.length)
+          : 0,
+      lastVisit: orders[0]?.createdAt || null,
+      firstVisit: orders[orders.length - 1]?.createdAt || null,
+    },
+    _metadata: { ...this.#getDateRanges() },
+  };
+}
+
+/**
+ * Notifications summary (unread + recent)
+ * @param {string} userId
+ * @returns {Promise<Object>}
+ */
+async getUserNotificationsSummary(userId) {
+  const [unread, recent, count] = await Promise.all([
+    prisma.notification.findMany({
+      where: { userId, isRead: false },
+      select: {
+        id: true,
+        title: true,
+        message: true,
+        type: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: "desc" },
+      take: 10,
+    }),
+    prisma.notification.findMany({
+      where: { userId },
+      select: {
+        id: true,
+        title: true,
+        message: true,
+        type: true,
+        isRead: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: "desc" },
+      take: 20,
+    }),
+    prisma.notification.count({
+      where: { userId, isRead: false },
+    }),
+  ]);
+
+  return {
+    unreadCount: count,
+    unread: unread,
+    recent: recent,
+    summary: {
+      totalUnread: count,
+      infoCount: unread.filter((n) => n.type === "INFO").length,
+      warningCount: unread.filter((n) => n.type === "WARNING").length,
+      errorCount: unread.filter((n) => n.type === "ERROR").length,
+    },
+    _metadata: { ...this.#getDateRanges(), type: "real-time" },
+  };
+}
+
+/**
+ * Daily operational checklist
+ * @returns {Promise<Object>}
+ */
+async getAdminDailyChecklist() {
+  const startDay = this.#getStartOfDay();
+  const endDay = new Date();
+  endDay.setHours(23, 59, 59, 999);
+
+  const [
+    openShifts,
+    activeMechanics,
+    pendingOrders,
+    unpaidCompleted,
+    stockAlerts,
+    todayRevenue,
+  ] = await Promise.all([
+    prisma.shift.findMany({
+      where: { status: "OPEN" },
+      select: {
+        id: true,
+        cashier: { select: { fullName: true } },
+        openedAt: true,
+        startingCash: true,
+        cashSales: true,
+      },
+    }),
+    prisma.$queryRaw`
+      SELECT u."fullName", COUNT(ma."id")::int as active_jobs
+      FROM "User" u
+      LEFT JOIN "MechanicAssignment" ma ON u."id" = ma."mechanicId"
+        AND ma."endAt" IS NULL
+        AND EXISTS (
+          SELECT 1 FROM "OrderItem" oi
+          INNER JOIN "Order" o ON oi."orderId" = o."id"
+          WHERE oi."id" = ma."orderItemId"
+            AND o."status" IN ('QUEUED','IN_PROGRESS')
+            AND o."deletedAt" IS NULL
+        )
+      WHERE u."role" = 'MECHANIC' AND u."isActive" = true
+      GROUP BY u."id", u."fullName"
+    `,
+    prisma.order.count({
+      where: {
+        status: { in: ["QUEUED", "IN_PROGRESS"] },
+        deletedAt: null,
+      },
+    }),
+    prisma.order.count({
+      where: {
+        status: "COMPLETED",
+        deletedAt: null,
+        payment: { is: null },
+      },
+    }),
+    prisma.product.count({
+      where: {
+        type: "SPAREPART",
+        isActive: true,
+        stock: {
+          lte: parseInt(await this.#getSetting("stock_low_threshold", "5"), 10),
+        },
+      },
+    }),
+    prisma.order.aggregate({
+      where: {
+        createdAt: { gte: startDay, lte: endDay },
+        status: { in: ["COMPLETED", "CLOSED"] },
+        deletedAt: null,
+      },
+      _sum: { total: true },
+      _count: true,
+    }),
+  ]);
+
+  const checklistItems = [
+    {
+      id: "shifts",
+      label: "Buka Shift Kasir",
+      status: openShifts.length > 0 ? "completed" : "pending",
+      detail: openShifts.length > 0 
+        ? `${openShifts.length} shift aktif` 
+        : "Belum ada shift dibuka",
+      data: openShifts.map((s) => ({
+        cashier: s.cashier.fullName,
+        openedAt: s.openedAt,
+        startingCash: s.startingCash,
+        currentSales: s.cashSales,
+      })),
+    },
+    {
+      id: "mechanics",
+      label: "Mekanik Aktif",
+      status: activeMechanics.length > 0 ? "completed" : "warning",
+      detail: `${activeMechanics.length} mekanik aktif`,
+      data: activeMechanics.map((m) => ({
+        name: m.fullName,
+        activeJobs: Number(m.active_jobs),
+      })),
+    },
+    {
+      id: "pending_orders",
+      label: "Order Tertunda",
+      status: pendingOrders === 0 ? "completed" : "warning",
+      detail: `${pendingOrders} order menunggu`,
+      value: pendingOrders,
+    },
+    {
+      id: "unpaid_completed",
+      label: "Order Selesai Belum Dibayar",
+      status: unpaidCompleted === 0 ? "completed" : "error",
+      detail: `${unpaidCompleted} order`,
+      value: unpaidCompleted,
+    },
+    {
+      id: "stock_alerts",
+      label: "Stok Rendah/Habis",
+      status: stockAlerts === 0 ? "completed" : "warning",
+      detail: `${stockAlerts} item`,
+      value: stockAlerts,
+    },
+    {
+      id: "revenue",
+      label: "Pendapatan Hari Ini",
+      status: Number(todayRevenue._sum.total || 0) > 0 ? "completed" : "info",
+      detail: `Rp ${Number(todayRevenue._sum.total || 0).toLocaleString()}`,
+      value: Number(todayRevenue._sum.total || 0),
+    },
+  ];
+
+  return {
+    checklist: checklistItems,
+    summary: {
+      totalItems: checklistItems.length,
+      completedItems: checklistItems.filter((i) => i.status === "completed").length,
+      warningItems: checklistItems.filter((i) => i.status === "warning").length,
+      errorItems: checklistItems.filter((i) => i.status === "error").length,
+      allClear: checklistItems.every(
+        (i) => i.status === "completed" || i.status === "info"
+      ),
+    },
+    _metadata: {
+      ...this.#getDateRanges(),
+      type: "real-time",
+      checkedAt: new Date().toISOString(),
+    },
+  };
+}
+
+/**
+ * Stock movement log (audit trail)
+ * @param {Object} [filters]
+ * @param {string} [filters.productId]
+ * @param {StockMovementType} [filters.type]
+ * @param {number} [filters.limit=50]
+ * @returns {Promise<Object>}
+ */
+async getStockMovementLog(filters = {}) {
+  const { productId, type, limit = 50 } = filters;
+  const where = {};
+  if (productId) where.productId = productId;
+  if (type) where.type = type;
+
+  const movements = await prisma.stockMovement.findMany({
+    where,
+    select: {
+      id: true,
+      type: true,
+      sourceType: true,
+      quantity: true,
+      note: true,
+      createdAt: true,
+      product: { select: { name: true, sku: true } },
+      recordedBy: { select: { fullName: true } },
+      orderItem: {
+        select: {
+          order: { select: { orderNumber: true } },
+        },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+  });
+
+  return {
+    movements: movements.map((m) => ({
+      id: m.id,
+      type: m.type,
+      sourceType: m.sourceType,
+      productName: m.product.name,
+      sku: m.product.sku,
+      quantity: m.quantity,
+      note: m.note,
+      recordedBy: m.recordedBy.fullName,
+      orderNumber: m.orderItem?.order?.orderNumber || null,
+      createdAt: m.createdAt,
+    })),
+    summary: {
+      totalMovements: movements.length,
+      totalIn: movements
+        .filter((m) => m.type === "IN")
+        .reduce((s, m) => s + m.quantity, 0),
+      totalOut: movements
+        .filter((m) => m.type === "OUT")
+        .reduce((s, m) => s + m.quantity, 0),
+      totalAdjustments: movements
+        .filter((m) => m.type === "ADJUSTMENT")
+        .reduce((s, m) => s + Math.abs(m.quantity), 0),
+    },
+    _metadata: {
+      ...this.#getDateRanges(),
+      filters: { productId: productId || null, type: type || null },
+      limit,
+    },
+  };
+}
+
+/**
+ * Product price history
+ * @param {string} productId
+ * @returns {Promise<Object>}
+ */
+async getProductPriceHistory(productId) {
+  const [product, history] = await Promise.all([
+    prisma.product.findUnique({
+      where: { id: productId },
+      select: {
+        id: true,
+        name: true,
+        sku: true,
+        type: true,
+        price: true,
+        cost: true,
+        stock: true,
+      },
+    }),
+    prisma.productPriceHistory.findMany({
+      where: { productId },
+      select: {
+        price: true,
+        cost: true,
+        effectiveFrom: true,
+        createdAt: true,
+      },
+      orderBy: { effectiveFrom: "desc" },
+      take: 50,
+    }),
+  ]);
+
+  if (!product) {
+    return {
+      product: null,
+      history: [],
+      _metadata: { ...this.#getDateRanges() },
+    };
+  }
+
+  return {
+    product: {
+      id: product.id,
+      name: product.name,
+      sku: product.sku,
+      type: product.type,
+      currentPrice: product.price,
+      currentCost: product.cost,
+      currentStock: product.stock,
+      currentMargin: product.price - product.cost,
+      marginPct:
+        product.price > 0
+          ? Math.round(((product.price - product.cost) / product.price) * 10000) / 100
+          : 0,
+    },
+    history: history.map((h) => ({
+      price: h.price,
+      cost: h.cost,
+      margin: h.price - h.cost,
+      marginPct: h.price > 0 ? Math.round(((h.price - h.cost) / h.price) * 10000) / 100 : 0,
+      effectiveFrom: h.effectiveFrom,
+      createdAt: h.createdAt,
+    })),
+    summary: {
+      totalChanges: history.length,
+      lowestPrice: history.length > 0 ? Math.min(...history.map((h) => h.price)) : product.price,
+      highestPrice: history.length > 0 ? Math.max(...history.map((h) => h.price)) : product.price,
+      latestChange: history[0] || null,
+    },
+    _metadata: { ...this.#getDateRanges() },
+  };
+}
+
 }
 
 export default InsightRepository;
