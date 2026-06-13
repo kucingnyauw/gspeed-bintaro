@@ -20,10 +20,6 @@ const AuthWrapper = ({ children }) => {
         justifyContent: "center",
         backgroundColor: theme.palette.background.default,
         p: { xs: 2, sm: 3 },
-        [theme.breakpoints.down("sm")]: {
-          alignItems: "flex-start",
-          pt: { xs: 10, sm: 14 },
-        },
       }}
     >
       {children}

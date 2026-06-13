@@ -6,47 +6,35 @@
  * @module chartConfig
  */
 import {
-  ArcElement,
-  BarElement,
-  CategoryScale,
-  Chart as ChartJS,
-  Filler,
-  Legend,
-  LinearScale,
-  LineElement,
-  PointElement,
-  RadialLinearScale,
-  Title,
-  Tooltip,
+  ArcElement, BarElement, CategoryScale, Chart as ChartJS, Filler,
+  Legend, LinearScale, LineElement, PointElement, RadialLinearScale,
+  Title, Tooltip,
 } from "chart.js";
 import PropTypes from "prop-types";
 import { alpha } from "@mui/material/styles";
 
 ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  ArcElement,
-  RadialLinearScale,
-  Title,
-  Tooltip,
-  Legend,
-  Filler
+  CategoryScale, LinearScale, PointElement, LineElement,
+  BarElement, ArcElement, RadialLinearScale, Title, Tooltip, Legend, Filler
 );
 
-/**
- * Default line tension for smooth, flowing curves.
- * Lowered for a more elegant and less dramatic arc.
- *
- * @type {number}
- */
+/** @type {number} */
 const DEFAULT_LINE_TENSION = 0.4;
+
+/** @type {number} */
+const DEFAULT_POINT_RADIUS = 5;
+
+/** @type {number} */
+const DEFAULT_HOVER_RADIUS = 7;
+
+/** @type {number} */
+const DEFAULT_HIT_RADIUS = 10;
+
+/** @type {number} */
+const DEFAULT_MAX_BAR_THICKNESS = 32;
 
 /**
  * Extracts a numeric value from theme spacing or borderRadius strings.
- * Provides a fallback to 4 if the parsing fails.
  *
  * @param {string|number} value - The theme value to parse.
  * @returns {number} The numeric representation in pixels.
@@ -65,19 +53,15 @@ const getNumericValue = (value) => {
 export const datasetShape = PropTypes.shape({
   label: PropTypes.string,
   data: PropTypes.arrayOf(PropTypes.number).isRequired,
-  backgroundColor: PropTypes.oneOfType([
-    PropTypes.string,
-    PropTypes.arrayOf(PropTypes.string),
-  ]),
+  backgroundColor: PropTypes.oneOfType([PropTypes.string, PropTypes.arrayOf(PropTypes.string)]),
   borderColor: PropTypes.string,
 });
 
 /**
  * Generates an array of default colors from the MUI theme palette.
- * Replaces secondary color with text primary for a monochromatic contrast.
  *
  * @param {Object} theme - The initialized MUI theme object.
- * @returns {string[]} An array of hex or rgb color strings.
+ * @returns {string[]} An array of color strings.
  */
 export const defaultColors = (theme) => [
   theme.palette.primary.main,
@@ -100,7 +84,6 @@ export const defaultColorsAlpha = (theme, opacity = 0.1) =>
 
 /**
  * Enriches standard datasets with theme-aware styling for an ultra-minimalist look.
- * Modifies borders to be razor-thin, hides points by default, and slims down bars.
  *
  * @param {Object[]} datasets - Array of standard Chart.js datasets.
  * @param {Object} theme - The initialized MUI theme object.
@@ -108,54 +91,46 @@ export const defaultColorsAlpha = (theme, opacity = 0.1) =>
  */
 export const enrichDatasets = (datasets, theme) => {
   const colors = defaultColors(theme);
-  const borderRadiusNum = getNumericValue(theme.shape.borderRadius);
+  const br = getNumericValue(theme.shape.borderRadius);
 
   return datasets.map((ds, i) => {
-    const colorIndex = i % colors.length;
-    const assignedColor = colors[colorIndex];
-
-    const isBubbleOrScatter = Array.isArray(ds.data) && typeof ds.data[0] === 'object';
+    const assignedColor = colors[i % colors.length];
+    const isBubbleOrScatter = Array.isArray(ds.data) && typeof ds.data[0] === "object";
     const isBar = ds.type === "bar" || (!ds.type && ds.backgroundColor !== "transparent" && !isBubbleOrScatter);
-    
-    const baseBgColor = isBar ? alpha(assignedColor, 0.85) : alpha(assignedColor, 0.5);
 
     return {
       ...ds,
-      backgroundColor: ds.backgroundColor || baseBgColor,
+      backgroundColor: ds.backgroundColor || (isBar ? alpha(assignedColor, 0.85) : alpha(assignedColor, 0.5)),
       hoverBackgroundColor: assignedColor,
       borderColor: ds.borderColor || assignedColor,
-
       borderWidth: isBar ? 0 : 2,
-      tension: DEFAULT_LINE_TENSION,
+      tension: ds.tension ?? DEFAULT_LINE_TENSION,
       fill: ds.fill || false,
-
-      pointBackgroundColor: ds.pointBackgroundColor || alpha(assignedColor, 0.8), 
+      pointBackgroundColor: ds.pointBackgroundColor || alpha(assignedColor, 0.8),
       pointBorderColor: ds.pointBorderColor || assignedColor,
       pointBorderWidth: 1.5,
-      pointRadius: ds.pointRadius !== undefined ? ds.pointRadius : 5, 
-      pointHoverRadius: 7,
-      hitRadius: 10,
+      pointRadius: ds.pointRadius ?? DEFAULT_POINT_RADIUS,
+      pointHoverRadius: DEFAULT_HOVER_RADIUS,
+      hitRadius: DEFAULT_HIT_RADIUS,
       pointHoverBackgroundColor: assignedColor,
       pointHoverBorderColor: theme.palette.background.paper,
       pointHoverBorderWidth: 2,
-
-      borderRadius: ds.borderRadius !== undefined ? ds.borderRadius : borderRadiusNum,
+      borderRadius: ds.borderRadius ?? br,
       borderSkipped: false,
-      maxBarThickness: 32,
+      maxBarThickness: ds.maxBarThickness ?? DEFAULT_MAX_BAR_THICKNESS,
     };
   });
 };
 
 /**
  * Creates consistent legend configuration for all chart types.
- * Ensures perfect circles with equal width/height and 50% border radius.
  *
  * @param {Object} theme - The initialized MUI theme object.
- * @param {boolean} legend - Display legend or not.
+ * @param {boolean} visible - Display legend or not.
  * @returns {Object} Legend configuration object.
  */
-const createLegendConfig = (theme, legend) => ({
-  display: legend,
+const createLegendConfig = (theme, visible) => ({
+  display: visible,
   position: "bottom",
   align: "center",
   labels: {
@@ -168,43 +143,41 @@ const createLegendConfig = (theme, legend) => ({
     useBorderRadius: true,
     borderRadius: 50,
     font: { size: 12, family: theme.typography.fontFamily, weight: 500 },
-    color: alpha(theme.palette.text.primary, 0.7), // Alpha elegan untuk legend
+    color: alpha(theme.palette.text.primary, 0.7),
   },
 });
 
 /**
  * Creates consistent legend config for circular charts (Pie, Doughnut, PolarArea).
- * Uses custom generateLabels to map array backgrounds to labels.
  *
  * @param {Object} theme - The initialized MUI theme object.
- * @param {boolean} legend - Display legend or not.
+ * @param {boolean} visible - Display legend or not.
  * @returns {Object} Legend configuration object.
  */
-const createCircularLegendConfig = (theme, legend) => ({
-  ...createLegendConfig(theme, legend),
+const createCircularLegendConfig = (theme, visible) => ({
+  ...createLegendConfig(theme, visible),
   labels: {
-    ...createLegendConfig(theme, legend).labels,
+    ...createLegendConfig(theme, visible).labels,
     generateLabels: (chart) => {
-      const data = chart.data;
-      if (data.labels.length && data.datasets.length) {
-        const dataset = data.datasets[0];
-        return data.labels.map((label, i) => ({
-          text: label,
-          fillStyle: Array.isArray(dataset.backgroundColor) 
-            ? dataset.backgroundColor[i] 
-            : dataset.backgroundColor,
-          strokeStyle: "transparent",
-          lineWidth: 0,
-          hidden: false,
-          index: i,
-          pointStyle: "circle",
-          pointStyleWidth: 7,
-          pointStyleHeight: 7,
-          borderRadius: 50,
-          fontColor: alpha(theme.palette.text.primary, 0.7), // Alpha elegan
-        }));
-      }
-      return [];
+      const { labels, datasets } = chart.data;
+      if (!labels.length || !datasets.length) return [];
+
+      const dataset = datasets[0];
+      return labels.map((label, i) => ({
+        text: label,
+        fillStyle: Array.isArray(dataset.backgroundColor)
+          ? dataset.backgroundColor[i]
+          : dataset.backgroundColor,
+        strokeStyle: "transparent",
+        lineWidth: 0,
+        hidden: false,
+        index: i,
+        pointStyle: "circle",
+        pointStyleWidth: 7,
+        pointStyleHeight: 7,
+        borderRadius: 50,
+        fontColor: alpha(theme.palette.text.primary, 0.7),
+      }));
     },
   },
 });
@@ -216,9 +189,9 @@ const createCircularLegendConfig = (theme, legend) => ({
  * @returns {Object} Tooltip configuration object.
  */
 const createTooltipConfig = (theme) => ({
-  backgroundColor: alpha(theme.palette.background.paper, 0.85), // Efek tembus pandang / glass
-  titleColor: alpha(theme.palette.text.primary, 0.6), // Judul tooltip lebih redup
-  bodyColor: alpha(theme.palette.text.primary, 0.95), // Angka lebih menonjol
+  backgroundColor: alpha(theme.palette.background.paper, 0.85),
+  titleColor: alpha(theme.palette.text.primary, 0.6),
+  bodyColor: alpha(theme.palette.text.primary, 0.95),
   borderColor: alpha(theme.palette.divider, 0.2),
   borderWidth: 1,
   padding: { top: 10, right: 14, bottom: 10, left: 14 },
@@ -229,18 +202,15 @@ const createTooltipConfig = (theme) => ({
   boxPadding: 6,
   usePointStyle: true,
   callbacks: {
-    labelColor: function (context) {
-      return {
-        borderColor: "transparent",
-        backgroundColor: context.dataset.borderColor || context.dataset.backgroundColor,
-      };
-    },
+    labelColor: (context) => ({
+      borderColor: "transparent",
+      backgroundColor: context.dataset.borderColor || context.dataset.backgroundColor,
+    }),
   },
 });
 
 /**
  * Provides base configuration options for Line, Bar, and Bubble charts.
- * Focuses on removing borders, minimizing grid lines to 0.5px, and floating tooltips.
  *
  * @param {Object} theme - The initialized MUI theme object.
  * @param {string} [title] - The title of the chart.
@@ -248,21 +218,15 @@ const createTooltipConfig = (theme) => ({
  * @returns {Object} Chart.js options object.
  */
 export const baseOptions = (theme, title, legend = true) => {
-  const fontFamily = theme.typography.fontFamily;
-  const borderRadius = getNumericValue(theme.shape.borderRadius);
+  const { fontFamily } = theme.typography;
+  const br = getNumericValue(theme.shape.borderRadius);
 
   return {
     responsive: true,
     maintainAspectRatio: false,
     elements: {
-      bar: {
-        borderRadius: borderRadius,
-        borderWidth: 0,
-      },
-      line: {
-        borderCapStyle: "round",
-        borderJoinStyle: "round",
-      },
+      bar: { borderRadius: br, borderWidth: 0 },
+      line: { borderCapStyle: "round", borderJoinStyle: "round" },
     },
     plugins: {
       legend: createLegendConfig(theme, legend),
@@ -278,13 +242,10 @@ export const baseOptions = (theme, title, legend = true) => {
     },
     scales: {
       x: {
-        grid: {
-          display: false,
-          drawBorder: false,
-        },
+        grid: { display: false, drawBorder: false },
         ticks: {
           font: { size: 11, family: fontFamily, weight: 500 },
-          color: alpha(theme.palette.text.primary, 0.45), // Teks sumbu X super minimalis
+          color: alpha(theme.palette.text.primary, 0.45),
           padding: 12,
         },
         border: { display: false },
@@ -292,33 +253,27 @@ export const baseOptions = (theme, title, legend = true) => {
       y: {
         beginAtZero: true,
         grid: {
-          color: alpha(theme.palette.divider, 0.1), // Garis grid super tipis
-          borderDash: [4, 4], // Garis putus-putus modern
+          color: alpha(theme.palette.divider, 0.1),
+          borderDash: [4, 4],
           drawBorder: false,
           lineWidth: 1,
         },
         ticks: {
           font: { size: 11, family: fontFamily, weight: 500 },
-          color: alpha(theme.palette.text.primary, 0.45), // Teks sumbu Y super minimalis
+          color: alpha(theme.palette.text.primary, 0.45),
           padding: 16,
           maxTicksLimit: 6,
         },
         border: { display: false },
       },
     },
-    layout: {
-      padding: { top: 0, right: 0, bottom: 0, left: 0 },
-    },
-    interaction: {
-      mode: "index",
-      intersect: false,
-    },
+    layout: { padding: 0 },
+    interaction: { mode: "index", intersect: false },
   };
 };
 
 /**
  * Provides base configuration options for Doughnut, Pie, and PolarArea charts.
- * Features an 85% cutout for an extremely thin ring aesthetic and custom legend mapping.
  *
  * @param {Object} theme - The initialized MUI theme object.
  * @param {string} [title] - The title of the chart.
@@ -326,8 +281,8 @@ export const baseOptions = (theme, title, legend = true) => {
  * @returns {Object} Chart.js options object.
  */
 export const circularBaseOptions = (theme, title, legend = true) => {
-  const fontFamily = theme.typography.fontFamily;
-  const borderRadius = getNumericValue(theme.shape.borderRadius);
+  const { fontFamily } = theme.typography;
+  const br = getNumericValue(theme.shape.borderRadius);
 
   return {
     responsive: true,
@@ -337,25 +292,20 @@ export const circularBaseOptions = (theme, title, legend = true) => {
       arc: {
         borderWidth: 2,
         borderColor: theme.palette.background.paper,
-        borderRadius: borderRadius > 4 ? 4 : borderRadius,
+        borderRadius: br > 4 ? 4 : br,
         hoverOffset: 4,
       },
     },
     scales: {
       r: {
-        ticks: { 
-          display: false, 
-          backdropColor: "transparent" 
-        },
+        ticks: { display: false, backdropColor: "transparent" },
         grid: {
           color: alpha(theme.palette.divider, 0.1),
-          borderDash: [4, 4], // Grid melingkar putus-putus untuk Polar Area
+          borderDash: [4, 4],
           circular: true,
           lineWidth: 1,
         },
-        angleLines: {
-          display: false, 
-        },
+        angleLines: { display: false },
         border: { display: false },
         pointLabels: { display: false },
       },
@@ -377,7 +327,6 @@ export const circularBaseOptions = (theme, title, legend = true) => {
 
 /**
  * Provides base configuration options for Radar charts.
- * Uses ultra-thin lines, highly transparent grids, and floating tooltips.
  *
  * @param {Object} theme - The initialized MUI theme object.
  * @param {string} [title] - The title of the chart.
@@ -385,18 +334,14 @@ export const circularBaseOptions = (theme, title, legend = true) => {
  * @returns {Object} Chart.js options object.
  */
 export const radarBaseOptions = (theme, title, legend = true) => {
-  const fontFamily = theme.typography.fontFamily;
+  const { fontFamily } = theme.typography;
 
   return {
     responsive: true,
     maintainAspectRatio: false,
     elements: {
       line: { borderWidth: 1.5 },
-      point: {
-        radius: 0,
-        hoverRadius: 5,
-        hitRadius: 10,
-      },
+      point: { radius: 0, hoverRadius: 5, hitRadius: 10 },
     },
     plugins: {
       legend: createLegendConfig(theme, legend),
@@ -414,18 +359,18 @@ export const radarBaseOptions = (theme, title, legend = true) => {
         beginAtZero: true,
         grid: {
           color: alpha(theme.palette.divider, 0.1),
-          borderDash: [4, 4], // Radar grid putus-putus
+          borderDash: [4, 4],
           circular: true,
           lineWidth: 1,
         },
         angleLines: {
           color: alpha(theme.palette.divider, 0.1),
-          borderDash: [4, 4], // Jaring tengah putus-putus
+          borderDash: [4, 4],
           lineWidth: 1,
         },
         pointLabels: {
           font: { size: 11, family: fontFamily, weight: 500 },
-          color: alpha(theme.palette.text.primary, 0.5), // Label titik radar tembus pandang
+          color: alpha(theme.palette.text.primary, 0.5),
         },
         ticks: { display: false },
       },

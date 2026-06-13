@@ -430,118 +430,57 @@ const componentsOverride = (theme) => ({
   },
 
   // ==================== TABLE ====================
-MuiTableContainer: {
-  styleOverrides: {
-    root: {
-      overflowX: "auto",
-      overflowY: "hidden",
-    },
-  },
-},
-
-MuiTable: {
-  styleOverrides: {
-    root: {
-      borderCollapse: "collapse",
-    },
-  },
-},
-
-MuiTableHead: {
-  styleOverrides: {
-    root: {
-      "& .MuiTableCell-root": {
-        borderBottom: `2px solid ${theme.palette.divider}`,
-        fontWeight: 600,
-        fontSize: "0.75rem",
-        color: theme.palette.text.secondary,
-        textTransform: "uppercase",
-        letterSpacing: "0.05em",
-        whiteSpace: "nowrap",
-        py: 1.5,
+  MuiTableContainer: {
+    styleOverrides: {
+      root: {
+        border: `1px solid ${theme.palette.divider}`,
+        overflowX: "scroll",
+        overflowY: "hidden",
       },
     },
   },
-},
 
-MuiTableBody: {
-  styleOverrides: {
-    root: {
-      "& .MuiTableRow-root:last-child .MuiTableCell-root": {
-        borderBottom: `1px solid ${theme.palette.divider}`,
-      },
-    },
-  },
-},
-
-MuiTableRow: {
-  styleOverrides: {
-    root: {
-      transition: "background-color 0.15s ease",
-      "&:hover": {
-        backgroundColor: alpha(theme.palette.secondary.main, 0.04),
-      },
-      "&.Mui-selected": {
-        backgroundColor: alpha(theme.palette.secondary.main, 0.08),
-        "&:hover": {
-          backgroundColor: alpha(theme.palette.secondary.main, 0.12),
+  MuiTableHead: {
+    styleOverrides: {
+      root: {
+        "& .MuiTableCell-root": {
+          borderBottom: `1px solid ${theme.palette.divider}`,
+          backgroundColor: "transparent",
         },
       },
     },
   },
-},
 
-MuiTableCell: {
-  styleOverrides: {
-    root: {
-      borderBottom: `1px solid ${theme.palette.divider}`,
-      padding: "12px 16px",
-      fontSize: "0.875rem",
-      fontWeight: 400,
-      color: theme.palette.text.primary,
-    },
-    head: {
-      borderBottom: `2px solid ${theme.palette.divider}`,
-      fontWeight: 600,
-      fontSize: "0.75rem",
-      color: theme.palette.text.secondary,
-      textTransform: "uppercase",
-      letterSpacing: "0.05em",
-      whiteSpace: "nowrap",
-      py: 1.5,
-    },
-  },
-},
-
-MuiTableFooter: {
-  styleOverrides: {
-    root: {
-      "& .MuiTableCell-root": {
-        borderTop: `2px solid ${theme.palette.divider}`,
-        borderBottom: "none",
-        fontWeight: 600,
-        fontSize: "0.8125rem",
-        color: theme.palette.text.secondary,
-        py: 1.5,
+  MuiTableRow: {
+    styleOverrides: {
+      root: {
+        transition: "background-color 0.15s ease",
+        "&:hover": {
+          backgroundColor: alpha(theme.palette.secondary.main, 0.04),
+        },
+        "&:last-child td": { borderBottom: 0 },
       },
     },
   },
-},
 
-MuiTablePagination: {
-  styleOverrides: {
-    root: {
-      borderTop: `1px solid ${theme.palette.divider}`,
-      "& .MuiTablePagination-toolbar": {
-        minHeight: 52,
-        paddingLeft: 16,
-        paddingRight: 16,
+  MuiTableCell: {
+    styleOverrides: {
+      root: {
+        borderBottom: `1px solid ${theme.palette.divider}`,
+        padding: "12px 16px",
         fontSize: "0.875rem",
+        fontWeight: 400,
+      },
+      head: {
+        fontWeight: 500,
+        fontSize: "0.75rem",
+        color: theme.palette.text.secondary,
+        textTransform: "uppercase",
+        letterSpacing: "0.05em",
       },
     },
   },
-},
-
+  
   // ==================== DIVIDER ====================
   MuiDivider: {
     styleOverrides: {

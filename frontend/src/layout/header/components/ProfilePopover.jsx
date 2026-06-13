@@ -1,5 +1,5 @@
 /**
- * ProfilePopover - User profile popover with greeting, role, theme toggle, cart access, and logout functionality.
+ * ProfilePopover - User profile popover dengan greeting, role, theme toggle, cart access, dan logout.
  *
  * @component
  * @param {Object} props - Component props
@@ -11,24 +11,12 @@
  * @param {string} [props.user.role] - User role (e.g., "kasir", "admin")
  * @param {boolean} props.isCashier - Whether current user is a cashier
  * @param {Function} [props.onOpenCart] - Handler to open the cart drawer/modal
- *
  * @returns {JSX.Element} Rendered profile popover
  */
 import { useSelector, useDispatch } from "react-redux";
 import {
-  Badge,
-  Box,
-  Divider,
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
-  Popover,
-  Stack,
-  Switch,
-  Typography,
-  useTheme,
+  Badge, Box, Divider, List, ListItem, ListItemButton, ListItemIcon, ListItemText,
+  Popover, Stack, Switch, Typography, useTheme,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { ChevronRight, LogOut, Moon, ShoppingCart, Sun } from "lucide-react";
@@ -40,190 +28,80 @@ import { selectThemeMode } from "@store/theme/themeSelector.js";
 import { toggleTheme } from "@store/theme/themeSlices.js";
 import { selectCartItems } from "@store/cart/cartSelector.js";
 
-/**
- * ProfilePopover - Popover profil pengguna dengan menu akses cepat.
- *
- * Fitur:
- * - Greeting dinamis berdasarkan waktu (pagi/siang/sore/malam)
- * - Menampilkan nama lengkap dan role pengguna
- * - Akses cepat ke keranjang belanja (khusus kasir)
- * - Badge counter jumlah item di keranjang
- * - Toggle theme dark/light dengan switch
- * - Logout dengan indikator loading
- * - Icon box konsisten untuk setiap menu item
- *
- * @param {Object} props - Props komponen
- * @param {boolean} props.open - Status popover terbuka/tutup
- * @param {HTMLElement|null} props.anchorEl - Element anchor untuk positioning
- * @param {Function} props.onClose - Handler untuk menutup popover
- * @param {Object} props.user - Data pengguna
- * @param {string} [props.user.fullName] - Nama lengkap pengguna
- * @param {string} [props.user.role] - Role pengguna
- * @param {boolean} props.isCashier - Apakah pengguna adalah kasir
- * @param {Function} [props.onOpenCart] - Handler untuk membuka keranjang
- * @returns {JSX.Element} Popover profil pengguna
- */
-const ProfilePopover = ({
-  open,
-  anchorEl,
-  onClose,
-  user,
-  isCashier,
-  onOpenCart,
-}) => {
+const ProfilePopover = ({ open, anchorEl, onClose, user, isCashier, onOpenCart }) => {
   const theme = useTheme();
   const dispatch = useDispatch();
-
-  /** @type {boolean} Status loading autentikasi */
   const isLoading = useSelector(selectAuthLoading);
-
-  /** @type {string} Mode tema saat ini ("light" | "dark") */
   const mode = useSelector(selectThemeMode);
-
-  /** @type {Array<Object>} Item di dalam keranjang belanja */
   const cartItems = useSelector(selectCartItems);
+  const br = `${theme.shape.borderRadius}px`;
 
-  /**
-   * Handler untuk logout.
-   * Dispatch logout thunk dan tutup popover.
-   */
-  const handleLogout = () => {
-    dispatch(logout());
-    onClose();
+  /** Padding horizontal yang sama untuk header dan menu items */
+  const contentPx = 2; // 16px — sama dengan padding ListItemButton default
+
+  /** Style untuk icon box di setiap menu item */
+  const iconBox = (bgColor, color) => ({
+    width: 32, height: 32, borderRadius: br, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+    bgcolor: alpha(bgColor, 0.08), color,
+  });
+
+  /** Style untuk ListItemButton */
+  const menuItemSx = {
+    borderRadius: br, py: 1.25, minHeight: 48, px: contentPx,
+    "&:hover": { bgcolor: alpha(theme.palette.secondary.main, 0.06) },
   };
 
-  /**
-   * Handler untuk toggle theme.
-   * Dispatch toggleTheme action.
-   *
-   * @param {React.MouseEvent} event - Event klik
-   */
-  const handleToggleTheme = (event) => {
-    event.stopPropagation();
-    dispatch(toggleTheme());
-  };
-
-  /**
-   * Handler untuk membuka keranjang belanja.
-   * Tutup popover terlebih dahulu, lalu panggil onOpenCart.
-   */
-  const handleCartClick = () => {
-    onClose();
-    if (onOpenCart) onOpenCart();
-  };
+  const handleLogout = () => { dispatch(logout()); onClose(); };
+  const handleToggleTheme = (e) => { e.stopPropagation(); dispatch(toggleTheme()); };
+  const handleCartClick = () => { onClose(); if (onOpenCart) onOpenCart(); };
 
   return (
     <Popover
-      open={open}
-      anchorEl={anchorEl}
-      onClose={onClose}
+      open={open} anchorEl={anchorEl} onClose={onClose}
       anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
       transformOrigin={{ vertical: "top", horizontal: "right" }}
       slotProps={{
         paper: {
           elevation: 0,
           sx: {
-            mt: 1.5,
-            width: 300,
-            borderRadius: `${theme.shape.borderRadius}px`,
-            border: `1px solid ${theme.palette.divider}`,
-            boxShadow: theme.shadows[4],
-            overflow: "hidden",
-            backgroundColor: theme.palette.background.paper,
-            backgroundImage: "none",
-            p: theme.spacing(2),
+            mt: 1.5, width: 300, borderRadius: br,
+            border: `1px solid ${theme.palette.divider}`, boxShadow: theme.shadows[4],
+            overflow: "hidden", bgcolor: "background.paper", backgroundImage: "none", p: 2,
           },
         },
       }}
     >
-      {/* Header: Greeting + Nama + Role */}
-      <Box sx={{ mb: 2, px: 1 }}>
-        <Typography variant="body2" sx={{ lineHeight: 1.5 }}>
-          <Box component="span" sx={{ fontWeight: 600 }}>
-            {getGreeting()},{" "}
-          </Box>
-          <Box component="span" sx={{ fontWeight: 400 }}>
-            {user?.fullName || "Pengguna"}
-          </Box>
+      {/* Header: Greeting + Nama + Role — px disamakan dengan menuItemSx */}
+      <Box sx={{ mb: 2, px: contentPx }}>
+        <Typography variant="body2" sx={{ lineHeight: 1.5, color: "text.primary" }}>
+          <Box component="span" sx={{ fontWeight: 600 }}>{getGreeting()}, </Box>
+          <Box component="span" sx={{ fontWeight: 400 }}>{user?.fullName || "Pengguna"}</Box>
         </Typography>
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{
-            textTransform: "capitalize",
-            mt: 0.5,
-            display: "block",
-            fontWeight: 400,
-          }}
-        >
-          {user?.role || "—"}
+        <Typography variant="caption" color="text.secondary" sx={{ textTransform: "capitalize", mt: 0.5, display: "block", fontWeight: 500, letterSpacing: "0.02em" }}>
+          {user?.role?.toLowerCase() || "—"}
         </Typography>
       </Box>
 
       <Divider sx={{ mb: 1.5 }} />
 
       {/* Menu Items */}
-      <List sx={{ p: 0 }}>
+      <List disablePadding sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
         {/* Cart Menu - Hanya untuk Kasir */}
         {isCashier && (
           <ListItem disablePadding>
-            <ListItemButton
-              onClick={handleCartClick}
-              sx={{
-                borderRadius: `${theme.shape.borderRadius}px`,
-                "&:hover": {
-                  bgcolor: alpha(theme.palette.secondary.main, 0.06),
-                },
-              }}
-            >
+            <ListItemButton onClick={handleCartClick} sx={menuItemSx}>
               <ListItemIcon sx={{ minWidth: 40, mr: 0.5 }}>
-                <Box
-                  sx={{
-                    width: 32,
-                    height: 32,
-                    borderRadius: `${theme.shape.borderRadius}px`,
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    bgcolor: alpha(theme.palette.secondary.main, 0.08),
-                    color: theme.palette.secondary.main,
-                  }}
-                >
+                <Box sx={iconBox(theme.palette.secondary.main, theme.palette.secondary.main)}>
                   <ShoppingCart size={16} strokeWidth={1.5} />
                 </Box>
               </ListItemIcon>
-              <ListItemText
-                primary="Keranjang Belanja"
-                slotProps={{
-                  primary: {
-                    variant: "body2",
-                    color: "text.primary",
-                  },
-                }}
-              />
+              <ListItemText primary="Keranjang Belanja" slotProps={{ primary: { variant: "body2", color: "text.primary", fontWeight: 500 } }} />
               <Stack direction="row" sx={{ gap: 1, alignItems: "center" }}>
                 {cartItems.length > 0 && (
-                  <Badge
-                    badgeContent={cartItems.length}
-                    color="error"
-                    max={99}
-                    sx={{
-                      "& .MuiBadge-badge": {
-                        position: "static",
-                        transform: "none",
-                        fontSize: "0.625rem",
-                        height: 18,
-                        minWidth: 18,
-                        borderRadius: `${theme.shape.borderRadius}px`,
-                      },
-                    }}
-                  />
+                  <Badge badgeContent={cartItems.length} color="error" max={99}
+                    sx={{ "& .MuiBadge-badge": { position: "static", transform: "none", fontSize: "0.625rem", height: 18, minWidth: 18, borderRadius: br, fontWeight: 600 } }} />
                 )}
-                <ChevronRight
-                  size={14}
-                  strokeWidth={1.5}
-                  color={theme.palette.text.disabled}
-                />
+                <ChevronRight size={14} strokeWidth={1.5} color={theme.palette.text.disabled} />
               </Stack>
             </ListItemButton>
           </ListItem>
@@ -231,50 +109,14 @@ const ProfilePopover = ({
 
         {/* Theme Toggle */}
         <ListItem disablePadding>
-          <ListItemButton
-            onClick={handleToggleTheme}
-            sx={{
-              borderRadius: `${theme.shape.borderRadius}px`,
-              "&:hover": {
-                bgcolor: alpha(theme.palette.secondary.main, 0.06),
-              },
-            }}
-          >
+          <ListItemButton onClick={handleToggleTheme} sx={menuItemSx}>
             <ListItemIcon sx={{ minWidth: 40, mr: 0.5 }}>
-              <Box
-                sx={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: `${theme.shape.borderRadius}px`,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  bgcolor: alpha(theme.palette.warning.main, 0.08),
-                  color: theme.palette.warning.main,
-                }}
-              >
-                {mode === "dark" ? (
-                  <Sun size={16} strokeWidth={1.5} />
-                ) : (
-                  <Moon size={16} strokeWidth={1.5} />
-                )}
+              <Box sx={iconBox(theme.palette.warning.main, theme.palette.warning.main)}>
+                {mode === "dark" ? <Sun size={16} strokeWidth={1.5} /> : <Moon size={16} strokeWidth={1.5} />}
               </Box>
             </ListItemIcon>
-            <ListItemText
-              primary={mode === "dark" ? "Mode Terang" : "Mode Gelap"}
-              slotProps={{
-                primary: {
-                  variant: "body2",
-                  color: "text.primary",
-                },
-              }}
-            />
-            <Switch
-              size="small"
-              checked={mode === "dark"}
-              onChange={handleToggleTheme}
-              onClick={(event) => event.stopPropagation()}
-            />
+            <ListItemText primary={mode === "dark" ? "Mode Terang" : "Mode Gelap"} slotProps={{ primary: { variant: "body2", color: "text.primary", fontWeight: 500 } }} />
+            <Switch size="small" checked={mode === "dark"} onChange={handleToggleTheme} onClick={(e) => e.stopPropagation()} sx={{ "& .MuiSwitch-thumb": { boxShadow: "none" } }} />
           </ListItemButton>
         </ListItem>
       </List>
@@ -282,42 +124,16 @@ const ProfilePopover = ({
       <Divider sx={{ my: 1.5 }} />
 
       {/* Logout */}
-      <List sx={{ p: 0 }}>
+      <List disablePadding>
         <ListItem disablePadding>
-          <ListItemButton
-            onClick={handleLogout}
-            disabled={isLoading}
-            sx={{
-              borderRadius: `${theme.shape.borderRadius}px`,
-              color: theme.palette.error.main,
-              "&:hover": {
-                bgcolor: alpha(theme.palette.error.main, 0.08),
-              },
-            }}
-          >
+          <ListItemButton onClick={handleLogout} disabled={isLoading}
+            sx={{ ...menuItemSx, color: theme.palette.error.main, "&:hover": { bgcolor: alpha(theme.palette.error.main, 0.08) }, "&.Mui-disabled": { opacity: 0.5 } }}>
             <ListItemIcon sx={{ minWidth: 40, mr: 0.5, color: "inherit" }}>
-              <Box
-                sx={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: `${theme.shape.borderRadius}px`,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  bgcolor: alpha(theme.palette.error.main, 0.08),
-                }}
-              >
+              <Box sx={iconBox(theme.palette.error.main, "inherit")}>
                 <LogOut size={16} strokeWidth={1.5} />
               </Box>
             </ListItemIcon>
-            <ListItemText
-              primary="Keluar"
-              slotProps={{
-                primary: {
-                  variant: "body2",
-                },
-              }}
-            />
+            <ListItemText primary="Keluar" slotProps={{ primary: { variant: "body2", fontWeight: 500 } }} />
           </ListItemButton>
         </ListItem>
       </List>

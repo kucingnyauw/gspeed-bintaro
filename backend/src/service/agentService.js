@@ -24,7 +24,7 @@ class AgentService {
    */
   #getModelConfig(role) {
     const configs = {
-      ADMIN: { max_tokens: 1024, temperature: 0.3 },
+      ADMIN: { max_tokens: 756, temperature: 0.3 },
       CASHIER: { max_tokens: 512, temperature: 0.4 },
       MECHANIC: { max_tokens: 512, temperature: 0.4 },
     };

@@ -1,11 +1,6 @@
 /**
  * AdminDashboard - Komponen dashboard admin untuk menampilkan metrik dan statistik.
  *
- * Menampilkan ringkasan pesanan, pendapatan, stok, pelanggan, dan target.
- * Menggunakan komponen SummaryCard dan BarChart untuk visualisasi data.
- * Sepenuhnya mengandalkan nilai dari theme MUI untuk styling.
- * Responsive di semua device dengan skeleton loading yang identik.
- *
  * @component
  * @param {Object} props - Component properties
  * @param {Object} props.data - Data dashboard dari API
@@ -44,12 +39,6 @@ import { formatDate, formatToIdr } from "@shared/utils";
 import { BarChart, SummaryCard } from "@components";
 import { useDevice } from "@hooks";
 
-/**
- * SVG ilustrasi untuk empty state stok.
- *
- * @component
- * @returns {JSX.Element}
- */
 const EmptyStockSVG = () => (
   <Box
     component="svg"
@@ -98,19 +87,8 @@ const EmptyStockSVG = () => (
   </Box>
 );
 
-/**
- * EmptyState - Komponen untuk menampilkan state kosong.
- *
- * @component
- * @param {Object} props
- * @param {string} props.title - Judul empty state
- * @param {string} props.description - Deskripsi empty state
- * @param {React.ReactNode} props.children - Ilustrasi atau ikon
- * @returns {JSX.Element}
- */
 const EmptyState = ({ title, description, children }) => {
   const { isMobile } = useDevice();
-
   return (
     <Stack
       sx={{
@@ -149,18 +127,6 @@ EmptyState.propTypes = {
   children: PropTypes.node.isRequired,
 };
 
-/**
- * TargetItem - Komponen target dengan progress bar.
- *
- * @component
- * @param {Object} props
- * @param {string} props.label - Label target
- * @param {string|number} props.actual - Nilai aktual
- * @param {string|number} props.target - Nilai target
- * @param {number} props.percentage - Persentase capaian
- * @param {boolean} [props.isCurrency=false] - Apakah nilai berupa mata uang
- * @returns {JSX.Element}
- */
 const TargetItem = ({
   label,
   actual,
@@ -170,10 +136,8 @@ const TargetItem = ({
 }) => {
   const theme = useTheme();
   const { isMobile } = useDevice();
-
   const fmt = (val) => (isCurrency ? formatToIdr(val) : String(val));
   const cappedProgress = Math.min(percentage, 100);
-
   return (
     <Box>
       <Stack
@@ -207,7 +171,6 @@ const TargetItem = ({
           </Typography>
         </Stack>
       </Stack>
-
       <LinearProgress
         variant="determinate"
         value={cappedProgress}
@@ -233,70 +196,73 @@ TargetItem.propTypes = {
   isCurrency: PropTypes.bool,
 };
 
-/**
- * Skeleton untuk section header — sama persis dengan layout asli.
- *
- * @component
- * @returns {JSX.Element}
- */
+const iconBtnSx = (theme) => ({
+  border: "1px solid",
+  borderColor: alpha(theme.palette.divider, 0.8),
+  borderRadius: `${theme.shape.borderRadius}px`,
+  color: "text.secondary",
+  minWidth: 38,
+  minHeight: 38,
+  p: 0,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  transition: theme.transitions.create(
+    ["background-color", "border-color", "color"],
+    { duration: theme.transitions.duration.shorter }
+  ),
+  "&:hover": {
+    bgcolor: alpha(theme.palette.secondary.main, 0.08),
+    borderColor: alpha(theme.palette.secondary.main, 0.4),
+    color: theme.palette.secondary.main,
+  },
+});
+
+// ==================== SKELETONS ====================
+
 const HeaderSkeleton = () => {
   const theme = useTheme();
   const { isMobile } = useDevice();
-
+  const br = `${theme.shape.borderRadius}px`;
   return (
-    <Card
-      sx={{
-        borderRadius: `${theme.shape.borderRadius}px`,
-      }}
-    >
+    <Card sx={{ borderRadius: br }}>
       <Box sx={{ p: { xs: 2, sm: 2.5, md: 3 } }}>
-        <Stack
-          direction={{ xs: "column", sm: "row" }}
-          sx={{
-            justifyContent: "space-between",
-            alignItems: { xs: "flex-start", sm: "center" },
-            flexWrap: "wrap",
-            gap: 2,
-          }}
-        >
+        <Stack sx={{ gap: { xs: 2, sm: 2.5 } }}>
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Skeleton
               variant="text"
-              width={isMobile ? "60%" : "40%"}
+              width={isMobile ? 180 : 240}
               height={isMobile ? 28 : 32}
+              sx={{ minWidth: 120 }}
             />
             <Skeleton
               variant="text"
-              width={isMobile ? "80%" : "50%"}
+              width={isMobile ? 240 : 320}
               height={isMobile ? 16 : 20}
-              sx={{ mt: 0.5 }}
+              sx={{ mt: 0.5, minWidth: 160 }}
             />
           </Box>
-          <Skeleton
-            variant="rounded"
-            width={40}
-            height={40}
-            sx={{ borderRadius: `${theme.shape.borderRadius}px` }}
-          />
+          <Stack direction="row" sx={{ justifyContent: "flex-end" }}>
+            <Skeleton
+              variant="rounded"
+              width={38}
+              height={38}
+              sx={{ borderRadius: br, flexShrink: 0 }}
+            />
+          </Stack>
         </Stack>
       </Box>
     </Card>
   );
 };
 
-/**
- * Skeleton untuk SummaryCard — tinggi minimal mengikuti asli.
- *
- * @component
- * @returns {JSX.Element}
- */
 const SummaryCardSkeleton = () => {
   const theme = useTheme();
-
+  const br = `${theme.shape.borderRadius}px`;
   return (
     <Card
       sx={{
-        borderRadius: `${theme.shape.borderRadius}px`,
+        borderRadius: br,
         height: "100%",
         display: "flex",
         flexDirection: "column",
@@ -317,7 +283,7 @@ const SummaryCardSkeleton = () => {
           variant="rounded"
           width={40}
           height={40}
-          sx={{ borderRadius: `${theme.shape.borderRadius}px` }}
+          sx={{ borderRadius: br }}
         />
         <Box>
           <Skeleton variant="text" width="60%" height={20} />
@@ -329,20 +295,14 @@ const SummaryCardSkeleton = () => {
   );
 };
 
-/**
- * Skeleton untuk section chart stok — tinggi minimal mengikuti asli.
- *
- * @component
- * @returns {JSX.Element}
- */
 const ChartSkeleton = () => {
   const theme = useTheme();
   const { isMobile } = useDevice();
-
+  const br = `${theme.shape.borderRadius}px`;
   return (
     <Card
       sx={{
-        borderRadius: `${theme.shape.borderRadius}px`,
+        borderRadius: br,
         display: "flex",
         flexDirection: "column",
         height: "100%",
@@ -352,14 +312,15 @@ const ChartSkeleton = () => {
       <Box sx={{ p: { xs: 2, sm: 2.5, md: 3 }, pb: 2 }}>
         <Skeleton
           variant="text"
-          width={isMobile ? "60%" : "40%"}
+          width={isMobile ? 160 : 200}
           height={isMobile ? 24 : 28}
+          sx={{ minWidth: 120 }}
         />
         <Skeleton
           variant="text"
-          width={isMobile ? "80%" : "50%"}
+          width={isMobile ? 200 : 260}
           height={16}
-          sx={{ mt: 0.5 }}
+          sx={{ mt: 0.5, minWidth: 140 }}
         />
       </Box>
       <Divider />
@@ -377,42 +338,25 @@ const ChartSkeleton = () => {
           variant="rounded"
           width="100%"
           height="100%"
-          sx={{
-            borderRadius: `${theme.shape.borderRadius}px`,
-            minHeight: { xs: 180, sm: 240, md: 280 },
-          }}
+          sx={{ borderRadius: br, minHeight: { xs: 180, sm: 240, md: 280 } }}
         />
       </Box>
     </Card>
   );
 };
 
-/**
- * Skeleton untuk stat card di sidebar chart — tinggi mengikuti asli.
- *
- * @component
- * @returns {JSX.Element}
- */
 const StatCardSkeleton = () => {
   const theme = useTheme();
-
+  const br = `${theme.shape.borderRadius}px`;
   return (
-    <Card
-      sx={{
-        borderRadius: `${theme.shape.borderRadius}px`,
-        minHeight: { xs: 120, sm: 140 },
-      }}
-    >
+    <Card sx={{ borderRadius: br, minHeight: { xs: 120, sm: 140 } }}>
       <Box sx={{ p: { xs: 2, sm: 2.5 } }}>
         <Stack direction="row" sx={{ gap: 2, alignItems: "center" }}>
           <Skeleton
             variant="rounded"
             width={44}
             height={44}
-            sx={{
-              borderRadius: `${theme.shape.borderRadius}px`,
-              flexShrink: 0,
-            }}
+            sx={{ borderRadius: br, flexShrink: 0 }}
           />
           <Box sx={{ flex: 1, minWidth: 0 }}>
             <Skeleton variant="text" width="50%" height={20} />
@@ -425,35 +369,24 @@ const StatCardSkeleton = () => {
   );
 };
 
-/**
- * Skeleton untuk target card dengan BarChart — tinggi mengikuti asli.
- *
- * @component
- * @returns {JSX.Element}
- */
 const TargetCardSkeleton = () => {
   const theme = useTheme();
   const { isMobile } = useDevice();
-
+  const br = `${theme.shape.borderRadius}px`;
   return (
-    <Card
-      sx={{
-        borderRadius: `${theme.shape.borderRadius}px`,
-        display: "flex",
-        flexDirection: "column",
-      }}
-    >
+    <Card sx={{ borderRadius: br, display: "flex", flexDirection: "column" }}>
       <Box sx={{ p: { xs: 2, sm: 2.5, md: 3 }, pb: 2 }}>
         <Skeleton
           variant="text"
-          width={isMobile ? "50%" : "35%"}
+          width={isMobile ? 140 : 160}
           height={isMobile ? 24 : 28}
+          sx={{ minWidth: 100 }}
         />
         <Skeleton
           variant="text"
-          width={isMobile ? "70%" : "45%"}
+          width={isMobile ? 180 : 220}
           height={16}
-          sx={{ mt: 0.5 }}
+          sx={{ mt: 0.5, minWidth: 120 }}
         />
       </Box>
       <Divider />
@@ -471,43 +404,31 @@ const TargetCardSkeleton = () => {
           variant="rounded"
           width="100%"
           height="100%"
-          sx={{
-            borderRadius: `${theme.shape.borderRadius}px`,
-            minHeight: { xs: 200, sm: 260, md: 280 },
-          }}
+          sx={{ borderRadius: br, minHeight: { xs: 200, sm: 260, md: 280 } }}
         />
       </Box>
     </Card>
   );
 };
 
-/**
- * Skeleton untuk target tahunan dengan LinearProgress — layout sama persis.
- *
- * @component
- * @returns {JSX.Element}
- */
 const YearlyTargetSkeleton = () => {
   const theme = useTheme();
   const { isMobile } = useDevice();
-
+  const br = `${theme.shape.borderRadius}px`;
   return (
-    <Card
-      sx={{
-        borderRadius: `${theme.shape.borderRadius}px`,
-      }}
-    >
+    <Card sx={{ borderRadius: br }}>
       <Box sx={{ p: { xs: 2, sm: 2.5, md: 3 }, pb: 2 }}>
         <Skeleton
           variant="text"
-          width={isMobile ? "50%" : "35%"}
+          width={isMobile ? 140 : 160}
           height={isMobile ? 24 : 28}
+          sx={{ minWidth: 100 }}
         />
         <Skeleton
           variant="text"
-          width={isMobile ? "70%" : "45%"}
+          width={isMobile ? 180 : 220}
           height={16}
-          sx={{ mt: 0.5 }}
+          sx={{ mt: 0.5, minWidth: 120 }}
         />
       </Box>
       <Divider />
@@ -539,7 +460,7 @@ const YearlyTargetSkeleton = () => {
               variant="rounded"
               width="100%"
               height={10}
-              sx={{ borderRadius: `${theme.shape.borderRadius}px` }}
+              sx={{ borderRadius: br }}
             />
           </Box>
           <Divider
@@ -588,41 +509,21 @@ const YearlyTargetSkeleton = () => {
   );
 };
 
-/**
- * AdminDashboard - Komponen utama dashboard admin.
- *
- * @component
- * @param {Object} props
- * @param {Object} props.data - Data dashboard
- * @param {boolean} props.isLoading - Status loading
- * @param {Function} props.refetch - Fungsi refresh
- * @returns {JSX.Element}
- */
+// ==================== MAIN COMPONENT ====================
+
 const AdminDashboard = ({ data, isLoading, refetch }) => {
   const theme = useTheme();
   const { isMobile, isTablet } = useDevice();
-
   const fmt = (val) => formatToIdr(val);
 
-  /**
-   * Data untuk BarChart stok menipis.
-   * Menggunakan warna purple (secondary.main) dengan variasi alpha.
-   */
   const lowStockData = useMemo(() => {
-    if (!data?.inventory?.lowStockProducts?.length) {
+    if (!data?.inventory?.lowStockProducts?.length)
       return { datasets: [], labels: [] };
-    }
-
     const validProducts = data.inventory.lowStockProducts.filter(
       (p) => p.stock >= 0
     );
-
-    if (!validProducts.length) {
-      return { datasets: [], labels: [] };
-    }
-
+    if (!validProducts.length) return { datasets: [], labels: [] };
     const colorCount = validProducts.length;
-
     return {
       datasets: [
         {
@@ -640,15 +541,11 @@ const AdminDashboard = ({ data, isLoading, refetch }) => {
     };
   }, [data, theme]);
 
-  /**
-   * Data untuk BarChart target harian.
-   */
   const dailyTargetChartData = useMemo(() => {
     const ordersActual = data?.today?.orders || 0;
     const ordersTarget = data?.targets?.daily?.orders?.target || 0;
     const revenueActual = data?.today?.revenue || 0;
     const revenueTarget = data?.targets?.daily?.revenue?.target || 0;
-
     return {
       datasets: [
         {
@@ -676,15 +573,11 @@ const AdminDashboard = ({ data, isLoading, refetch }) => {
     };
   }, [data, theme]);
 
-  /**
-   * Data untuk BarChart target bulanan.
-   */
   const monthlyTargetChartData = useMemo(() => {
     const ordersActual = data?.thisMonth?.orders || 0;
     const ordersTarget = data?.targets?.monthly?.orders?.target || 0;
     const revenueActual = data?.thisMonth?.revenue || 0;
     const revenueTarget = data?.targets?.monthly?.revenue?.target || 0;
-
     return {
       datasets: [
         {
@@ -777,18 +670,11 @@ const AdminDashboard = ({ data, isLoading, refetch }) => {
 
   return (
     <Stack sx={{ gap: { xs: 2, sm: 3, md: 4 } }}>
-      {/* Header */}
+      {/* Header — Mobile: title+subtitle di atas, icon refresh di kanan bawah */}
       <Card sx={{ borderRadius: `${theme.shape.borderRadius}px` }}>
         <Box sx={{ p: { xs: 2, sm: 2.5, md: 3 } }}>
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            sx={{
-              justifyContent: "space-between",
-              alignItems: { xs: "flex-start", sm: "center" },
-              flexWrap: "wrap",
-              gap: 2,
-            }}
-          >
+          <Stack sx={{ gap: { xs: 2, sm: 2.5 } }}>
+            {/* Baris 1: Title & Subtitle */}
             <Box sx={{ flex: 1, minWidth: 0 }}>
               <Typography
                 variant={isMobile ? "h6" : "h5"}
@@ -804,12 +690,7 @@ const AdminDashboard = ({ data, isLoading, refetch }) => {
               <Typography
                 variant={isMobile ? "caption" : "body2"}
                 color="text.secondary"
-                sx={{
-                  mt: 0.5,
-                  fontWeight: 500,
-                  opacity: 0.8,
-                  display: "block",
-                }}
+                sx={{ mt: 0.5 }}
               >
                 {data?.activeShift
                   ? `Shift aktif · ${data.activeShift.cashier}`
@@ -820,28 +701,20 @@ const AdminDashboard = ({ data, isLoading, refetch }) => {
                 })}
               </Typography>
             </Box>
-            <Tooltip title="Refresh data" placement="bottom">
-              <span>
+
+            {/* Baris 2: Icon refresh di kanan */}
+            <Stack direction="row" sx={{ justifyContent: "flex-end" }}>
+              <Tooltip title="Refresh data" placement="bottom">
                 <IconButton
                   onClick={() => refetch?.()}
                   size={isMobile ? "small" : "medium"}
-                  sx={{
-                    border: "1px solid",
-                    borderColor: alpha(theme.palette.divider, 0.8),
-                    borderRadius: `${theme.shape.borderRadius}px`,
-                    color: theme.palette.text.secondary,
-                    alignSelf: { xs: "flex-end", sm: "center" },
-                    "&:hover": {
-                      bgcolor: alpha(theme.palette.secondary.main, 0.08),
-                      borderColor: alpha(theme.palette.secondary.main, 0.4),
-                      color: theme.palette.secondary.main,
-                    },
-                  }}
+                  aria-label="Refresh data"
+                  sx={iconBtnSx(theme)}
                 >
-                  <RotateCcw size={isMobile ? 14 : 16} strokeWidth={2} />
+                  <RotateCcw size={isMobile ? 16 : 18} strokeWidth={2} />
                 </IconButton>
-              </span>
-            </Tooltip>
+              </Tooltip>
+            </Stack>
           </Stack>
         </Box>
       </Card>
@@ -927,7 +800,7 @@ const AdminDashboard = ({ data, isLoading, refetch }) => {
             <Typography
               variant={isMobile ? "caption" : "body2"}
               color="text.secondary"
-              sx={{ mt: 0.5, fontWeight: 500, opacity: 0.8 }}
+              sx={{ mt: 0.5 }}
             >
               {data?.inventory?.lowStockCount || 0} item butuh restock
             </Typography>
@@ -959,7 +832,6 @@ const AdminDashboard = ({ data, isLoading, refetch }) => {
             )}
           </Box>
         </Card>
-
         <Stack sx={{ gap: { xs: 2, sm: 2.5, md: 3 } }}>
           <SummaryCard
             color="secondary"
@@ -1034,7 +906,7 @@ const AdminDashboard = ({ data, isLoading, refetch }) => {
         />
       </Box>
 
-      {/* Target Section - Using BarChart for Daily & Monthly */}
+      {/* Target Section */}
       <Box
         sx={{
           display: "grid",
@@ -1042,7 +914,6 @@ const AdminDashboard = ({ data, isLoading, refetch }) => {
           gap: { xs: 2, sm: 2.5, md: 3 },
         }}
       >
-        {/* Target Harian - BarChart */}
         <Card sx={{ borderRadius: `${theme.shape.borderRadius}px` }}>
           <Box sx={{ p: { xs: 2, sm: 2.5, md: 3 }, pb: 2 }}>
             <Typography
@@ -1055,7 +926,7 @@ const AdminDashboard = ({ data, isLoading, refetch }) => {
             <Typography
               variant={isMobile ? "caption" : "body2"}
               color="text.secondary"
-              sx={{ mt: 0.5, fontWeight: 500, opacity: 0.8 }}
+              sx={{ mt: 0.5 }}
             >
               Capaian vs target hari ini
             </Typography>
@@ -1076,8 +947,6 @@ const AdminDashboard = ({ data, isLoading, refetch }) => {
             />
           </Box>
         </Card>
-
-        {/* Target Bulanan - BarChart */}
         <Card sx={{ borderRadius: `${theme.shape.borderRadius}px` }}>
           <Box sx={{ p: { xs: 2, sm: 2.5, md: 3 }, pb: 2 }}>
             <Typography
@@ -1090,7 +959,7 @@ const AdminDashboard = ({ data, isLoading, refetch }) => {
             <Typography
               variant={isMobile ? "caption" : "body2"}
               color="text.secondary"
-              sx={{ mt: 0.5, fontWeight: 500, opacity: 0.8 }}
+              sx={{ mt: 0.5 }}
             >
               Capaian vs target bulan ini
             </Typography>
@@ -1113,7 +982,7 @@ const AdminDashboard = ({ data, isLoading, refetch }) => {
         </Card>
       </Box>
 
-      {/* Target Tahunan - LinearProgress */}
+      {/* Target Tahunan */}
       <Card sx={{ borderRadius: `${theme.shape.borderRadius}px` }}>
         <Box sx={{ p: { xs: 2, sm: 2.5, md: 3 }, pb: 2 }}>
           <Typography
@@ -1126,7 +995,7 @@ const AdminDashboard = ({ data, isLoading, refetch }) => {
           <Typography
             variant={isMobile ? "caption" : "body2"}
             color="text.secondary"
-            sx={{ mt: 0.5, fontWeight: 500, opacity: 0.8 }}
+            sx={{ mt: 0.5 }}
           >
             Capaian vs target tahun ini
           </Typography>
@@ -1147,9 +1016,7 @@ const AdminDashboard = ({ data, isLoading, refetch }) => {
                 label="Pendapatan"
                 actual={data?.targets?.yearly?.revenue?.actual || 0}
                 target={data?.targets?.yearly?.revenue?.target || 0}
-                percentage={
-                  data?.targets?.yearly?.revenue?.percentage || 0
-                }
+                percentage={data?.targets?.yearly?.revenue?.percentage || 0}
                 isCurrency
               />
             </Box>

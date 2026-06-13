@@ -252,23 +252,30 @@ const Header = () => {
     setSearchVal("");
   };
 
+
   /**
-   * Style untuk icon button konsisten.
-   *
-   * @type {Object}
-   */
-  const iconBtnStyle = {
-    border: "1px solid",
-    borderColor: alpha(theme.palette.divider, 0.8),
-    borderRadius: `${theme.shape.borderRadius}px`,
-    color: "text.secondary",
-    padding: { xs: "6px", sm: "8px" },
-    "&:hover": {
-      bgcolor: alpha(theme.palette.secondary.main, 0.08),
-      borderColor: alpha(theme.palette.secondary.main, 0.4),
-      color: theme.palette.secondary.main,
-    },
-  };
+ * Style untuk icon button konsisten.
+ *
+ * @type {Object}
+ */
+const iconBtnStyle = {
+  border: "1px solid",
+  borderColor: alpha(theme.palette.divider, 0.8),
+  borderRadius: `${theme.shape.borderRadius}px`,
+  color: "text.secondary",
+  minWidth: 38,
+  minHeight: 38,
+  p: 0,
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  "&:hover": {
+    bgcolor: alpha(theme.palette.secondary.main, 0.08),
+    borderColor: alpha(theme.palette.secondary.main, 0.4),
+    color: theme.palette.secondary.main,
+  },
+};
+
 
   /**
    * Style untuk icon wrapper di dalam TextField (search & close).
@@ -309,7 +316,7 @@ const Header = () => {
     gap: { xs: 0, md: 1.5 },
     cursor: "pointer",
     px: { xs: 0, md: 1.5 },
-    py: 0.5,
+    py: 1,
     borderRadius: `${theme.shape.borderRadius}px`,
     border: { xs: "none", md: `1px solid ${alpha(theme.palette.divider, 0.8)}` },
     transition: "all 0.15s ease",
@@ -705,8 +712,8 @@ const Header = () => {
                   src={getAvatarUrl(user?.fullName)}
                   variant="circular"
                   sx={{
-                    width: { xs: 32, sm: 36 },
-                    height: { xs: 32, sm: 36 },
+                    width: 32,
+                    height: 32 ,
                     flexShrink: 0,
                     fontSize: "0.875rem",
                     fontWeight: 500,
@@ -764,7 +771,7 @@ const Header = () => {
                   style={{
                     display: isSmallDevice ? "none" : "block",
                     color: theme.palette.text.secondary,
-                    marginLeft: 4,
+                    marginLeft: 8,
                     flexShrink: 0,
                   }}
                 />

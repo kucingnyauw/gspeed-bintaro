@@ -1,3 +1,9 @@
+/**
+ * Login - Login page with email OTP authentication.
+ *
+ * @component
+ * @returns {JSX.Element} Rendered login page
+ */
 import { useMutation } from "@tanstack/react-query";
 import { useDispatch } from "react-redux";
 import { signInWithEmailOtp } from "@api/supabaseApi.js";
@@ -39,9 +45,7 @@ const Login = () => {
     },
   });
 
-  const handleEmailSubmit = (email) => {
-    emailMutation.mutate(email);
-  };
+  const handleEmailSubmit = (email) => emailMutation.mutate(email);
 
   return (
     <AuthWrapper>

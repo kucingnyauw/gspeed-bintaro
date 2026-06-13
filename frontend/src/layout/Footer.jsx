@@ -28,7 +28,7 @@ const Footer = () => {
       }}
     >
       <Stack
-        direction={{ xs: "column", sm: "row" }}
+        direction="row"
         sx={{
           justifyContent: "space-between",
           alignItems: { xs: "center", sm: "center" },
