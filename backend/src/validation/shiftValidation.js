@@ -47,6 +47,10 @@ const recordCashOutSchema = Joi.object({
   }),
 });
 
+/**
+ * Schema validasi query GET /shifts
+ * Support filter: page, limit, status, cashierId, search, startDate, endDate, sortBy, sortOrder
+ */
 const getShiftsQuerySchema = Joi.object({
   page: Joi.number().integer().min(1).max(MAX_PAGE).optional().default(1).messages({
     "number.base": "Halaman harus berupa angka",
@@ -66,13 +70,32 @@ const getShiftsQuerySchema = Joi.object({
   cashierId: Joi.string().optional().messages({
     "string.empty": "ID kasir tidak boleh kosong",
   }),
-  startDate: Joi.date().optional().messages({
-    "date.base": "Tanggal mulai harus berupa tanggal yang valid",
+  search: Joi.string().max(100).optional().allow("").messages({
+    "string.max": "Pencarian maksimal 100 karakter",
   }),
-  endDate: Joi.date().min(Joi.ref("startDate")).optional().messages({
+  startDate: Joi.date().iso().optional().messages({
+    "date.base": "Tanggal mulai harus berupa tanggal yang valid",
+    "date.format": "Format tanggal mulai harus ISO (YYYY-MM-DD)",
+  }),
+  endDate: Joi.date().iso().min(Joi.ref("startDate")).optional().messages({
     "date.base": "Tanggal akhir harus berupa tanggal yang valid",
+    "date.format": "Format tanggal akhir harus ISO (YYYY-MM-DD)",
     "date.min": "Tanggal akhir tidak boleh kurang dari tanggal mulai",
   }),
+  sortBy: Joi.string()
+    .valid("openedAt", "closedAt", "cashSales", "discrepancy")
+    .optional()
+    .default("openedAt")
+    .messages({
+      "any.only": "Sort by harus openedAt, closedAt, cashSales, atau discrepancy",
+    }),
+  sortOrder: Joi.string()
+    .valid("asc", "desc")
+    .optional()
+    .default("desc")
+    .messages({
+      "any.only": "Sort order harus asc atau desc",
+    }),
 });
 
 const shiftIdParamSchema = Joi.object({

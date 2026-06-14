@@ -14,12 +14,13 @@
  * @param {Function} [props.isOptionEqualToValue] - Custom equality checker for value matching
  * @param {boolean} [props.disabled=false] - Disabled state
  * @param {string} [props.loadingText="Memuat..."] - Loading indicator text
+ * @param {number} [props.minSearch=0] - Minimum characters sebelum fetch
+ * @param {boolean} [props.error=false] - Error state
+ * @param {string} [props.helperText] - Helper text
  * @param {Object} [props.slotProps] - Additional slot props passed to Autocomplete
- *
  * @returns {JSX.Element} Rendered async autocomplete component
  *
  * @example
- * // Basic usage
  * <AsyncAutocomplete
  *   value={selectedCustomer}
  *   onChange={setSelectedCustomer}
@@ -55,17 +56,21 @@ const AsyncAutocomplete = ({
   isOptionEqualToValue = (a, b) => a?.id === b?.id,
   disabled = false,
   loadingText = "Memuat...",
+  minSearch = 0,
+  error = false,
+  helperText,
   slotProps,
 }) => {
   const theme = useTheme();
   const [input, setInput] = useState("");
 
   const debounced = useDebounce(input, debounceMs);
+  const shouldFetch = debounced.length >= minSearch;
 
   const { data, isLoading } = useQuery({
     queryKey: [...queryKey, debounced],
     queryFn: () => fetchOptions(debounced),
-    enabled: true,
+    enabled: shouldFetch,
     staleTime: STALE_TIME,
     placeholderData: (prev) => prev,
   });
@@ -74,31 +79,39 @@ const AsyncAutocomplete = ({
 
   return (
     <Autocomplete
-      size="small"
+      size="medium"
       options={options}
       value={value}
       onChange={(_, v) => onChange(v)}
       onInputChange={(_, v) => setInput(v)}
       getOptionLabel={getOptionLabel}
       isOptionEqualToValue={isOptionEqualToValue}
-      loading={isLoading}
+      loading={isLoading && shouldFetch}
       disabled={disabled}
-      noOptionsText={isLoading ? loadingText : "Tidak ditemukan"}
+      noOptionsText={
+        !shouldFetch
+          ? `Ketik minimal ${minSearch} karakter`
+          : isLoading
+          ? loadingText
+          : "Tidak ditemukan"
+      }
       loadingText={loadingText}
       filterOptions={(x) => x}
       renderInput={(params) => (
         <TextField
           {...params}
           placeholder={placeholder}
+          error={error}
+          helperText={helperText}
           slotProps={{
             ...params.slotProps,
             input: {
               ...params.slotProps?.input,
               endAdornment: (
                 <>
-                  {isLoading && (
+                  {isLoading && shouldFetch && (
                     <CircularProgress
-                      size={16}
+                      size={18}
                       sx={{ color: theme.palette.text.secondary }}
                     />
                   )}
@@ -117,7 +130,12 @@ const AsyncAutocomplete = ({
           </li>
         ))
       }
-      slotProps={{ paper: { sx: { mt: 0.5 } }, ...slotProps }}
+      slotProps={{
+        paper: {
+          sx: { mt: 0.5, borderRadius: `${theme.shape.borderRadius}px` },
+        },
+        ...slotProps,
+      }}
     />
   );
 };

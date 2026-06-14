@@ -26,7 +26,7 @@ class OrderService {
 
   /**
    * Cek apakah items memiliki tipe SERVICE
-   * @param {Array} items
+   * @param {Array<{productType?: string, product?: {type: string}}>} items
    * @returns {boolean}
    * @private
    */
@@ -56,7 +56,6 @@ class OrderService {
    * @returns {Promise<number>}
    * @private
    */
-
   async #getTaxRate() {
     const enabled = await this.#getSetting("enable_ppn", "true");
     if (enabled !== "true") return 0;
@@ -74,34 +73,114 @@ class OrderService {
   }
 
   /**
-   * Format detail kendaraan
-   * @param {Object} vehicle
+   * Format detail kendaraan untuk display
+   * @param {Object|null} vehicle
+   * @param {string} vehicle.plateNumber
+   * @param {string} [vehicle.brand]
+   * @param {string} [vehicle.model]
    * @returns {string}
    * @private
    */
   #formatVehicleInfo(vehicle) {
     if (!vehicle) return "Tidak ada kendaraan";
-    return `${vehicle.plateNumber} - ${vehicle.brand || ""} ${
-      vehicle.model || ""
-    }`.trim();
+    const parts = [vehicle.plateNumber, vehicle.brand, vehicle.model].filter(
+      Boolean
+    );
+    return parts.join(" - ");
   }
 
   /**
-   * Format daftar item untuk notifikasi
-   * @param {Array} items
+   * Format daftar item dalam Markdown table
+   * @param {Array<{productNameSnapshot?: string, product?: {name: string}, quantity: number, subtotal?: number, unitPrice?: number}>} items
    * @returns {string}
    * @private
    */
-  #formatItemList(items) {
-    if (!items || items.length === 0) return "";
-    return items
-      .map((item, index) => {
-        const name = item.productNameSnapshot || item.product?.name || "Item";
-        const qty = item.quantity > 1 ? ` (x${item.quantity})` : "";
-        const subtotal = item.subtotal || item.unitPrice * item.quantity;
-        return `  ${index + 1}. ${name}${qty} = ${Currency.toIDR(subtotal)}`;
-      })
-      .join("\n");
+  #formatItemTable(items) {
+    if (!items || items.length === 0) return "*Tidak ada item*";
+
+    let table = "| # | Item | Qty | Harga |\n";
+    table += "|---|------|-----|-------|\n";
+
+    items.forEach((item, index) => {
+      const name = item.productNameSnapshot || item.product?.name || "Item";
+      const subtotal = item.subtotal || item.unitPrice * item.quantity;
+      table += `| ${index + 1} | ${name} | ${item.quantity} | ${Currency.toIDR(
+        subtotal
+      )} |\n`;
+    });
+
+    return table;
+  }
+
+  /**
+   * Build notifikasi dalam format Markdown
+   * @param {Object} params
+   * @param {string} params.eventTitle
+   * @param {Object} params.order
+   * @param {string} params.order.orderNumber
+   * @param {string} params.order.status
+   * @param {number} params.order.subtotal
+   * @param {number} params.order.tax
+   * @param {number} params.order.total
+   * @param {Date} [params.order.createdAt]
+   * @param {string} [params.cashierName]
+   * @param {string} [params.customerName]
+   * @param {string} [params.vehicleInfo]
+   * @param {Array} [params.items]
+   * @param {number} [params.taxRate=11]
+   * @param {string} [params.note]
+   * @param {string} [params.paymentMethod]
+   * @returns {string}
+   * @private
+   */
+  #buildMarkdownNotification({
+    eventTitle,
+    order,
+    cashierName,
+    customerName,
+    vehicleInfo,
+    items,
+    taxRate = 11,
+    note,
+    paymentMethod,
+  }) {
+    const lines = [];
+
+    lines.push(`## ${eventTitle}`);
+    lines.push("");
+
+    lines.push(`**Nomor Pesanan:** ${order.orderNumber}`);
+    lines.push(`**Status:** ${order.status}`);
+    if (cashierName) lines.push(`**Kasir:** ${cashierName}`);
+    if (customerName) lines.push(`**Pelanggan:** ${customerName}`);
+    if (vehicleInfo) lines.push(`**Kendaraan:** ${vehicleInfo}`);
+    lines.push(
+      `**Tanggal:** ${DateTime.toFullID(order.createdAt || new Date())}`
+    );
+    lines.push("");
+
+    if (items && items.length > 0) {
+      lines.push("### Rincian Item");
+      lines.push(this.#formatItemTable(items));
+      lines.push("");
+    }
+
+    lines.push("### Ringkasan");
+    lines.push(`- Subtotal: ${Currency.toIDR(order.subtotal || 0)}`);
+    lines.push(`- Pajak (${taxRate}%): ${Currency.toIDR(order.tax || 0)}`);
+    lines.push(`- **Total: ${Currency.toIDR(order.total || 0)}**`);
+    lines.push("");
+
+    if (paymentMethod) {
+      lines.push(`**Pembayaran:** ${paymentMethod}`);
+      lines.push("");
+    }
+
+    if (note) {
+      lines.push(`> ${note}`);
+    }
+
+    return lines.join("\n");
   }
 
   /**
@@ -128,8 +207,14 @@ class OrderService {
   /**
    * Generate note status history menggunakan AI
    * @param {string} status - Status baru
-   * @param {string} previousStatus - Status sebelumnya
-   * @param {Object} context - Konteks tambahan (orderNumber, customerName, items, dll)
+   * @param {string|null} previousStatus - Status sebelumnya
+   * @param {Object} context - Konteks tambahan
+   * @param {string} context.orderNumber
+   * @param {string} [context.customerName]
+   * @param {string} [context.vehicleInfo]
+   * @param {number} [context.total]
+   * @param {number} [context.itemCount]
+   * @param {string} [context.cashierName]
    * @returns {Promise<string>}
    * @private
    */
@@ -140,27 +225,23 @@ class OrderService {
 Status sebelumnya: ${previousStatus || "Tidak ada (pesanan baru)"}
 Status baru: ${status}
 
-Konteks tambahan:
+Konteks:
 - Nomor Pesanan: ${context.orderNumber || "-"}
 - Pelanggan: ${context.customerName || "Tidak diketahui"}
 - Kendaraan: ${context.vehicleInfo || "Tidak ada"}
 - Total: ${context.total ? Currency.toIDR(context.total) : "-"}
 - Item: ${context.itemCount || 0} item
+${context.cashierName ? `- Kasir: ${context.cashierName}` : ""}
 
 Catatan harus:
 1. Informatif dan deskriptif
-2. Menjelaskan APA yang terjadi dan MENGAPA (jika relevan)
-3. Natural seperti ditulis oleh staff bengkel
-4. Jangan terlalu teknis
-5. JANGAN gunakan format JSON atau markup apapun
+2. Natural seperti ditulis oleh staff bengkel
+3. JANGAN gunakan format JSON atau markup apapun
 
-Contoh format yang baik:
+Contoh:
 "Pesanan dibuat oleh kasir Budi untuk servis Vespa Sprint 150."
-"Pembayaran lunas via QRIS. Motor masuk antrian pengerjaan."
 "Mekanik Andi mulai pengerjaan servis ringan dan ganti oli."
-"Servis selesai. Motor siap diambil oleh pelanggan."
-"Pesanan ditutup. Motor sudah diambil pelanggan."
-"Pesanan dibatalkan oleh kasir. Stok sparepart dikembalikan."`;
+"Pesanan ditutup. Motor sudah diambil pelanggan."`;
 
       const response = await axios.post(
         "https://openrouter.ai/api/v1/chat/completions",
@@ -201,7 +282,7 @@ Contoh format yang baik:
   /**
    * Fallback note jika AI gagal
    * @param {string} status
-   * @param {string} previousStatus
+   * @param {string|null} previousStatus
    * @returns {string}
    * @private
    */
@@ -212,7 +293,7 @@ Contoh format yang baik:
       IN_PROGRESS: "Mekanik mulai mengerjakan pesanan.",
       COMPLETED: "Pengerjaan selesai. Menunggu penutupan pesanan.",
       CLOSED: "Pesanan ditutup. Motor sudah diambil pelanggan.",
-      CANCELLED: "Pesanan dibatalkan.",
+      CANCELLED: "Pesanan dibatalkan. Stok sparepart dikembalikan.",
     };
     return (
       notes[status] || `Status diubah dari "${previousStatus}" ke "${status}".`
@@ -222,8 +303,11 @@ Contoh format yang baik:
   /**
    * Validasi apakah pesanan dapat diedit
    * @param {Object} order
+   * @param {string} order.status
+   * @param {string} order.orderNumber
    * @param {string} action
-   * @throws {ApiError}
+   * @throws {ApiError} notFound - Jika order tidak ditemukan
+   * @throws {ApiError} conflict - Jika order sudah selesai/dibatalkan
    * @private
    */
   #validateOrderEditable(order, action = "diubah") {
@@ -246,8 +330,13 @@ Contoh format yang baik:
   /**
    * Validasi produk dan stok
    * @param {Object} product
+   * @param {string} product.name
+   * @param {string} product.type
+   * @param {number} product.stock
+   * @param {boolean} product.isActive
    * @param {number} quantity
-   * @throws {ApiError}
+   * @throws {ApiError} notFound - Jika produk tidak ditemukan
+   * @throws {ApiError} badRequest - Jika produk tidak aktif atau stok kurang
    * @private
    */
   #validateProduct(product, quantity) {
@@ -268,7 +357,7 @@ Contoh format yang baik:
 
   /**
    * Menghitung subtotal dan memproses item pesanan
-   * @param {Array} items
+   * @param {Array<{productId: string, quantity: number}>} items
    * @returns {Promise<{subtotal: number, processedItems: Array}>}
    * @private
    */
@@ -304,7 +393,7 @@ Contoh format yang baik:
    * Mendapatkan shift aktif kasir
    * @param {string} cashierId
    * @returns {Promise<Object>}
-   * @throws {ApiError}
+   * @throws {ApiError} badRequest - Jika tidak ada shift aktif
    * @private
    */
   async #getActiveShift(cashierId) {
@@ -332,26 +421,105 @@ Contoh format yang baik:
   }
 
   /**
-   * Mengembalikan stok sparepart yang dibatalkan secara batch
-   * @param {Array} sparepartItems
-   * @param {Object} tx
+   * Kurangi stok sparepart dan buat stock movement
+   * @param {Array<{productId: string, quantity: number}>} sparepartItems
+   * @param {Object} tx - Prisma transaction client
+   * @param {string} orderId - ID order
+   * @param {string} orderNumber - Nomor order
+   * @param {string} recordedById - User ID
    * @returns {Promise<void>}
    * @private
    */
-  async #restoreSparePartStock(sparepartItems, tx) {
-    const restorePromises = sparepartItems.map((item) =>
-      tx.product.update({
-        where: { id: item.productId },
-        data: { stock: { increment: item.quantity } },
+  async #deductSparePartStock(
+    sparepartItems,
+    tx,
+    orderId,
+    orderNumber,
+    recordedById
+  ) {
+    if (!sparepartItems.length) return;
+
+    await Promise.all(
+      sparepartItems.map((item) =>
+        tx.product.update({
+          where: { id: item.productId },
+          data: { stock: { decrement: item.quantity } },
+        })
+      )
+    );
+
+    const createdItems = await tx.orderItem.findMany({
+      where: { orderId },
+      select: { id: true, productId: true, quantity: true },
+    });
+
+    await Promise.all(
+      sparepartItems.map((item) => {
+        const orderItem = createdItems.find(
+          (oi) =>
+            oi.productId === item.productId && oi.quantity === item.quantity
+        );
+        return tx.stockMovement.create({
+          data: {
+            productId: item.productId,
+            type: "OUT",
+            sourceType: "SALE",
+            quantity: item.quantity,
+            orderItemId: orderItem?.id || null,
+            recordedById,
+            note: `Penjualan - Order #${orderNumber}`,
+          },
+        });
       })
     );
-    await Promise.all(restorePromises);
   }
 
   /**
-   * Menghitung estimasi total pesanan
-   * @param {Array} items
-   * @returns {Promise<Object>}
+   * Kembalikan stok sparepart dan buat stock movement return
+   * @param {Array<{productId: string, quantity: number, id: string}>} sparepartItems
+   * @param {Object} tx - Prisma transaction client
+   * @param {string} orderNumber - Nomor order
+   * @param {string} recordedById - User ID
+   * @returns {Promise<void>}
+   * @private
+   */
+  async #restoreSparePartStock(sparepartItems, tx, orderNumber, recordedById) {
+    if (!sparepartItems.length) return;
+
+    await Promise.all(
+      sparepartItems.map((item) =>
+        tx.product.update({
+          where: { id: item.productId },
+          data: { stock: { increment: item.quantity } },
+        })
+      )
+    );
+
+    await Promise.all(
+      sparepartItems.map((item) =>
+        tx.stockMovement.create({
+          data: {
+            productId: item.productId,
+            type: "IN",
+            sourceType: "RETURN",
+            quantity: item.quantity,
+            orderItemId: item.id,
+            recordedById,
+            note: `Retur dari pembatalan order #${orderNumber}`,
+          },
+        })
+      )
+    );
+  }
+
+  // ==========================================================================
+  // PUBLIC METHODS
+  // ==========================================================================
+
+  /**
+   * Menghitung estimasi total pesanan (tanpa menyimpan)
+   * @param {Array<{productId: string, quantity: number}>} items
+   * @returns {Promise<{subtotal: number, tax: number, total: number, items: Array}>}
    */
   async calculateTotal(items) {
     const productIds = items.map((item) => item.productId);
@@ -398,6 +566,9 @@ Contoh format yang baik:
    * Membuat pesanan baru (DRAFT)
    * @param {string} cashierId
    * @param {Object} payload
+   * @param {string} [payload.customerId]
+   * @param {string} [payload.vehicleId]
+   * @param {Array<{productId: string, quantity: number}>} payload.items
    * @returns {Promise<Object>}
    */
   async createOrder(cashierId, payload) {
@@ -424,7 +595,6 @@ Contoh format yang baik:
     const sparepartItems = processedItems.filter(
       (i) => i.productType === "SPAREPART"
     );
-    const hasSparepart = sparepartItems.length > 0;
 
     const vehicle = vehicleId
       ? await prisma.vehicle.findUnique({
@@ -439,16 +609,12 @@ Contoh format yang baik:
         })
       : null;
 
-    const context = {
+    const aiNote = await this.#generateStatusNote("DRAFT", null, {
       orderNumber,
       customerName: customer?.name || "Umum",
       vehicleInfo: this.#formatVehicleInfo(vehicle),
       total,
       itemCount: processedItems.length,
-    };
-
-    const aiNote = await this.#generateStatusNote("DRAFT", null, {
-      ...context,
       cashierName: cashier?.fullName || "-",
     });
 
@@ -474,75 +640,37 @@ Contoh format yang baik:
             })),
           },
           histories: {
-            create: {
-              status: "DRAFT",
-              changedById: cashierId,
-              note: aiNote,
-            },
-          },
-        },
-        select: {
-          id: true,
-          orderNumber: true,
-          status: true,
-          subtotal: true,
-          tax: true,
-          total: true,
-          createdAt: true,
-          customer: { select: { name: true } },
-          vehicle: { select: { plateNumber: true, brand: true, model: true } },
-          items: {
-            select: {
-              id: true,
-              productId: true,
-              productNameSnapshot: true,
-              quantity: true,
-              unitPrice: true,
-              unitCostSnapshot: true,
-              subtotal: true,
-            },
+            create: { status: "DRAFT", changedById: cashierId, note: aiNote },
           },
         },
       });
 
-      if (hasSparepart) {
-        await Promise.all(
-          sparepartItems.map((item) =>
-            tx.product.update({
-              where: { id: item.productId },
-              data: { stock: { decrement: item.quantity } },
-            })
-          )
-        );
-      }
+      await this.#deductSparePartStock(
+        sparepartItems,
+        tx,
+        newOrder.id,
+        orderNumber,
+        cashierId
+      );
+
       await tx.shift.update({
         where: { id: activeShift.id },
         data: { cashSales: { increment: total } },
       });
+
       return newOrder;
     });
 
-    const itemList = this.#formatItemList(processedItems);
-    const notificationMessage = [
-      `Pesanan Baru Dibuat`,
-      ``,
-      `Nomor Pesanan  : #${orderNumber}`,
-      `Kasir          : ${cashier?.fullName || "-"}`,
-      `Pelanggan      : ${context.customerName}`,
-      `Kendaraan      : ${context.vehicleInfo}`,
-      ``,
-      `Rincian Item (${processedItems.length}):`,
-      `${itemList}`,
-      ``,
-      `Subtotal       : ${Currency.toIDR(subtotal)}`,
-      `Pajak (${taxRate}%)   : ${Currency.toIDR(taxAmount)}`,
-      `Total          : ${Currency.toIDR(total)}`,
-      ``,
-      `Status         : DRAFT`,
-      `Waktu          : ${DateTime.toFullID(new Date())}`,
-      ``,
-      `${aiNote}`,
-    ].join("\n");
+    const notificationMessage = this.#buildMarkdownNotification({
+      eventTitle: "Pesanan Baru Dibuat",
+      order,
+      cashierName: cashier?.fullName || "-",
+      customerName: customer?.name || "Umum",
+      vehicleInfo: this.#formatVehicleInfo(vehicle),
+      items: processedItems,
+      taxRate,
+      note: aiNote,
+    });
 
     await this.#sendNotification(
       cashierId,
@@ -597,7 +725,7 @@ Contoh format yang baik:
   }
 
   /**
-   * Membatalkan pesanan
+   * Membatalkan pesanan (restore stok + stock movement + hapus payment)
    * @param {string} orderId
    * @param {string} userId
    * @returns {Promise<Object>}
@@ -629,9 +757,12 @@ Contoh format yang baik:
     );
 
     await prisma.$transaction(async (tx) => {
-      if (sparepartItems.length > 0) {
-        await this.#restoreSparePartStock(sparepartItems, tx);
-      }
+      await this.#restoreSparePartStock(
+        sparepartItems,
+        tx,
+        order.orderNumber,
+        changedById
+      );
 
       await tx.order.update({
         where: { id: order.id },
@@ -658,15 +789,13 @@ Contoh format yang baik:
 
     await this.#invalidateOrderCache(order.orderNumber);
 
-    const notificationMessage = [
-      `Pesanan Dibatalkan`,
-      ``,
-      `Nomor Pesanan  : #${order.orderNumber}`,
-      `Total          : ${Currency.toIDR(order.total)}`,
-      `Waktu          : ${DateTime.toFullID(new Date())}`,
-      ``,
-      `${cancelNote}`,
-    ].join("\n");
+    const notificationMessage = this.#buildMarkdownNotification({
+      eventTitle: "Pesanan Dibatalkan",
+      order,
+      customerName: order.customer?.name || "Umum",
+      vehicleInfo: this.#formatVehicleInfo(order.vehicle),
+      note: cancelNote,
+    });
 
     await this.#sendNotification(
       order.cashierId,
@@ -715,26 +844,14 @@ Contoh format yang baik:
       const result = await tx.order.update({
         where: { id: orderId },
         data: { status, updatedAt: new Date(), ...timestampUpdate },
-        select: {
-          id: true,
-          orderNumber: true,
-          status: true,
-          startedAt: true,
-          completedAt: true,
-          closedAt: true,
-          updatedAt: true,
-        },
       });
-
       await tx.orderStatusHistory.create({
         data: { orderId, status, changedById, note: statusNote },
       });
-
       return result;
     });
 
     await this.#invalidateOrderCache(order.orderNumber);
-
     logger.info("Status pesanan diperbarui", { orderId, newStatus: status });
     return updated;
   }
@@ -773,33 +890,22 @@ Contoh format yang baik:
       const result = await tx.order.update({
         where: { id: orderId },
         data: { status: "CLOSED", closedAt: new Date(), updatedAt: new Date() },
-        select: {
-          id: true,
-          orderNumber: true,
-          status: true,
-          closedAt: true,
-          updatedAt: true,
-        },
       });
-
       await tx.orderStatusHistory.create({
         data: { orderId, status: "CLOSED", changedById, note: closeNote },
       });
-
       return result;
     });
 
     await this.#invalidateOrderCache(order.orderNumber);
 
-    const notificationMessage = [
-      `Pesanan Ditutup`,
-      ``,
-      `Nomor Pesanan  : #${order.orderNumber}`,
-      `Total          : ${Currency.toIDR(order.total)}`,
-      `Waktu Tutup    : ${DateTime.toFullID(updated.closedAt)}`,
-      ``,
-      `${closeNote}`,
-    ].join("\n");
+    const notificationMessage = this.#buildMarkdownNotification({
+      eventTitle: "Pesanan Ditutup",
+      order: { ...order, ...updated },
+      customerName: order.customer?.name || "Umum",
+      vehicleInfo: this.#formatVehicleInfo(order.vehicle),
+      note: closeNote,
+    });
 
     await this.#sendNotification(
       order.cashierId,
@@ -813,7 +919,7 @@ Contoh format yang baik:
   }
 
   /**
-   * Melacak riwayat lengkap pesanan
+   * Melacak riwayat lengkap pesanan (dengan cache)
    * @param {string} orderNumber
    * @returns {Promise<Object>}
    */

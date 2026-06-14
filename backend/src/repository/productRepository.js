@@ -50,10 +50,17 @@ class ProductRepository {
     stock: true,
     isActive: true,
     createdAt: true,
+    updatedAt: true,
     image: {
       select: {
         id: true,
         path: true,
+      },
+    },
+    _count: {
+      select: {
+        orderItems: true,
+        movements: true,
       },
     },
   };
@@ -63,15 +70,13 @@ class ProductRepository {
    * @param {Object} data - Data produk
    * @param {string} data.name - Nama produk
    * @param {string} data.sku - Kode SKU
-   * @param {string} [data.type] - Tipe produk
+   * @param {string} [data.type="SPAREPART"] - Tipe produk
    * @param {string} [data.description] - Deskripsi
    * @param {number} data.price - Harga jual
-   * @param {number} [data.cost] - Harga modal
-   * @param {number} [data.stock] - Stok awal
+   * @param {number} [data.cost=0] - Harga modal
+   * @param {number} [data.stock=0] - Stok awal
    * @param {string} [data.imageId] - ID file gambar
    * @returns {Promise<Object>} Produk yang berhasil dibuat
-   * @complexity Before: O(1) - Single insert
-   * @complexity After: O(1) - No change needed
    */
   async create(data) {
     return prisma.product.create({
@@ -91,11 +96,9 @@ class ProductRepository {
   }
 
   /**
-   * Mencari produk berdasarkan ID
+   * Mencari produk berdasarkan ID dengan relasi lengkap
    * @param {string} id - ID produk
-   * @returns {Promise<Object|null>} Data produk atau null
-   * @complexity Before: O(log n) - Primary key lookup
-   * @complexity After: O(log n) - No change needed
+   * @returns {Promise<Object|null>} Data produk atau null jika tidak ditemukan
    */
   async findById(id) {
     return prisma.product.findUnique({
@@ -105,11 +108,9 @@ class ProductRepository {
   }
 
   /**
-   * Mencari produk berdasarkan SKU
-   * @param {string} sku - Kode SKU
-   * @returns {Promise<Object|null>} Data produk atau null
-   * @complexity Before: O(log n) - Unique index lookup
-   * @complexity After: O(log n) - No change needed
+   * Mencari produk berdasarkan SKU dengan relasi lengkap
+   * @param {string} sku - Kode SKU produk
+   * @returns {Promise<Object|null>} Data produk atau null jika tidak ditemukan
    */
   async findBySku(sku) {
     return prisma.product.findUnique({
@@ -119,21 +120,35 @@ class ProductRepository {
   }
 
   /**
-   * Mencari daftar produk dengan filter dan pagination
+   * Mencari daftar produk dengan filter, sorting, dan pagination
    * @param {Object} [query={}] - Parameter query
-   * @param {number} [query.page] - Nomor halaman
-   * @param {number} [query.limit] - Jumlah item per halaman
-   * @param {string} [query.search] - Pencarian berdasarkan nama atau SKU
-   * @param {string} [query.type] - Filter berdasarkan tipe
+   * @param {number} [query.page=1] - Nomor halaman
+   * @param {number} [query.limit=10] - Jumlah item per halaman
+   * @param {string} [query.search] - Pencarian berdasarkan nama, SKU, atau deskripsi
+   * @param {string} [query.type] - Filter berdasarkan tipe (SPAREPART/SERVICE)
    * @param {boolean|string} [query.isActive] - Filter status aktif
-   * @param {number|string} [query.lowStockThreshold] - Filter stok rendah
+   * @param {number|string} [query.lowStockThreshold] - Filter stok rendah (hanya SPAREPART)
    * @param {number|string} [query.minPrice] - Filter harga minimum
    * @param {number|string} [query.maxPrice] - Filter harga maksimum
-   * @param {string} [query.sortBy] - Field sorting
-   * @param {string} [query.sortOrder] - Arah sorting
-   * @returns {Promise<{data: Array, metadata: Object}>} Data produk dan metadata
-   * @complexity Before: O(n) - Multiple OR conditions with offset pagination
-   * @complexity After: O(log n) - Leverages indexes on name, sku, type, price
+   * @param {string} [query.sortBy] - Field sorting (name/price/stock/createdAt)
+   * @param {string} [query.sortOrder] - Arah sorting (asc/desc)
+   * @returns {Promise<{data: Array, metadata: Object}>} Data produk dan metadata pagination
+   *
+   * @example
+   * // Semua produk aktif
+   * await productRepo.findMany({ isActive: true });
+   *
+   * @example
+   * // Cari sparepart dengan stok rendah
+   * await productRepo.findMany({ type: "SPAREPART", lowStockThreshold: 5 });
+   *
+   * @example
+   * // Cari berdasarkan nama
+   * await productRepo.findMany({ search: "kampas rem" });
+   *
+   * @example
+   * // Filter harga dan sorting
+   * await productRepo.findMany({ minPrice: 50000, maxPrice: 200000, sortBy: "price", sortOrder: "asc" });
    */
   async findMany(query = {}) {
     const limit = query.limit || 10;
@@ -144,16 +159,23 @@ class ProductRepository {
       where.OR = [
         { name: { contains: query.search, mode: "insensitive" } },
         { sku: { contains: query.search, mode: "insensitive" } },
+        { description: { contains: query.search, mode: "insensitive" } },
       ];
     }
-    if (query.type) where.type = query.type;
+
+    if (query.type) {
+      where.type = query.type;
+    }
+
     if (query.isActive !== undefined) {
       where.isActive = query.isActive === "true" || query.isActive === true;
     }
+
     if (query.lowStockThreshold) {
       where.type = "SPAREPART";
       where.stock = { lte: parseInt(query.lowStockThreshold) };
     }
+
     if (query.minPrice || query.maxPrice) {
       where.price = {};
       if (query.minPrice) where.price.gte = parseInt(query.minPrice);
@@ -161,9 +183,7 @@ class ProductRepository {
     }
 
     const validSortFields = ["name", "price", "stock", "createdAt"];
-    const sortBy = validSortFields.includes(query.sortBy)
-      ? query.sortBy
-      : "createdAt";
+    const sortBy = validSortFields.includes(query.sortBy) ? query.sortBy : "createdAt";
     const sortOrder = query.sortOrder === "asc" ? "asc" : "desc";
 
     const [total, data] = await Promise.all([
@@ -186,10 +206,16 @@ class ProductRepository {
   /**
    * Mengupdate data produk
    * @param {string} id - ID produk
-   * @param {Object} data - Data yang akan diupdate
-   * @returns {Promise<Object>} Produk yang sudah diupdate
-   * @complexity Before: O(log n) - Primary key update
-   * @complexity After: O(log n) - No change needed
+   * @param {Object} data - Data yang akan diupdate (partial)
+   * @param {string} [data.name] - Nama baru
+   * @param {string} [data.description] - Deskripsi baru
+   * @param {string} [data.type] - Tipe baru
+   * @param {number} [data.price] - Harga jual baru
+   * @param {number} [data.cost] - Harga modal baru
+   * @param {number} [data.stock] - Stok baru
+   * @param {boolean} [data.isActive] - Status aktif baru
+   * @param {string} [data.imageId] - ID gambar baru
+   * @returns {Promise<Object>} Produk yang sudah diupdate dengan relasi lengkap
    */
   async update(id, data) {
     return prisma.product.update({
@@ -202,10 +228,8 @@ class ProductRepository {
   /**
    * Mengupdate status aktif produk
    * @param {string} id - ID produk
-   * @param {boolean} isActive - Status aktif
-   * @returns {Promise<Object>} Produk yang sudah diupdate
-   * @complexity Before: O(log n) - Primary key update
-   * @complexity After: O(log n) - No change needed
+   * @param {boolean} isActive - Status aktif baru
+   * @returns {Promise<Object>} Produk dengan status terbaru
    */
   async updateStatus(id, isActive) {
     return prisma.product.update({
@@ -225,8 +249,6 @@ class ProductRepository {
    * Menonaktifkan produk (soft delete)
    * @param {string} id - ID produk
    * @returns {Promise<Object>} Produk yang sudah dinonaktifkan
-   * @complexity Before: O(log n) - Primary key update
-   * @complexity After: O(log n) - No change needed
    */
   async deactivate(id) {
     return prisma.product.update({
@@ -246,8 +268,6 @@ class ProductRepository {
    * Mengaktifkan kembali produk yang dinonaktifkan
    * @param {string} id - ID produk
    * @returns {Promise<Object>} Produk yang sudah diaktifkan
-   * @complexity Before: O(log n) - Primary key update
-   * @complexity After: O(log n) - No change needed
    */
   async activate(id) {
     return prisma.product.update({
@@ -264,13 +284,11 @@ class ProductRepository {
   }
 
   /**
-   * Mengupdate stok produk
+   * Mengupdate stok produk secara atomic (increment/decrement)
    * @param {string} id - ID produk
    * @param {number} quantity - Jumlah perubahan
-   * @param {boolean} [increment=true] - true untuk tambah, false untuk kurang
-   * @returns {Promise<Object>} Produk yang sudah diupdate
-   * @complexity Before: O(log n) - Atomic increment/decrement
-   * @complexity After: O(log n) - No change needed
+   * @param {boolean} [increment=true] - true untuk tambah stok, false untuk kurang
+   * @returns {Promise<Object>} Produk dengan stok terbaru
    */
   async updateStock(id, quantity, increment = true) {
     return prisma.product.update({
@@ -289,12 +307,10 @@ class ProductRepository {
   }
 
   /**
-   * Mengecek apakah SKU sudah digunakan
-   * @param {string} sku - SKU yang dicek
-   * @param {string} [excludeId] - ID produk yang dikecualikan
-   * @returns {Promise<boolean>} Status ketersediaan SKU
-   * @complexity Before: O(log n) - Unique index lookup
-   * @complexity After: O(log n) - No change needed
+   * Mengecek apakah SKU sudah digunakan oleh produk lain
+   * @param {string} sku - SKU yang akan dicek
+   * @param {string} [excludeId] - ID produk yang dikecualikan (untuk update)
+   * @returns {Promise<boolean>} true jika SKU sudah ada
    */
   async isSkuExists(sku, excludeId = null) {
     const where = { sku };
@@ -309,11 +325,31 @@ class ProductRepository {
   }
 
   /**
+   * Mengecek apakah produk memiliki relasi data (order items atau stock movements)
+   * @param {string} id - ID produk
+   * @returns {Promise<boolean>} true jika produk memiliki relasi
+   */
+  async hasRelations(id) {
+    const product = await prisma.product.findUnique({
+      where: { id },
+      select: {
+        _count: {
+          select: {
+            orderItems: true,
+            movements: true,
+          },
+        },
+      },
+    });
+
+    if (!product) return false;
+    return product._count.orderItems > 0 || product._count.movements > 0;
+  }
+
+  /**
    * Mendapatkan produk dengan stok rendah
-   * @param {number} [threshold=5] - Batas threshold
-   * @returns {Promise<Array>} Daftar produk stok rendah
-   * @complexity Before: O(n) - Full scan with filter
-   * @complexity After: O(log n) - Uses composite index (type, isActive, stock)
+   * @param {number} [threshold=5] - Batas threshold stok rendah
+   * @returns {Promise<Array>} Daftar produk sparepart dengan stok di bawah threshold
    */
   async getLowStockProducts(threshold = 5) {
     return prisma.product.findMany({
@@ -335,13 +371,11 @@ class ProductRepository {
   }
 
   /**
-   * Mencatat riwayat harga produk
+   * Mencatat riwayat perubahan harga produk
    * @param {string} productId - ID produk
-   * @param {number} price - Harga baru
+   * @param {number} price - Harga jual baru
    * @param {number} cost - Harga modal baru
    * @returns {Promise<void>}
-   * @complexity Before: O(1) - Single insert
-   * @complexity After: O(1) - No change needed
    */
   async createPriceHistory(productId, price, cost) {
     await prisma.productPriceHistory.create({
@@ -355,12 +389,10 @@ class ProductRepository {
   }
 
   /**
-   * Mencari produk service
+   * Mencari produk service yang aktif
    * @param {Object} [query={}] - Parameter query
-   * @param {boolean} [query.isActive] - Filter status aktif
+   * @param {boolean} [query.isActive=true] - Filter status aktif
    * @returns {Promise<Array>} Daftar produk service
-   * @complexity Before: O(n) - Full scan with type filter
-   * @complexity After: O(log n) - Uses composite index (type, isActive)
    */
   async findServices(query = {}) {
     const where = {
@@ -382,13 +414,11 @@ class ProductRepository {
   }
 
   /**
-   * Mencari produk sparepart
+   * Mencari produk sparepart yang aktif
    * @param {Object} [query={}] - Parameter query
-   * @param {boolean} [query.inStockOnly] - Hanya stok tersedia
-   * @param {boolean} [query.isActive] - Filter status aktif
+   * @param {boolean} [query.inStockOnly=false] - Hanya produk dengan stok tersedia
+   * @param {boolean} [query.isActive=true] - Filter status aktif
    * @returns {Promise<Array>} Daftar produk sparepart
-   * @complexity Before: O(n) - Full scan with type and stock filters
-   * @complexity After: O(log n) - Uses composite index (type, isActive, stock)
    */
   async findSpareparts(query = {}) {
     const where = {
@@ -421,14 +451,12 @@ class ProductRepository {
   }
 
   /**
-   * Menonaktifkan banyak produk sekaligus
-   * @param {string[]} ids - Array ID produk
-   * @returns {Promise<{success: Array, failed: Array}>} Hasil penonaktifan
-   * @complexity O(n) - Batch deactivate dengan partial success tracking
+   * Menonaktifkan banyak produk sekaligus dengan partial success
+   * @param {string[]} ids - Array ID produk yang akan dinonaktifkan
+   * @returns {Promise<{success: string[], failed: Array<{id: string, error: string}>}>}
    */
   async deactivateMany(ids) {
     const results = { success: [], failed: [] };
-
     const batchSize = 10;
 
     for (let i = 0; i < ids.length; i += batchSize) {
@@ -439,7 +467,6 @@ class ProductRepository {
           where: { id: { in: batch } },
           data: { isActive: false, updatedAt: new Date() },
         });
-
         results.success.push(...batch);
       } catch (error) {
         for (const id of batch) {
@@ -448,7 +475,6 @@ class ProductRepository {
               where: { id },
               data: { isActive: false, updatedAt: new Date() },
             });
-
             results.success.push(id);
           } catch (individualError) {
             results.failed.push({ id, error: individualError.message });
@@ -461,14 +487,12 @@ class ProductRepository {
   }
 
   /**
-   * Mengaktifkan banyak produk sekaligus
-   * @param {string[]} ids - Array ID produk
-   * @returns {Promise<{success: Array, failed: Array}>} Hasil pengaktifan
-   * @complexity O(n) - Batch activate dengan partial success tracking
+   * Mengaktifkan banyak produk sekaligus dengan partial success
+   * @param {string[]} ids - Array ID produk yang akan diaktifkan
+   * @returns {Promise<{success: string[], failed: Array<{id: string, error: string}>}>}
    */
   async activateMany(ids) {
     const results = { success: [], failed: [] };
-
     const batchSize = 10;
 
     for (let i = 0; i < ids.length; i += batchSize) {
@@ -479,7 +503,6 @@ class ProductRepository {
           where: { id: { in: batch } },
           data: { isActive: true, updatedAt: new Date() },
         });
-
         results.success.push(...batch);
       } catch (error) {
         for (const id of batch) {
@@ -488,7 +511,6 @@ class ProductRepository {
               where: { id },
               data: { isActive: true, updatedAt: new Date() },
             });
-
             results.success.push(id);
           } catch (individualError) {
             results.failed.push({ id, error: individualError.message });

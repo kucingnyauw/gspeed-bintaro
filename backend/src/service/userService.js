@@ -12,24 +12,8 @@ import JWT from "#shared/utils/jwt.js";
  * Menangani autentikasi, manajemen user, notifikasi, dan operasi bulk
  *
  * @class UserService
- * @description
- * Fitur utama:
- * - Login dengan JWT token generation
- * - Manajemen user (CRUD) dengan validasi role dan data
- * - Pengiriman Magic Link via Supabase Auth
- * - Notifikasi user dan admin
- * - Operasi bulk (activate/deactivate banyak user)
- * - Caching dengan CacheManager
- *
- * @example
- * const userService = new UserService();
- * const { user, tokens } = await userService.login("admin@bengkel.com");
  */
 class UserService {
-  /**
-   * Inisialisasi UserService dengan repository dan dependencies
-   * @constructor
-   */
   constructor() {
     this.userRepo = new UserRepository();
     this.shiftRepo = new ShiftRepository();
@@ -39,7 +23,7 @@ class UserService {
 
   /**
    * Mengirim Magic Link ke email user via Supabase Auth
-   * @param {string} email - Email tujuan pengiriman Magic Link
+   * @param {string} email - Email tujuan
    * @returns {Promise<void>}
    * @throws {ApiError} 429 - Rate limit exceeded
    * @throws {ApiError} 500 - Gagal mengirim email
@@ -57,18 +41,11 @@ class UserService {
       if (error) {
         if (error.code === "over_email_send_rate_limit") {
           throw ApiError.tooManyRequests({
-            message:
-              "Terlalu banyak permintaan pengiriman email. Silakan coba lagi dalam beberapa saat.",
+            message: "Terlalu banyak permintaan pengiriman email. Silakan coba lagi dalam beberapa saat.",
           });
         }
-        logger.warn("Gagal mengirim Magic Link", {
-          email,
-          error: error.message,
-          code: error.code,
-        });
-        throw ApiError.internal({
-          message: "Gagal mengirim email verifikasi. Silakan coba lagi.",
-        });
+        logger.warn("Gagal mengirim Magic Link", { email, error: error.message, code: error.code });
+        throw ApiError.internal({ message: "Gagal mengirim email verifikasi. Silakan coba lagi." });
       }
 
       logger.info("Magic Link dikirim", { email });
@@ -76,24 +53,20 @@ class UserService {
       if (err instanceof ApiError) throw err;
       if (err?.code === "over_email_send_rate_limit" || err?.status === 429) {
         throw ApiError.tooManyRequests({
-          message:
-            "Terlalu banyak permintaan pengiriman email. Silakan coba lagi dalam beberapa saat.",
+          message: "Terlalu banyak permintaan pengiriman email. Silakan coba lagi dalam beberapa saat.",
         });
       }
-      logger.error("Error saat mengirim Magic Link", {
-        email,
-        error: err.message,
-      });
+      logger.error("Error saat mengirim Magic Link", { email, error: err.message });
       throw ApiError.internal({ message: "Gagal mengirim email verifikasi." });
     }
   }
 
   /**
    * Mengirim notifikasi ke user tertentu
-   * @param {string} userId - ID user penerima notifikasi
-   * @param {string} title - Judul notifikasi
-   * @param {string} message - Pesan notifikasi
-   * @param {string} [type="INFO"] - Tipe notifikasi (INFO/SUCCESS/WARNING/ERROR)
+   * @param {string} userId
+   * @param {string} title
+   * @param {string} message
+   * @param {string} [type="INFO"]
    * @returns {Promise<void>}
    * @private
    */
@@ -102,18 +75,15 @@ class UserService {
     try {
       await this.notifRepo.create({ title, message, type, userId });
     } catch (err) {
-      logger.warn("Gagal mengirim notifikasi user", {
-        userId,
-        error: err.message,
-      });
+      logger.warn("Gagal mengirim notifikasi user", { userId, error: err.message });
     }
   }
 
   /**
    * Mengirim notifikasi ke semua admin aktif
-   * @param {string} title - Judul notifikasi
-   * @param {string} message - Pesan notifikasi
-   * @param {string} [type="INFO"] - Tipe notifikasi
+   * @param {string} title
+   * @param {string} message
+   * @param {string} [type="INFO"]
    * @returns {Promise<void>}
    * @private
    */
@@ -135,8 +105,8 @@ class UserService {
 
   /**
    * Mendapatkan label role dalam Bahasa Indonesia
-   * @param {string} role - Role user
-   * @returns {string} Label role
+   * @param {string} role
+   * @returns {string}
    * @private
    */
   #getRoleLabel(role) {
@@ -146,26 +116,24 @@ class UserService {
 
   /**
    * Validasi role yang bisa dibuat
-   * @param {string} role - Role yang akan divalidasi
-   * @throws {ApiError} 403 - Role tidak diizinkan
+   * @param {string} role
+   * @throws {ApiError} 403
    * @private
    */
   #validateCreatableRole(role) {
     const allowedRoles = ["CASHIER", "MECHANIC"];
     if (!allowedRoles.includes(role)) {
       throw ApiError.forbidden({
-        message: `Tidak dapat membuat user dengan role ${role}. Role yang diizinkan: ${allowedRoles.join(
-          ", "
-        )}.`,
+        message: `Tidak dapat membuat user dengan role ${role}. Role yang diizinkan: ${allowedRoles.join(", ")}.`,
       });
     }
   }
 
   /**
    * Validasi role yang bisa diupdate
-   * @param {string} currentRole - Role saat ini
-   * @param {string} newRole - Role baru
-   * @throws {ApiError} 403 - Role tidak valid atau mencoba mengubah admin
+   * @param {string} currentRole
+   * @param {string} newRole
+   * @throws {ApiError} 403
    * @private
    */
   #validateUpdatableRole(currentRole, newRole) {
@@ -175,90 +143,18 @@ class UserService {
     const allowedRoles = ["CASHIER", "MECHANIC"];
     if (newRole && !allowedRoles.includes(newRole) && newRole !== "ADMIN") {
       throw ApiError.forbidden({
-        message: `Role '${newRole}' tidak valid. Role yang diizinkan: ${allowedRoles.join(
-          ", "
-        )}.`,
+        message: `Role '${newRole}' tidak valid. Role yang diizinkan: ${allowedRoles.join(", ")}.`,
       });
     }
   }
 
   /**
    * Login untuk mendapatkan JWT token
-   * Generate JWT token untuk user yang sudah terdaftar
-   *
-   * @param {string} email - Email user yang akan login
-   * @returns {Promise<{user: Object, tokens: Object}>} User data dan token pair
-   * @returns {Object} return.user - Data user
-   * @returns {string} return.user.id - User ID
-   * @returns {string} return.user.email - Email user
-   * @returns {string} return.user.fullName - Nama lengkap user
-   * @returns {string|null} return.user.phone - Nomor telepon user
-   * @returns {string} return.user.role - Role user (ADMIN/CASHIER/MECHANIC)
-   * @returns {boolean} return.user.isActive - Status aktif user
-   * @returns {boolean} return.user.isAuthenticated - Status autentikasi user
-   * @returns {string} return.user.createdAt - Tanggal pembuatan
-   * @returns {string} return.user.updatedAt - Tanggal update terakhir
-   * @returns {Object} return.tokens - Token pair
-   * @returns {string} return.tokens.accessToken - JWT access token (expires in 15m)
-   * @returns {string} return.tokens.refreshToken - JWT refresh token (expires in 7d)
-   *
-   * @throws {ApiError} 400 - LOGIN_EMAIL_REQUIRED - Jika email tidak diisi
-   * @throws {ApiError} 400 - LOGIN_INVALID_EMAIL_FORMAT - Jika format email tidak valid
-   * @throws {ApiError} 404 - LOGIN_USER_NOT_FOUND - Jika user tidak ditemukan
-   * @throws {ApiError} 403 - LOGIN_USER_INACTIVE - Jika user tidak aktif
-   * @throws {ApiError} 500 - LOGIN_TOKEN_GENERATE_ERROR - Jika gagal generate token
-   *
-   * @example
-   * // Login dengan email
-   * const { user, tokens } = await userService.login("admin@bengkel.com");
-   * console.log(user.fullName); // "Admin User"
-   * console.log(tokens.accessToken); // "eyJhbGciOiJIUzI1NiIs..."
-   *
-   * @example
-   * // Error handling
-   * try {
-   *   const result = await userService.login("nonexistent@email.com");
-   * } catch (error) {
-   *   if (error.code === "LOGIN_USER_NOT_FOUND") {
-   *     // Handle user not found
-   *   }
-   * }
-   */
-  /**
-   * Login untuk mendapatkan JWT token
-   * Generate JWT token untuk user yang sudah terdaftar
-   *
-   * @param {string} email - Email user yang akan login
-   * @returns {Promise<{user: Object, tokens: Object}>} User data dan token pair
-   * @returns {Object} return.user - Data user
-   * @returns {string} return.user.id - User ID
-   * @returns {string} return.user.email - Email user
-   * @returns {string} return.user.fullName - Nama lengkap user
-   * @returns {string|null} return.user.phone - Nomor telepon user
-   * @returns {string} return.user.role - Role user (ADMIN/CASHIER/MECHANIC)
-   * @returns {boolean} return.user.isActive - Status aktif user
-   * @returns {boolean} return.user.isAuthenticated - Status autentikasi user
-   * @returns {string} return.user.createdAt - Tanggal pembuatan
-   * @returns {string} return.user.updatedAt - Tanggal update terakhir
-   * @returns {Object} return.tokens - Token pair
-   * @returns {string} return.tokens.accessToken - JWT access token (expires in 15m)
-   * @returns {string} return.tokens.refreshToken - JWT refresh token (expires in 7d)
-   *
-   * @throws {ApiError} 404 - LOGIN_USER_NOT_FOUND - Jika user tidak ditemukan
-   * @throws {ApiError} 403 - LOGIN_USER_INACTIVE - Jika user tidak aktif
-   * @throws {ApiError} 500 - LOGIN_TOKEN_GENERATE_ERROR - Jika gagal generate token
-   *
-   * @example
-   * const { user, tokens } = await userService.login("admin@bengkel.com");
-   *
-   * @example
-   * try {
-   *   const result = await userService.login("nonexistent@email.com");
-   * } catch (error) {
-   *   if (error.code === "LOGIN_USER_NOT_FOUND") {
-   *     // Handle user not found
-   *   }
-   * }
+   * @param {string} email - Email user
+   * @returns {Promise<{user: Object, tokens: Object}>}
+   * @throws {ApiError} 404 - User tidak ditemukan
+   * @throws {ApiError} 403 - User tidak aktif
+   * @throws {ApiError} 500 - Gagal generate token
    */
   async login(email) {
     const user = await this.userRepo.findByEmail(email);
@@ -289,11 +185,7 @@ class UserService {
 
       const tokens = JWT.generateTokenPair(payload);
 
-      logger.info("Login berhasil", {
-        userId: user.id,
-        email: user.email,
-        role: user.role,
-      });
+      logger.info("Login berhasil", { userId: user.id, email: user.email, role: user.role });
 
       return {
         user: {
@@ -326,27 +218,16 @@ class UserService {
 
   /**
    * Membuat user baru dengan role CASHIER atau MECHANIC
-   * Mengirim undangan via Supabase Auth dan notifikasi
-   *
-   * @param {Object} payload - Data user baru
-   * @param {string} payload.fullName - Nama lengkap user
-   * @param {string} payload.email - Email user (harus unik)
-   * @param {string} [payload.phone] - Nomor telepon (harus unik jika diisi)
-   * @param {string} payload.role - Role user (CASHIER/MECHANIC)
-   * @returns {Promise<Object>} User yang berhasil dibuat
-   *
+   * @param {Object} payload
+   * @param {string} payload.fullName
+   * @param {string} payload.email
+   * @param {string} [payload.phone]
+   * @param {string} payload.role
+   * @returns {Promise<Object>}
    * @throws {ApiError} 400 - Email wajib diisi
    * @throws {ApiError} 403 - Role tidak diizinkan
    * @throws {ApiError} 409 - Email atau phone sudah digunakan
    * @throws {ApiError} 500 - Gagal membuat user di Supabase
-   *
-   * @example
-   * const newUser = await userService.createUser({
-   *   fullName: "John Doe",
-   *   email: "john@example.com",
-   *   phone: "08123456789",
-   *   role: "CASHIER"
-   * });
    */
   async createUser(payload) {
     const { fullName, email, phone, role } = payload;
@@ -354,39 +235,28 @@ class UserService {
     this.#validateCreatableRole(role);
 
     if (!email) {
-      throw ApiError.badRequest({
-        message: "Email wajib diisi untuk membuat user baru.",
-      });
+      throw ApiError.badRequest({ message: "Email wajib diisi untuk membuat user baru." });
     }
 
     const emailExists = await this.userRepo.isEmailExists(email);
     if (emailExists) {
-      throw ApiError.conflict({
-        message: `Email ${email} sudah digunakan oleh user lain.`,
-      });
+      throw ApiError.conflict({ message: `Email ${email} sudah digunakan oleh user lain.` });
     }
 
     if (phone) {
       const phoneExists = await this.userRepo.isPhoneExists(phone);
       if (phoneExists) {
-        throw ApiError.conflict({
-          message: `Nomor telepon ${phone} sudah digunakan oleh user lain.`,
-        });
+        throw ApiError.conflict({ message: `Nomor telepon ${phone} sudah digunakan oleh user lain.` });
       }
     }
 
-    const { data: authData, error: authError } =
-      await supabase.auth.admin.inviteUserByEmail(email, {
-        data: { fullName, phone, role },
-      });
+    const { data: authData, error: authError } = await supabase.auth.admin.inviteUserByEmail(email, {
+      data: { fullName, phone, role },
+    });
 
     if (authError) {
-      logger.error("Gagal membuat user di Supabase Auth", {
-        error: authError.message,
-      });
-      throw ApiError.internal({
-        message: `Gagal membuat user. Supabase Error: ${authError.message}`,
-      });
+      logger.error("Gagal membuat user di Supabase Auth", { error: authError.message });
+      throw ApiError.internal({ message: `Gagal membuat user. Supabase Error: ${authError.message}` });
     }
 
     const userId = authData.user.id;
@@ -406,18 +276,28 @@ class UserService {
 
     const roleLabel = this.#getRoleLabel(role);
 
-    await this.#sendNotification(
-      userId,
-      "Selamat Datang",
-      `Halo ${fullName},\n\nAkun Anda telah berhasil dibuat sebagai ${roleLabel}. Selamat bergabung di Bengkel POS.`,
-      "SUCCESS"
-    );
+    const welcomeMessage = [
+      `## Selamat Datang`,
+      ``,
+      `Halo **${fullName}**,`,
+      ``,
+      `Akun Anda telah berhasil dibuat sebagai **${roleLabel}**. Selamat bergabung di Bengkel POS.`,
+      ``,
+      `Silakan cek email Anda untuk verifikasi akun.`,
+    ].join("\n");
 
-    await this.#notifyAdmins(
-      "User Baru Dibuat",
-      `User baru telah ditambahkan.\n\nNama: ${fullName}\nEmail: ${email}\nRole: ${roleLabel}`,
-      "INFO"
-    );
+    await this.#sendNotification(userId, "Selamat Datang", welcomeMessage, "SUCCESS");
+
+    const adminMessage = [
+      `## User Baru Dibuat`,
+      ``,
+      `**Nama:** ${fullName}`,
+      `**Email:** ${email}`,
+      `**Role:** ${roleLabel}`,
+      `**Telepon:** ${phone || "-"}`,
+    ].join("\n");
+
+    await this.#notifyAdmins("User Baru Dibuat", adminMessage, "INFO");
 
     logger.info(`User dibuat: ${fullName}`, { userId, role, email });
     return user;
@@ -425,30 +305,21 @@ class UserService {
 
   /**
    * Mengirim ulang Magic Link ke user yang belum terautentikasi
-   *
-   * @param {string} userId - ID user
-   * @returns {Promise<{userId: string, email: string, message: string}>} Info pengiriman Magic Link
-   *
+   * @param {string} userId
+   * @returns {Promise<Object>}
    * @throws {ApiError} 404 - User tidak ditemukan
    * @throws {ApiError} 400 - User tidak memiliki email
    * @throws {ApiError} 409 - User sudah terautentikasi
-   *
-   * @example
-   * const result = await userService.resendMagicLink("user-id-123");
    */
   async resendMagicLink(userId) {
     const user = await this.userRepo.findById(userId);
 
     if (!user) {
-      throw ApiError.notFound({
-        message: `User dengan ID '${userId}' tidak ditemukan.`,
-      });
+      throw ApiError.notFound({ message: `User dengan ID '${userId}' tidak ditemukan.` });
     }
 
     if (!user.email) {
-      throw ApiError.badRequest({
-        message: "User tidak memiliki email. Tidak dapat mengirim Magic Link.",
-      });
+      throw ApiError.badRequest({ message: "User tidak memiliki email. Tidak dapat mengirim Magic Link." });
     }
 
     if (user.isAuthenticated) {
@@ -470,113 +341,59 @@ class UserService {
 
   /**
    * Mendapatkan user berdasarkan ID
-   *
-   * @param {string} userId - ID user
-   * @returns {Promise<Object>} Data user lengkap dengan relasi count
-   *
-   * @throws {ApiError} 404 - User tidak ditemukan
-   *
-   * @example
-   * const user = await userService.getUserById("user-id-123");
+   * @param {string} userId
+   * @returns {Promise<Object>}
+   * @throws {ApiError} 404
    */
   async getUserById(userId) {
     const user = await this.userRepo.findById(userId);
-    if (!user)
-      throw ApiError.notFound({
-        message: `User dengan ID '${userId}' tidak ditemukan.`,
-      });
+    if (!user) throw ApiError.notFound({ message: `User dengan ID '${userId}' tidak ditemukan.` });
     return user;
   }
 
   /**
    * Mendapatkan user berdasarkan email
-   *
-   * @param {string} email - Email user
-   * @returns {Promise<Object>} Data user
-   *
-   * @throws {ApiError} 404 - User tidak ditemukan
-   *
-   * @example
-   * const user = await userService.getUserByEmail("john@example.com");
+   * @param {string} email
+   * @returns {Promise<Object>}
+   * @throws {ApiError} 404
    */
   async getUserByEmail(email) {
     const user = await this.userRepo.findByEmail(email);
-    if (!user)
-      throw ApiError.notFound({
-        message: `User dengan email '${email}' tidak ditemukan.`,
-      });
+    if (!user) throw ApiError.notFound({ message: `User dengan email '${email}' tidak ditemukan.` });
     return user;
   }
 
   /**
    * Mendapatkan user berdasarkan nomor telepon
-   *
-   * @param {string} phone - Nomor telepon user
-   * @returns {Promise<Object>} Data user
-   *
-   * @throws {ApiError} 404 - User tidak ditemukan
-   *
-   * @example
-   * const user = await userService.getUserByPhone("08123456789");
+   * @param {string} phone
+   * @returns {Promise<Object>}
+   * @throws {ApiError} 404
    */
   async getUserByPhone(phone) {
     const user = await this.userRepo.findByPhone(phone);
-    if (!user)
-      throw ApiError.notFound({
-        message: `User dengan nomor telepon '${phone}' tidak ditemukan.`,
-      });
+    if (!user) throw ApiError.notFound({ message: `User dengan nomor telepon '${phone}' tidak ditemukan.` });
     return user;
   }
 
   /**
    * Mendapatkan daftar user dengan filter dan pagination
-   *
-   * @param {Object} [query={}] - Parameter query
-   * @param {number} [query.page=1] - Nomor halaman
-   * @param {number} [query.limit=10] - Jumlah item per halaman
-   * @param {string} [query.role] - Filter berdasarkan role
-   * @param {string} [query.search] - Pencarian berdasarkan nama atau email
-   * @param {boolean} [query.isActive] - Filter status aktif
-   * @returns {Promise<{data: Array, metadata: Object}>} Daftar user dan metadata pagination
-   *
-   * @example
-   * const { data, metadata } = await userService.getUsers({
-   *   page: 1,
-   *   limit: 10,
-   *   role: "CASHIER",
-   *   search: "john"
-   * });
+   * @param {Object} [query={}]
+   * @returns {Promise<{data: Array, metadata: Object}>}
    */
   async getUsers(query = {}) {
     const result = await this.userRepo.findMany(query);
     logger.info("Mengambil daftar user", {
       total: result.metadata.total,
       page: result.metadata.currentPage,
-      filters: {
-        role: query.role,
-        search: query.search,
-        isActive: query.isActive,
-      },
+      filters: { role: query.role, search: query.search, isActive: query.isActive },
     });
     return result;
   }
 
   /**
    * Mendapatkan daftar karyawan (CASHIER & MECHANIC)
-   *
-   * @param {Object} [query={}] - Parameter query
-   * @param {number} [query.page=1] - Nomor halaman
-   * @param {number} [query.limit=10] - Jumlah item per halaman
-   * @param {string} [query.role] - Filter role spesifik
-   * @param {string} [query.search] - Pencarian berdasarkan nama atau email
-   * @param {boolean} [query.isActive] - Filter status aktif
-   * @returns {Promise<{data: Array, metadata: Object}>} Daftar karyawan
-   *
-   * @example
-   * const { data, metadata } = await userService.getEmployees({
-   *   role: "MECHANIC",
-   *   isActive: true
-   * });
+   * @param {Object} [query={}]
+   * @returns {Promise<{data: Array, metadata: Object}>}
    */
   async getEmployees(query = {}) {
     const result = await this.userRepo.findEmployees(query);
@@ -591,11 +408,7 @@ class UserService {
 
   /**
    * Mendapatkan daftar semua admin
-   *
-   * @returns {Promise<Array>} Daftar admin
-   *
-   * @example
-   * const admins = await userService.getAdmins();
+   * @returns {Promise<Array>}
    */
   async getAdmins() {
     const admins = await this.userRepo.findByRole("ADMIN");
@@ -605,12 +418,8 @@ class UserService {
 
   /**
    * Mendapatkan user berdasarkan role tertentu
-   *
-   * @param {string} role - Role user
-   * @returns {Promise<Array>} Daftar user dengan role tersebut
-   *
-   * @example
-   * const mechanics = await userService.getUsersByRole("MECHANIC");
+   * @param {string} role
+   * @returns {Promise<Array>}
    */
   async getUsersByRole(role) {
     return this.userRepo.findByRole(role);
@@ -618,51 +427,32 @@ class UserService {
 
   /**
    * Memperbarui data user
-   * Validasi role, phone unique, dan shift aktif sebelum update
-   *
-   * @param {string} userId - ID user yang akan diupdate
-   * @param {Object} payload - Data yang akan diupdate
-   * @param {string} [payload.fullName] - Nama lengkap baru
-   * @param {string} [payload.phone] - Nomor telepon baru
-   * @param {string} [payload.role] - Role baru
-   * @param {boolean} [payload.isActive] - Status aktif baru
-   * @returns {Promise<Object>} User yang sudah diupdate
-   *
+   * @param {string} userId
+   * @param {Object} payload
+   * @returns {Promise<Object>}
    * @throws {ApiError} 404 - User tidak ditemukan
-   * @throws {ApiError} 403 - Role tidak valid atau mencoba mengubah admin
-   * @throws {ApiError} 409 - Phone sudah digunakan atau masih ada shift aktif
-   *
-   * @example
-   * const updated = await userService.updateUser("user-id-123", {
-   *   fullName: "John Updated",
-   *   role: "MECHANIC"
-   * });
+   * @throws {ApiError} 403 - Role tidak valid
+   * @throws {ApiError} 409 - Phone sudah digunakan / masih ada shift aktif
    */
- 
   async updateUser(userId, payload) {
     const user = await this.userRepo.findById(userId);
     if (!user) {
-      throw ApiError.notFound({
-        message: `Gagal memperbarui. User dengan ID '${userId}' tidak ditemukan.`,
-      });
+      throw ApiError.notFound({ message: `Gagal memperbarui. User dengan ID '${userId}' tidak ditemukan.` });
     }
-  
+
     if (payload.role !== undefined) {
       this.#validateUpdatableRole(user.role, payload.role);
     }
-  
+
     if (payload.phone && payload.phone !== user.phone) {
-      const existingPhone = await this.userRepo.isPhoneExists(
-        payload.phone,
-        userId
-      );
+      const existingPhone = await this.userRepo.isPhoneExists(payload.phone, userId);
       if (existingPhone) {
         throw ApiError.conflict({
           message: `Gagal memperbarui. Nomor telepon '${payload.phone}' sudah digunakan oleh user lain.`,
         });
       }
     }
-  
+
     if (payload.isActive === false && user.isActive === true) {
       const hasActiveShift = await this.shiftRepo.hasActiveShift(userId);
       if (hasActiveShift) {
@@ -671,81 +461,62 @@ class UserService {
         });
       }
     }
-  
+
     const updateData = {};
     if (payload.fullName !== undefined) updateData.fullName = payload.fullName;
     if (payload.phone !== undefined) updateData.phone = payload.phone;
     if (payload.role !== undefined) updateData.role = payload.role;
     if (payload.isActive !== undefined) updateData.isActive = payload.isActive;
-  
+
     const updated = await this.userRepo.update(userId, updateData);
-  
+
     await this.cache.delete(`email:${user.email}`);
-  
     if (payload.email && payload.email !== user.email) {
       await this.cache.delete(`email:${payload.email}`);
     }
-  
+
     const changes = [];
     if (payload.fullName !== undefined && payload.fullName !== user.fullName)
-      changes.push(`Nama: "${user.fullName}" -> "${payload.fullName}"`);
+      changes.push(`Nama: ${user.fullName} -> ${payload.fullName}`);
     if (payload.phone !== undefined && payload.phone !== user.phone)
-      changes.push(
-        `Telepon: "${user.phone || "-"}" -> "${payload.phone || "-"}"`
-      );
+      changes.push(`Telepon: ${user.phone || "-"} -> ${payload.phone || "-"}`);
     if (payload.role !== undefined && payload.role !== user.role)
-      changes.push(
-        `Role: "${this.#getRoleLabel(user.role)}" -> "${this.#getRoleLabel(
-          payload.role
-        )}"`
-      );
+      changes.push(`Role: ${this.#getRoleLabel(user.role)} -> ${this.#getRoleLabel(payload.role)}`);
     if (payload.isActive !== undefined && payload.isActive !== user.isActive)
-      changes.push(
-        `Status: "${user.isActive ? "Aktif" : "Nonaktif"}" -> "${
-          payload.isActive ? "Aktif" : "Nonaktif"
-        }"`
-      );
-  
+      changes.push(`Status: ${user.isActive ? "Aktif" : "Nonaktif"} -> ${payload.isActive ? "Aktif" : "Nonaktif"}`);
+
     if (changes.length > 0) {
-      await this.#sendNotification(
-        userId,
-        "Profil Diperbarui",
-        `Data akun Anda telah diperbarui.\n\n${changes.join("\n")}`,
-        "INFO"
-      );
+      const notifMessage = [
+        `## Profil Diperbarui`,
+        ``,
+        `Data akun Anda telah diperbarui:`,
+        ``,
+        ...changes.map((c) => `- ${c}`),
+      ].join("\n");
+
+      await this.#sendNotification(userId, "Profil Diperbarui", notifMessage, "INFO");
     }
-  
+
     logger.info("User berhasil diperbarui", { userId, changes });
     return updated;
   }
-  
 
   /**
    * Menghapus user dari sistem
-   * Memvalidasi tidak ada relasi data dan shift aktif
-   *
-   * @param {string} userId - ID user yang akan dihapus
+   * @param {string} userId
    * @returns {Promise<void>}
-   *
    * @throws {ApiError} 404 - User tidak ditemukan
    * @throws {ApiError} 403 - Mencoba menghapus admin
-   * @throws {ApiError} 409 - User masih memiliki shift aktif atau data relasi
-   *
-   * @example
-   * await userService.deleteUser("user-id-123");
+   * @throws {ApiError} 409 - Masih memiliki shift aktif atau data relasi
    */
   async deleteUser(userId) {
     const user = await this.userRepo.findById(userId);
     if (!user) {
-      throw ApiError.notFound({
-        message: `Gagal menghapus. User dengan ID '${userId}' tidak ditemukan.`,
-      });
+      throw ApiError.notFound({ message: `Gagal menghapus. User dengan ID '${userId}' tidak ditemukan.` });
     }
 
     if (user.role === "ADMIN") {
-      throw ApiError.forbidden({
-        message: "Tidak dapat menghapus user dengan role Admin.",
-      });
+      throw ApiError.forbidden({ message: "Tidak dapat menghapus user dengan role Admin." });
     }
 
     const hasActiveShift = await this.shiftRepo.hasActiveShift(userId);
@@ -766,11 +537,18 @@ class UserService {
 
     await this.userRepo.delete(userId);
 
-    await this.#notifyAdmins(
-      "User Dihapus",
-      `User telah dihapus dari sistem.\n\nNama: ${user.fullName}\nEmail: ${user.email}\nRole: ${roleLabel}`,
-      "WARNING"
-    );
+    const adminMessage = [
+      `## User Dihapus`,
+      ``,
+      `User telah dihapus dari sistem.`,
+      ``,
+      `**Nama:** ${user.fullName}`,
+      `**Email:** ${user.email}`,
+      `**Role:** ${roleLabel}`,
+      `**Telepon:** ${user.phone || "-"}`,
+    ].join("\n");
+
+    await this.#notifyAdmins("User Dihapus", adminMessage, "WARNING");
 
     logger.info("User berhasil dihapus", {
       userId,
@@ -782,16 +560,10 @@ class UserService {
 
   /**
    * Memvalidasi email user untuk proses autentikasi
-   *
-   * @param {string} email - Email yang akan divalidasi
-   * @returns {Promise<Object>} Data user jika valid
-   *
+   * @param {string} email
+   * @returns {Promise<Object>}
    * @throws {ApiError} 404 - Email tidak terdaftar
-   * @throws {ApiError} 403 - User tidak aktif
-   * @throws {ApiError} 403 - User belum terautentikasi
-   *
-   * @example
-   * const user = await userService.validateUserEmail("john@example.com");
+   * @throws {ApiError} 403 - User tidak aktif / belum terautentikasi
    */
   async validateUserEmail(email) {
     const user = await this.userRepo.findByEmail(email);
@@ -819,76 +591,42 @@ class UserService {
 
   /**
    * Mengecek ketersediaan email
-   *
-   * @param {string} email - Email yang akan dicek
-   * @param {string} [excludeId] - ID user yang dikecualikan (untuk update)
-   * @returns {Promise<{exists: boolean, message: string}>} Status ketersediaan email
-   *
-   * @example
-   * const { exists, message } = await userService.checkEmailExists("john@example.com");
+   * @param {string} email
+   * @param {string} [excludeId]
+   * @returns {Promise<{exists: boolean, message: string}>}
    */
   async checkEmailExists(email, excludeId = null) {
     const exists = await this.userRepo.isEmailExists(email, excludeId);
     return {
       exists,
-      message: exists
-        ? `Email '${email}' sudah terdaftar.`
-        : `Email '${email}' tersedia.`,
+      message: exists ? `Email '${email}' sudah terdaftar.` : `Email '${email}' tersedia.`,
     };
   }
 
   /**
    * Mengecek ketersediaan nomor telepon
-   *
-   * @param {string} phone - Nomor telepon yang akan dicek
-   * @param {string} [excludeId] - ID user yang dikecualikan (untuk update)
-   * @returns {Promise<{exists: boolean, message: string}>} Status ketersediaan phone
-   *
-   * @example
-   * const { exists, message } = await userService.checkPhoneExists("08123456789");
+   * @param {string} phone
+   * @param {string} [excludeId]
+   * @returns {Promise<{exists: boolean, message: string}>}
    */
   async checkPhoneExists(phone, excludeId = null) {
     const exists = await this.userRepo.isPhoneExists(phone, excludeId);
     return {
       exists,
-      message: exists
-        ? `Nomor telepon '${phone}' sudah digunakan.`
-        : `Nomor telepon '${phone}' tersedia.`,
+      message: exists ? `Nomor telepon '${phone}' sudah digunakan.` : `Nomor telepon '${phone}' tersedia.`,
     };
   }
 
   /**
    * Menonaktifkan banyak user sekaligus
-   * Memvalidasi setiap user sebelum menonaktifkan
-   *
-   * @param {string[]} userIds - Array ID user yang akan dinonaktifkan
-   * @param {string} actorId - ID user yang melakukan penonaktifan
-   * @returns {Promise<{summary: Object, details: Object}>} Ringkasan dan detail hasil
-   * @returns {Object} return.summary - Ringkasan operasi
-   * @returns {number} return.summary.total - Total user yang diproses
-   * @returns {number} return.summary.valid - User yang valid
-   * @returns {number} return.summary.skipped - User yang dilewati
-   * @returns {number} return.summary.deactivated - User yang berhasil dinonaktifkan
-   * @returns {number} return.summary.failed - User yang gagal dinonaktifkan
-   * @returns {Object} return.details - Detail operasi
-   * @returns {Array} return.details.deactivated - ID user yang berhasil
-   * @returns {Array} return.details.failed - User yang gagal beserta error
-   * @returns {Array} return.details.skipped - User yang dilewati beserta alasan
-   *
+   * @param {string[]} userIds
+   * @param {string} actorId
+   * @returns {Promise<{summary: Object, details: Object}>}
    * @throws {ApiError} 400 - Tidak ada user yang dipilih atau memenuhi syarat
-   *
-   * @example
-   * const result = await userService.deactivateUsers(
-   *   ["id-1", "id-2", "id-3"],
-   *   "admin-id"
-   * );
-   * console.log(result.summary.deactivated); // 2
    */
   async deactivateUsers(userIds, actorId) {
     if (!userIds || userIds.length === 0) {
-      throw ApiError.badRequest({
-        message: "Gagal menonaktifkan. Tidak ada user yang dipilih.",
-      });
+      throw ApiError.badRequest({ message: "Gagal menonaktifkan. Tidak ada user yang dipilih." });
     }
 
     const validIds = [];
@@ -900,42 +638,25 @@ class UserService {
         skippedUsers.push({ id, reason: "User tidak ditemukan" });
         continue;
       }
-
       if (user.role === "ADMIN") {
-        skippedUsers.push({
-          id,
-          name: user.fullName,
-          reason: "Tidak dapat menonaktifkan Admin",
-        });
+        skippedUsers.push({ id, name: user.fullName, reason: "Tidak dapat menonaktifkan Admin" });
         continue;
       }
-
       if (!user.isActive) {
-        skippedUsers.push({
-          id,
-          name: user.fullName,
-          reason: "User sudah nonaktif",
-        });
+        skippedUsers.push({ id, name: user.fullName, reason: "User sudah nonaktif" });
         continue;
       }
-
       const hasActiveShift = await this.shiftRepo.hasActiveShift(id);
       if (hasActiveShift) {
-        skippedUsers.push({
-          id,
-          name: user.fullName,
-          reason: "Masih memiliki shift aktif",
-        });
+        skippedUsers.push({ id, name: user.fullName, reason: "Masih memiliki shift aktif" });
         continue;
       }
-
       validIds.push(id);
     }
 
     if (validIds.length === 0) {
       throw ApiError.badRequest({
-        message:
-          "Gagal menonaktifkan. Tidak ada user yang memenuhi syarat untuk dinonaktifkan.",
+        message: "Gagal menonaktifkan. Tidak ada user yang memenuhi syarat untuk dinonaktifkan.",
         details: skippedUsers,
       });
     }
@@ -969,36 +690,14 @@ class UserService {
 
   /**
    * Mengaktifkan banyak user sekaligus
-   * Hanya mengaktifkan user yang sedang nonaktif
-   *
-   * @param {string[]} userIds - Array ID user yang akan diaktifkan
-   * @param {string} actorId - ID user yang melakukan pengaktifan
-   * @returns {Promise<{summary: Object, details: Object}>} Ringkasan dan detail hasil
-   * @returns {Object} return.summary - Ringkasan operasi
-   * @returns {number} return.summary.total - Total user yang diproses
-   * @returns {number} return.summary.valid - User yang valid
-   * @returns {number} return.summary.skipped - User yang dilewati
-   * @returns {number} return.summary.activated - User yang berhasil diaktifkan
-   * @returns {number} return.summary.failed - User yang gagal diaktifkan
-   * @returns {Object} return.details - Detail operasi
-   * @returns {Array} return.details.activated - ID user yang berhasil
-   * @returns {Array} return.details.failed - User yang gagal beserta error
-   * @returns {Array} return.details.skipped - User yang dilewati beserta alasan
-   *
+   * @param {string[]} userIds
+   * @param {string} actorId
+   * @returns {Promise<{summary: Object, details: Object}>}
    * @throws {ApiError} 400 - Tidak ada user yang dipilih atau memenuhi syarat
-   *
-   * @example
-   * const result = await userService.activateUsers(
-   *   ["id-1", "id-2", "id-3"],
-   *   "admin-id"
-   * );
-   * console.log(result.summary.activated); // 3
    */
   async activateUsers(userIds, actorId) {
     if (!userIds || userIds.length === 0) {
-      throw ApiError.badRequest({
-        message: "Gagal mengaktifkan. Tidak ada user yang dipilih.",
-      });
+      throw ApiError.badRequest({ message: "Gagal mengaktifkan. Tidak ada user yang dipilih." });
     }
 
     const validIds = [];
@@ -1010,23 +709,16 @@ class UserService {
         skippedUsers.push({ id, reason: "User tidak ditemukan" });
         continue;
       }
-
       if (user.isActive) {
-        skippedUsers.push({
-          id,
-          name: user.fullName,
-          reason: "User sudah aktif",
-        });
+        skippedUsers.push({ id, name: user.fullName, reason: "User sudah aktif" });
         continue;
       }
-
       validIds.push(id);
     }
 
     if (validIds.length === 0) {
       throw ApiError.badRequest({
-        message:
-          "Gagal mengaktifkan. Tidak ada user yang memenuhi syarat untuk diaktifkan.",
+        message: "Gagal mengaktifkan. Tidak ada user yang memenuhi syarat untuk diaktifkan.",
         details: skippedUsers,
       });
     }

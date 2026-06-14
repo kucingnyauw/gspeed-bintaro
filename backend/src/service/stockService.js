@@ -31,19 +31,111 @@ class StockService {
   }
 
   /**
-   * Format info produk untuk notifikasi
+   * Format info produk dalam Markdown untuk notifikasi
    * @param {Object} product
+   * @param {string} product.name
+   * @param {string} product.sku
+   * @param {number} product.stock
+   * @param {number} product.price
+   * @param {number} product.cost
    * @returns {string}
    * @private
    */
   #formatProductInfo(product) {
     return [
-      `Nama Produk    : ${product.name}`,
-      `SKU            : ${product.sku}`,
-      `Stok Saat Ini  : ${product.stock} unit`,
-      `Harga Jual     : ${Currency.toIDR(product.price)}`,
-      `Harga Beli     : ${Currency.toIDR(product.cost)}`,
+      `**Nama Produk:** ${product.name}`,
+      `**SKU:** ${product.sku}`,
+      `**Stok Saat Ini:** ${product.stock} unit`,
+      `**Harga Jual:** ${Currency.toIDR(product.price)}`,
+      `**Harga Beli:** ${Currency.toIDR(product.cost)}`,
     ].join("\n");
+  }
+
+  /**
+   * Build notifikasi stok dalam format Markdown
+   * @param {Object} params
+   * @param {string} params.eventTitle
+   * @param {Object} params.product
+   * @param {number} params.threshold
+   * @param {number} [params.previousStock]
+   * @param {number} [params.addedStock]
+   * @param {string} [params.note]
+   * @returns {string}
+   * @private
+   */
+  #buildMarkdownNotification({
+    eventTitle,
+    product,
+    threshold,
+    previousStock,
+    addedStock,
+    note,
+  }) {
+    const lines = [];
+
+    lines.push(`## ${eventTitle}`);
+    lines.push("");
+
+    lines.push(this.#formatProductInfo(product));
+    lines.push("");
+
+    if (previousStock !== undefined) {
+      lines.push(`**Stok Sebelumnya:** ${previousStock} unit`);
+    }
+
+    if (addedStock !== undefined) {
+      lines.push(`**Stok Bertambah:** ${addedStock} unit`);
+    }
+
+    if (note) {
+      lines.push("");
+      lines.push(`> ${note}`);
+    }
+
+    lines.push("");
+    lines.push(`**Batas Minimum:** ${threshold} unit`);
+    lines.push(`**Waktu:** ${DateTime.toFullID(new Date())}`);
+
+    return lines.join("\n");
+  }
+
+  /**
+   * Format ringkasan mutasi stok dalam Markdown
+   * @param {Object} data
+   * @param {string} data.productName
+   * @param {string} data.productSku
+   * @param {string} data.typeLabel
+   * @param {number} data.quantity
+   * @param {number} data.currentStock
+   * @param {number} [data.previousStock]
+   * @param {string} [data.note]
+   * @param {string} data.recordedByName
+   * @returns {string}
+   * @private
+   */
+  #formatMovementSummary(data) {
+    const lines = [];
+
+    lines.push(`**Produk:** ${data.productName}`);
+    lines.push(`**SKU:** ${data.productSku}`);
+    lines.push(`**Tipe Mutasi:** ${data.typeLabel}`);
+    lines.push(`**Jumlah:** ${data.quantity} unit`);
+
+    if (data.previousStock !== undefined) {
+      lines.push(`**Stok Sebelumnya:** ${data.previousStock} unit`);
+    }
+
+    lines.push(`**Stok Saat Ini:** ${data.currentStock} unit`);
+
+    if (data.note) {
+      lines.push(`**Catatan:** ${data.note}`);
+    }
+
+    lines.push("");
+    lines.push(`**Dicatat Oleh:** ${data.recordedByName}`);
+    lines.push(`**Waktu:** ${DateTime.toFullID(new Date())}`);
+
+    return lines.join("\n");
   }
 
   /**
@@ -66,24 +158,19 @@ class StockService {
 
         const isOutOfStock = product.stock === 0;
         const notificationType = isOutOfStock ? "ERROR" : "WARNING";
-        const statusLabel = isOutOfStock ? "STOK HABIS" : "Stok Rendah";
+        const eventTitle = isOutOfStock ? "Stok Habis" : "Stok Rendah";
 
-        const notificationMessage = [
-          `Peringatan ${statusLabel}`,
-          ``,
-          this.#formatProductInfo(product),
-          ``,
-          isOutOfStock
-            ? `Stok produk ini sudah habis. Segera lakukan pembelian untuk menghindari terhambatnya penjualan.`
+        const notificationMessage = this.#buildMarkdownNotification({
+          eventTitle,
+          product,
+          threshold,
+          note: isOutOfStock
+            ? "Stok produk ini sudah habis. Segera lakukan pembelian untuk menghindari terhambatnya penjualan."
             : `Stok produk ini tinggal ${product.stock} unit, berada di bawah batas minimum ${threshold} unit. Segera lakukan pembelian ulang.`,
-          ``,
-          `Waktu Peringatan: ${DateTime.toFullID(new Date())}`,
-        ].join("\n");
+        });
 
         const notifications = admins.map((admin) => ({
-          title: isOutOfStock
-            ? `Stok Habis - ${product.name}`
-            : `Stok Rendah - ${product.name}`,
+          title: `${eventTitle} - ${product.name}`,
           message: notificationMessage,
           type: notificationType,
           userId: admin.id,
@@ -127,18 +214,14 @@ class StockService {
 
         const addedStock = product.stock - previousStock;
 
-        const notificationMessage = [
-          `Stok Kembali Normal`,
-          ``,
-          this.#formatProductInfo(product),
-          ``,
-          `Stok sebelumnya : ${previousStock} unit`,
-          `Stok bertambah  : ${addedStock} unit`,
-          ``,
-          `Stok produk ini sudah kembali di atas batas minimum (${threshold} unit) dan aman untuk penjualan.`,
-          ``,
-          `Waktu Pemulihan : ${DateTime.toFullID(new Date())}`,
-        ].join("\n");
+        const notificationMessage = this.#buildMarkdownNotification({
+          eventTitle: "Stok Kembali Normal",
+          product,
+          threshold,
+          previousStock,
+          addedStock,
+          note: `Stok produk ini sudah kembali di atas batas minimum (${threshold} unit) dan aman untuk penjualan.`,
+        });
 
         const notifications = admins.map((admin) => ({
           title: `Stok Normal - ${product.name}`,
@@ -165,39 +248,6 @@ class StockService {
   }
 
   /**
-   * Format ringkasan mutasi stok untuk notifikasi
-   * @param {Object} data
-   * @returns {string}
-   * @private
-   */
-  #formatMovementSummary(data) {
-    const lines = [
-      `Produk         : ${data.productName}`,
-      `SKU            : ${data.productSku}`,
-      `Tipe Mutasi    : ${data.typeLabel}`,
-      `Jumlah         : ${data.quantity} unit`,
-    ];
-
-    if (data.previousStock !== undefined) {
-      lines.push(`Stok Sebelumnya : ${data.previousStock} unit`);
-    }
-
-    lines.push(`Stok Saat Ini   : ${data.currentStock} unit`);
-
-    if (data.note) {
-      lines.push(`Catatan        : ${data.note}`);
-    }
-
-    lines.push(
-      ``,
-      `Dicatat Oleh   : ${data.recordedByName}`,
-      `Waktu          : ${DateTime.toFullID(new Date())}`
-    );
-
-    return lines.join("\n");
-  }
-
-  /**
    * Mencatat stok masuk
    * @param {string} productId
    * @param {number} quantity
@@ -205,7 +255,8 @@ class StockService {
    * @param {string} [note=null]
    * @param {StockSourceType} [sourceType="MANUAL"]
    * @returns {Promise<Object>}
-   * @throws {ApiError}
+   * @throws {ApiError} notFound - Produk tidak ditemukan
+   * @throws {ApiError} badRequest - Produk bukan sparepart
    */
   async recordStockIn(
     productId,
@@ -294,7 +345,8 @@ class StockService {
    * @param {string} [note=null]
    * @param {StockSourceType} [sourceType="MANUAL"]
    * @returns {Promise<Object>}
-   * @throws {ApiError}
+   * @throws {ApiError} notFound - Produk tidak ditemukan
+   * @throws {ApiError} badRequest - Produk bukan sparepart atau stok kurang
    */
   async recordStockOut(
     productId,
@@ -402,11 +454,12 @@ class StockService {
   /**
    * Mencatat penyesuaian stok
    * @param {string} productId
-   * @param {number} quantity
+   * @param {number} quantity - Positif untuk tambah, negatif untuk kurang
    * @param {string} recordedById
    * @param {string} note
    * @returns {Promise<Object>}
-   * @throws {ApiError}
+   * @throws {ApiError} notFound - Produk tidak ditemukan
+   * @throws {ApiError} badRequest - Produk bukan sparepart atau stok kurang
    */
   async recordAdjustment(productId, quantity, recordedById, note) {
     const product = await this.productRepo.findById(productId);
@@ -499,7 +552,7 @@ class StockService {
    * Mendapatkan detail mutasi stok berdasarkan ID
    * @param {string} id
    * @returns {Promise<Object>}
-   * @throws {ApiError}
+   * @throws {ApiError} notFound - Mutasi stok tidak ditemukan
    */
   async getStockMovementById(id) {
     const movement = await this.stockRepo.findById(id);
@@ -518,7 +571,7 @@ class StockService {
    * @param {string} productId
    * @param {Object} [query={}]
    * @returns {Promise<Object>}
-   * @throws {ApiError}
+   * @throws {ApiError} notFound - Produk tidak ditemukan
    */
   async getMovementsByProduct(productId, query = {}) {
     const product = await this.productRepo.findById(productId);
@@ -544,7 +597,7 @@ class StockService {
    * Menghapus record mutasi stok
    * @param {string} id
    * @returns {Promise<void>}
-   * @throws {ApiError}
+   * @throws {ApiError} notFound - Mutasi stok tidak ditemukan
    */
   async deleteStockMovement(id) {
     const movement = await this.stockRepo.findById(id);
@@ -566,66 +619,65 @@ class StockService {
   }
 
   /**
- * Menghapus banyak record mutasi stok sekaligus
- * @param {string[]} movementIds - Array ID mutasi stok
- * @param {string} userId - ID user yang menghapus
- * @returns {Promise<{summary: Object, details: Object}>} Ringkasan dan detail hasil penghapusan
- * @throws {ApiError} 400 - Tidak ada mutasi stok yang dipilih
- */
-async deleteStockMovements(movementIds, userId) {
-  if (!movementIds || movementIds.length === 0) {
-    throw ApiError.badRequest({
-      message: "Gagal menghapus. Tidak ada mutasi stok yang dipilih.",
-    });
-  }
-
-  const validIds = [];
-  const skippedMovements = [];
-
-  for (const id of movementIds) {
-    const movement = await this.stockRepo.findById(id);
-    if (!movement) {
-      skippedMovements.push({ id, reason: "Mutasi stok tidak ditemukan" });
-      continue;
+   * Menghapus banyak record mutasi stok sekaligus
+   * @param {string[]} movementIds - Array ID mutasi stok
+   * @param {string} userId - ID user yang menghapus
+   * @returns {Promise<{summary: Object, details: Object}>}
+   * @throws {ApiError} badRequest - Tidak ada mutasi stok yang dipilih
+   */
+  async deleteStockMovements(movementIds, userId) {
+    if (!movementIds || movementIds.length === 0) {
+      throw ApiError.badRequest({
+        message: "Gagal menghapus. Tidak ada mutasi stok yang dipilih.",
+      });
     }
 
-    validIds.push(id);
-  }
+    const validIds = [];
+    const skippedMovements = [];
 
-  if (validIds.length === 0) {
-    throw ApiError.badRequest({
-      message: "Gagal menghapus. Tidak ada mutasi stok yang valid untuk dihapus.",
-      details: skippedMovements,
+    for (const id of movementIds) {
+      const movement = await this.stockRepo.findById(id);
+      if (!movement) {
+        skippedMovements.push({ id, reason: "Mutasi stok tidak ditemukan" });
+        continue;
+      }
+      validIds.push(id);
+    }
+
+    if (validIds.length === 0) {
+      throw ApiError.badRequest({
+        message:
+          "Gagal menghapus. Tidak ada mutasi stok yang valid untuk dihapus.",
+        details: skippedMovements,
+      });
+    }
+
+    const deleteResults = await this.stockRepo.deleteMany(validIds);
+
+    const summary = {
+      total: movementIds.length,
+      valid: validIds.length,
+      skipped: skippedMovements.length,
+      deleted: deleteResults.success.length,
+      failed: deleteResults.failed.length,
+    };
+
+    logger.info("Bulk delete mutasi stok selesai", {
+      summary,
+      skippedMovements,
+      failedDeletes: deleteResults.failed,
+      userId,
     });
+
+    return {
+      summary,
+      details: {
+        deleted: deleteResults.success,
+        failed: deleteResults.failed,
+        skipped: skippedMovements,
+      },
+    };
   }
-
-  const deleteResults = await this.stockRepo.deleteMany(validIds);
-
-  const summary = {
-    total: movementIds.length,
-    valid: validIds.length,
-    skipped: skippedMovements.length,
-    deleted: deleteResults.success.length,
-    failed: deleteResults.failed.length,
-  };
-
-  logger.info("Bulk delete mutasi stok selesai", {
-    summary,
-    skippedMovements,
-    failedDeletes: deleteResults.failed,
-    userId,
-  });
-
-  return {
-    summary,
-    details: {
-      deleted: deleteResults.success,
-      failed: deleteResults.failed,
-      skipped: skippedMovements,
-    },
-  };
-}
-
 }
 
 export default StockService;

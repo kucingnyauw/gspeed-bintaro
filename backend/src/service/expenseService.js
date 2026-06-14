@@ -1,7 +1,11 @@
 import ExpenseRepository from "#repository/expenseRepository.js";
 import FileRepository from "#repository/fileRepository.js";
 import ShiftRepository from "#repository/shiftRepository.js";
+import NotificationRepository from "#repository/notificationRepository.js";
+import UserRepository from "#repository/userRepository.js";
 import ApiError from "#shared/utils/error.js";
+import Currency from "#shared/utils/currency.js";
+import DateTime from "#shared/utils/datetime.js";
 import Storage from "#shared/utils/storage.js";
 import prisma from "#app/database.js";
 import logger from "#app/logger.js";
@@ -15,6 +19,8 @@ class ExpenseService {
     this.expenseRepo = new ExpenseRepository();
     this.shiftRepo = new ShiftRepository();
     this.fileRepo = new FileRepository();
+    this.notifRepo = new NotificationRepository();
+    this.userRepo = new UserRepository();
   }
 
   /**
@@ -26,7 +32,6 @@ class ExpenseService {
    */
   async #uploadReceipt(file, userId) {
     const path = await Storage.uploadFile(file, "expenses");
-
     return this.fileRepo.create({
       path: path,
       fileName: file.originalname,
@@ -57,6 +62,108 @@ class ExpenseService {
         fileId,
         error: err.message,
       });
+    }
+  }
+
+  /**
+   * Mendapatkan label kategori dalam Bahasa Indonesia
+   * @param {string} category
+   * @returns {string}
+   * @private
+   */
+  #getCategoryLabel(category) {
+    const labels = {
+      SUPPLIES: "Perlengkapan",
+      MAINTENANCE: "Perawatan",
+      UTILITIES: "Utilitas",
+      RENT: "Sewa",
+      OTHER: "Lainnya",
+    };
+    return labels[category] || category;
+  }
+
+  /**
+   * Build notifikasi pengeluaran dalam format Markdown
+   * @param {Object} params
+   * @param {string} params.eventTitle
+   * @param {Object} params.expense
+   * @param {string} [params.cashierName]
+   * @param {string} [params.shiftInfo]
+   * @param {boolean} [params.hasReceipt]
+   * @returns {string}
+   * @private
+   */
+  #buildExpenseNotification({
+    eventTitle,
+    expense,
+    cashierName,
+    shiftInfo,
+    hasReceipt,
+  }) {
+    const lines = [];
+
+    lines.push(`## ${eventTitle}`);
+    lines.push("");
+
+    lines.push(`**Judul:** ${expense.title}`);
+    if (expense.description)
+      lines.push(`**Deskripsi:** ${expense.description}`);
+    lines.push(`**Jumlah:** ${Currency.toIDR(expense.amount)}`);
+    lines.push(`**Kategori:** ${this.#getCategoryLabel(expense.category)}`);
+    lines.push(`**Tanggal:** ${DateTime.toFullID(expense.date || new Date())}`);
+
+    if (cashierName) lines.push(`**Dicatat Oleh:** ${cashierName}`);
+    if (shiftInfo) lines.push(`**Shift:** ${shiftInfo}`);
+    if (hasReceipt) lines.push(`**Bukti:** Terlampir`);
+
+    lines.push("");
+    lines.push(`**Waktu:** ${DateTime.toFullID(new Date())}`);
+
+    return lines.join("\n");
+  }
+
+  /**
+   * Mengirim notifikasi ke user
+   * @param {string} userId
+   * @param {string} title
+   * @param {string} message
+   * @param {string} [type="INFO"]
+   * @returns {Promise<void>}
+   * @private
+   */
+  async #sendNotification(userId, title, message, type = "INFO") {
+    if (!userId) return;
+    try {
+      await this.notifRepo.create({ title, message, type, userId });
+    } catch (err) {
+      logger.warn("Gagal mengirim notifikasi expense", {
+        userId,
+        error: err.message,
+      });
+    }
+  }
+
+  /**
+   * Mengirim notifikasi ke semua admin
+   * @param {string} title
+   * @param {string} message
+   * @param {string} [type="INFO"]
+   * @returns {Promise<void>}
+   * @private
+   */
+  async #notifyAdmins(title, message, type = "INFO") {
+    try {
+      const admins = await this.userRepo.findByRole("ADMIN");
+      const activeAdmins = admins.filter((a) => a.isActive);
+      if (activeAdmins.length > 0) {
+        await Promise.all(
+          activeAdmins.map((admin) =>
+            this.notifRepo.create({ title, message, type, userId: admin.id })
+          )
+        );
+      }
+    } catch (err) {
+      logger.warn("Gagal mengirim notifikasi ke admin", { error: err.message });
     }
   }
 
@@ -119,6 +226,39 @@ class ExpenseService {
 
       return newExpense;
     });
+
+    const cashier = await this.userRepo.findById(cashierId);
+
+    const notificationMessage = this.#buildExpenseNotification({
+      eventTitle: "Pengeluaran Baru Dicatat",
+      expense,
+      cashierName: cashier?.fullName || "-",
+      shiftInfo: activeShift.id,
+      hasReceipt: !!receiptId,
+    });
+
+    await this.#sendNotification(
+      cashierId,
+      `Pengeluaran - ${Currency.toIDR(amount)}`,
+      notificationMessage,
+      "INFO"
+    );
+
+    if (amount >= 500000) {
+      const adminMessage = this.#buildExpenseNotification({
+        eventTitle: "Pengeluaran Signifikan",
+        expense,
+        cashierName: cashier?.fullName || "-",
+        shiftInfo: activeShift.id,
+        hasReceipt: !!receiptId,
+      });
+
+      await this.#notifyAdmins(
+        `Pengeluaran Besar - ${Currency.toIDR(amount)}`,
+        adminMessage,
+        "WARNING"
+      );
+    }
 
     logger.info("Pengeluaran berhasil dibuat", {
       expenseId: expense.id,
@@ -209,6 +349,21 @@ class ExpenseService {
 
       return expense;
     });
+
+    const user = await this.userRepo.findById(userId);
+
+    const notificationMessage = this.#buildExpenseNotification({
+      eventTitle: "Pengeluaran Diperbarui",
+      expense: updatedExpense,
+      cashierName: user?.fullName || "-",
+    });
+
+    await this.#sendNotification(
+      existingExpense.recordedById,
+      `Pengeluaran Diperbarui - ${Currency.toIDR(updatedExpense.amount)}`,
+      notificationMessage,
+      "INFO"
+    );
 
     logger.info("Pengeluaran berhasil diperbarui", {
       expenseId,
@@ -320,6 +475,18 @@ class ExpenseService {
       await this.#deleteReceipt(expense.receiptId, expenseId);
 
     await this.expenseRepo.delete(expenseId);
+
+    const notificationMessage = this.#buildExpenseNotification({
+      eventTitle: "Pengeluaran Dihapus",
+      expense,
+    });
+
+    await this.#sendNotification(
+      expense.recordedById,
+      `Pengeluaran Dihapus - ${Currency.toIDR(expense.amount)}`,
+      notificationMessage,
+      "WARNING"
+    );
 
     logger.info("Pengeluaran berhasil dihapus", {
       expenseId,

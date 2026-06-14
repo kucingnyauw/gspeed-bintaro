@@ -64,20 +64,86 @@ class TaskService {
    */
   #formatVehicleInfo(vehicle) {
     if (!vehicle) return "Tidak ada kendaraan";
-    return `${vehicle.plateNumber} - ${vehicle.brand || ""} ${
-      vehicle.model || ""
-    }`.trim();
+    const parts = [vehicle.plateNumber, vehicle.brand, vehicle.model].filter(
+      Boolean
+    );
+    return parts.join(" - ");
   }
 
   /**
-   * Format daftar service untuk notifikasi
+   * Format daftar service dalam Markdown
    * @param {string[]} services - Array nama service
    * @returns {string} Daftar service terformat
    * @private
    */
   #formatServiceList(services) {
     if (!services || services.length === 0) return "";
-    return services.map((name, index) => `  ${index + 1}. ${name}`).join("\n");
+    return services.map((name, index) => `${index + 1}. ${name}`).join("\n");
+  }
+
+  /**
+   * Build notifikasi task dalam format Markdown
+   * @param {Object} params
+   * @param {string} params.eventTitle
+   * @param {string} params.orderNumber
+   * @param {string} [params.mechanicName]
+   * @param {string} [params.customerName]
+   * @param {string} [params.vehicleInfo]
+   * @param {string[]} [params.services]
+   * @param {string} [params.duration]
+   * @param {string} [params.note]
+   * @param {string} [params.extraInfo]
+   * @returns {string}
+   * @private
+   */
+  #buildTaskNotification({
+    eventTitle,
+    orderNumber,
+    mechanicName,
+    customerName,
+    vehicleInfo,
+    services,
+    duration,
+    note,
+    extraInfo,
+  }) {
+    const lines = [];
+
+    lines.push(`## ${eventTitle}`);
+    lines.push("");
+
+    lines.push(`**Pesanan:** #${orderNumber}`);
+
+    if (mechanicName) lines.push(`**Mekanik:** ${mechanicName}`);
+    if (customerName) lines.push(`**Pelanggan:** ${customerName}`);
+    if (vehicleInfo) lines.push(`**Kendaraan:** ${vehicleInfo}`);
+
+    lines.push("");
+
+    if (services && services.length > 0) {
+      lines.push(`**Service (${services.length}):**`);
+      lines.push(this.#formatServiceList(services));
+      lines.push("");
+    }
+
+    if (duration) {
+      lines.push(`**Durasi:** ${duration}`);
+      lines.push("");
+    }
+
+    if (extraInfo) {
+      lines.push(extraInfo);
+      lines.push("");
+    }
+
+    lines.push(`**Waktu:** ${DateTime.toFullID(new Date())}`);
+
+    if (note) {
+      lines.push("");
+      lines.push(`> ${note}`);
+    }
+
+    return lines.join("\n");
   }
 
   /**
@@ -98,7 +164,7 @@ Konteks:
 - Service: ${context.serviceNames || "-"}
 - Nomor Pesanan: ${context.orderNumber || "-"}
 
-Contoh: "Mekanik Andi ditugaskan ke 2 service: Service Ringan dan Ganti Oli. Menunggu pengerjaan dimulai."`,
+Contoh: "Mekanik Andi ditugaskan ke 2 service: Service Ringan dan Ganti Oli."`,
 
         unassign: `Buatkan catatan singkat (1-2 kalimat, maksimal 100 karakter) dalam bahasa Indonesia tentang pelepasan mekanik dari pesanan.
 
@@ -272,7 +338,7 @@ Contoh: "Semua service selesai dikerjakan oleh Andi. Durasi pengerjaan 45 menit.
   }
 
   /**
-   * Mengirim notifikasi
+   * Mengirim notifikasi dengan format Markdown
    * @param {string} userId - ID user penerima
    * @param {string} title - Judul notifikasi
    * @param {string} message - Pesan notifikasi
@@ -304,29 +370,13 @@ Contoh: "Semua service selesai dikerjakan oleh Andi. Durasi pengerjaan 45 menit.
     return product;
   }
 
-  // ============================================================
-  // PUBLIC METHODS
-  // ============================================================
-
   /**
    * Assign mekanik ke semua item service unassigned dalam order
-   *
-   * Flow:
-   * 1. Validasi mekanik (role, ketersediaan, kapasitas)
-   * 2. Validasi order (harus QUEUED)
-   * 3. Ambil item service unassigned
-   * 4. Assign mekanik ke setiap item
-   * 5. Catat history + notifikasi + invalidasi cache
-   *
    * @param {string} orderId - ID pesanan
    * @param {string} mechanicId - ID mekanik
    * @returns {Promise<Array>} Daftar assignment yang dibuat
-   *
    * @throws {ApiError} 400 - Bukan mekanik / tidak tersedia / kapasitas penuh / bukan QUEUED
    * @throws {ApiError} 404 - Pesanan tidak ditemukan
-   *
-   * @example
-   * const assignments = await taskService.assignMechanicToOrder("order-id", "mechanic-id");
    */
   async assignMechanicToOrder(orderId, mechanicId) {
     const mechanic = await this.userRepo.findById(mechanicId);
@@ -369,20 +419,20 @@ Contoh: "Semua service selesai dikerjakan oleh Andi. Durasi pengerjaan 45 menit.
 
     await this.#invalidateOrderHistoryCache(order.orderNumber);
 
-    const msg = [
-      `Tugas Baru Diterima`,
-      ``,
-      `Pesanan: #${order.orderNumber}`,
-      `Pelanggan: ${order.customer?.name || "-"}`,
-      `Kendaraan: ${this.#formatVehicleInfo(order.vehicle)}`,
-      ``,
-      `Service (${assignments.length}):`,
-      `${this.#formatServiceList(serviceNames)}`,
-    ].join("\n");
+    const notificationMessage = this.#buildTaskNotification({
+      eventTitle: "Tugas Baru Diterima",
+      orderNumber: order.orderNumber,
+      mechanicName: mechanic.fullName,
+      customerName: order.customer?.name || "-",
+      vehicleInfo: this.#formatVehicleInfo(order.vehicle),
+      services: serviceNames,
+    });
+
     await this.#sendNotification(
       mechanicId,
       `Tugas Baru - #${order.orderNumber}`,
-      msg
+      notificationMessage,
+      "INFO"
     );
 
     logger.info("Mekanik di-assign", {
@@ -395,21 +445,11 @@ Contoh: "Semua service selesai dikerjakan oleh Andi. Durasi pengerjaan 45 menit.
 
   /**
    * Unassign semua mekanik dari order
-   *
-   * Flow:
-   * 1. Validasi order (tidak boleh COMPLETED/CLOSED/CANCELLED/DRAFT)
-   * 2. Unassign semua mekanik dari item service
-   * 3. Catat history + notifikasi + invalidasi cache
-   *
    * @param {string} orderId - ID pesanan
    * @param {string} [userId] - ID user yang melakukan unassign
    * @returns {Promise<void>}
-   *
    * @throws {ApiError} 404 - Pesanan tidak ditemukan
    * @throws {ApiError} 400 - Pesanan sudah selesai / belum dibayar / tidak ada mekanik
-   *
-   * @example
-   * await taskService.unassignMechanicFromOrder("order-id", "user-id");
    */
   async unassignMechanicFromOrder(orderId, userId) {
     const order = await this.orderRepo.findById(orderId);
@@ -458,16 +498,17 @@ Contoh: "Semua service selesai dikerjakan oleh Andi. Durasi pengerjaan 45 menit.
 
     await this.#invalidateOrderHistoryCache(order.orderNumber);
 
+    const notificationMessage = this.#buildTaskNotification({
+      eventTitle: "Penugasan Dilepas",
+      orderNumber: order.orderNumber,
+      note: "Anda telah dilepas dari pesanan ini.",
+    });
+
     for (const mId of mechanicIds) {
       await this.#sendNotification(
         mId,
         `Unassign - #${order.orderNumber}`,
-        [
-          `Penugasan Dilepas`,
-          ``,
-          `Pesanan: #${order.orderNumber}`,
-          `Anda telah dilepas dari pesanan ini.`,
-        ].join("\n"),
+        notificationMessage,
         "WARNING"
       );
     }
@@ -480,9 +521,6 @@ Contoh: "Semua service selesai dikerjakan oleh Andi. Durasi pengerjaan 45 menit.
    * @param {string} assignmentId - ID assignment
    * @returns {Promise<Object>} Data assignment
    * @throws {ApiError} 404 - Task tidak ditemukan
-   *
-   * @example
-   * const task = await taskService.getTaskById("assignment-id");
    */
   async getTaskById(assignmentId) {
     const a = await this.taskRepo.findById(assignmentId);
@@ -497,9 +535,6 @@ Contoh: "Semua service selesai dikerjakan oleh Andi. Durasi pengerjaan 45 menit.
    * @param {string} orderId - ID pesanan
    * @returns {Promise<Object>} Data order dengan services dan assignments
    * @throws {ApiError} 404 - Pesanan tidak ditemukan
-   *
-   * @example
-   * const tasks = await taskService.getTasksByOrderId("order-id");
    */
   async getTasksByOrderId(orderId) {
     const order = await this.orderRepo.findById(orderId);
@@ -586,9 +621,6 @@ Contoh: "Semua service selesai dikerjakan oleh Andi. Durasi pengerjaan 45 menit.
    * Dapatkan semua tasks dengan filter dan paginasi
    * @param {Object} [query={}] - Parameter query
    * @returns {Promise<{data: Array, metadata: Object}>} Daftar tasks
-   *
-   * @example
-   * const { data, metadata } = await taskService.getTasks({ page: 1, limit: 10 });
    */
   async getTasks(query = {}) {
     return this.taskRepo.findMany(query);
@@ -598,9 +630,6 @@ Contoh: "Semua service selesai dikerjakan oleh Andi. Durasi pengerjaan 45 menit.
    * Dapatkan tasks berdasarkan mekanik (grouped by order)
    * @param {string} mechanicId - ID mekanik
    * @returns {Promise<Array>} Daftar order dengan services
-   *
-   * @example
-   * const tasks = await taskService.getTasksByMechanic("mechanic-id");
    */
   async getTasksByMechanic(mechanicId) {
     const assignments = await this.taskRepo.findByMechanicId(mechanicId);
@@ -632,9 +661,6 @@ Contoh: "Semua service selesai dikerjakan oleh Andi. Durasi pengerjaan 45 menit.
    * Dapatkan tasks yang belum di-assign
    * @param {Object} [query={}] - Parameter query
    * @returns {Promise<{data: Array, metadata: Object}>} Daftar tasks unassigned
-   *
-   * @example
-   * const { data } = await taskService.getUnassignedTasks({ page: 1 });
    */
   async getUnassignedTasks(query = {}) {
     return this.taskRepo.findUnassignedServiceTasks(query);
@@ -642,23 +668,12 @@ Contoh: "Semua service selesai dikerjakan oleh Andi. Durasi pengerjaan 45 menit.
 
   /**
    * Mulai pengerjaan order (QUEUED -> IN_PROGRESS)
-   *
-   * Flow:
-   * 1. Validasi order (harus QUEUED)
-   * 2. Ambil assignment pending mekanik
-   * 3. Start semua task pending
-   * 4. Update order status + history + notifikasi + invalidasi cache
-   *
    * @param {string} orderId - ID pesanan
    * @param {string} mechanicId - ID mekanik
    * @returns {Promise<Array>} Daftar task yang dimulai
-   *
    * @throws {ApiError} 404 - Pesanan tidak ditemukan
    * @throws {ApiError} 400 - Bukan QUEUED / tidak ada task aktif
    * @throws {ApiError} 409 - Semua task sudah dimulai
-   *
-   * @example
-   * const started = await taskService.startOrder("order-id", "mechanic-id");
    */
   async startOrder(orderId, mechanicId) {
     const order = await this.orderRepo.findById(orderId);
@@ -709,20 +724,19 @@ Contoh: "Semua service selesai dikerjakan oleh Andi. Durasi pengerjaan 45 menit.
     await this.#invalidateOrderHistoryCache(order.orderNumber);
 
     if (order.cashierId) {
+      const notificationMessage = this.#buildTaskNotification({
+        eventTitle: "Pengerjaan Dimulai",
+        orderNumber: order.orderNumber,
+        mechanicName: mechanic?.fullName || "-",
+        services: names,
+        extraInfo: `**Waktu Mulai:** ${DateTime.toFullID(startTime)}`,
+      });
+
       await this.#sendNotification(
         order.cashierId,
         `Pengerjaan Dimulai - #${order.orderNumber}`,
-        [
-          `Pengerjaan Dimulai`,
-          ``,
-          `Pesanan: #${order.orderNumber}`,
-          `Mekanik: ${mechanic?.fullName || "-"}`,
-          ``,
-          `Service:`,
-          `${this.#formatServiceList(names)}`,
-          ``,
-          `Waktu: ${DateTime.toFullID(startTime)}`,
-        ].join("\n")
+        notificationMessage,
+        "INFO"
       );
     }
 
@@ -736,23 +750,12 @@ Contoh: "Semua service selesai dikerjakan oleh Andi. Durasi pengerjaan 45 menit.
 
   /**
    * Selesaikan pengerjaan order (IN_PROGRESS -> COMPLETED)
-   *
-   * Flow:
-   * 1. Validasi order (harus IN_PROGRESS)
-   * 2. Ambil assignment aktif mekanik
-   * 3. Complete semua task pending
-   * 4. Update order status + history + notifikasi + invalidasi cache
-   *
    * @param {string} orderId - ID pesanan
    * @param {string} mechanicId - ID mekanik
    * @returns {Promise<Array>} Daftar task yang diselesaikan
-   *
    * @throws {ApiError} 404 - Pesanan tidak ditemukan
    * @throws {ApiError} 400 - Bukan IN_PROGRESS / tidak ada task aktif
    * @throws {ApiError} 409 - Semua task sudah selesai
-   *
-   * @example
-   * const completed = await taskService.completeOrder("order-id", "mechanic-id");
    */
   async completeOrder(orderId, mechanicId) {
     const order = await this.orderRepo.findById(orderId);
@@ -805,22 +808,19 @@ Contoh: "Semua service selesai dikerjakan oleh Andi. Durasi pengerjaan 45 menit.
     await this.#invalidateOrderHistoryCache(order.orderNumber);
 
     if (order.cashierId) {
+      const notificationMessage = this.#buildTaskNotification({
+        eventTitle: "Pengerjaan Selesai",
+        orderNumber: order.orderNumber,
+        mechanicName: mechanic?.fullName || "-",
+        services: names,
+        duration,
+        note: "Pesanan siap ditutup.",
+      });
+
       await this.#sendNotification(
         order.cashierId,
         `Pengerjaan Selesai - #${order.orderNumber}`,
-        [
-          `Pengerjaan Selesai`,
-          ``,
-          `Pesanan: #${order.orderNumber}`,
-          `Mekanik: ${mechanic?.fullName || "-"}`,
-          ``,
-          `Service:`,
-          `${this.#formatServiceList(names)}`,
-          ``,
-          `Durasi: ${duration}`,
-          ``,
-          `Pesanan siap ditutup.`,
-        ].join("\n"),
+        notificationMessage,
         "SUCCESS"
       );
     }
@@ -838,9 +838,6 @@ Contoh: "Semua service selesai dikerjakan oleh Andi. Durasi pengerjaan 45 menit.
    * Dapatkan daftar mekanik yang tersedia
    * @param {Object} [query={}] - Parameter query
    * @returns {Promise<{data: Array, metadata: Object}>} Daftar mekanik dengan status ketersediaan
-   *
-   * @example
-   * const { data } = await taskService.getAvailableMechanics({ page: 1 });
    */
   async getAvailableMechanics(query = {}) {
     const result = await this.taskRepo.getAvailableMechanics(query);
@@ -854,11 +851,8 @@ Contoh: "Semua service selesai dikerjakan oleh Andi. Durasi pengerjaan 45 menit.
   /**
    * Cek status ketersediaan mekanik
    * @param {string} mechanicId - ID mekanik
-   * @returns {Promise<Object>} Status ketersediaan (isAvailable, activeTaskCount, maxTasks, remainingCapacity)
+   * @returns {Promise<Object>} Status ketersediaan
    * @throws {ApiError} 400 - Bukan mekanik
-   *
-   * @example
-   * const status = await taskService.getMechanicAvailabilityStatus("mechanic-id");
    */
   async getMechanicAvailabilityStatus(mechanicId) {
     const m = await this.userRepo.findById(mechanicId);
@@ -878,9 +872,6 @@ Contoh: "Semua service selesai dikerjakan oleh Andi. Durasi pengerjaan 45 menit.
    * Cek apakah order item sudah memiliki mekanik
    * @param {string} orderItemId - ID order item
    * @returns {Promise<boolean>} True jika sudah ada mekanik
-   *
-   * @example
-   * const hasMechanic = await taskService.hasMechanicAssigned("order-item-id");
    */
   async hasMechanicAssigned(orderItemId) {
     return this.taskRepo.hasMechanicAssigned(orderItemId);
@@ -891,12 +882,6 @@ Contoh: "Semua service selesai dikerjakan oleh Andi. Durasi pengerjaan 45 menit.
    * @param {Array<{orderId: string, mechanicId: string}>} assignments - Array penugasan
    * @returns {Promise<{summary: Object, details: Object}>} Ringkasan dan detail assign
    * @throws {ApiError} 400 - Tidak ada data penugasan / tidak ada yang valid
-   *
-   * @example
-   * const result = await taskService.bulkAssignMechanics([
-   *   { orderId: "order-1", mechanicId: "mech-1" },
-   *   { orderId: "order-2", mechanicId: "mech-2" },
-   * ]);
    */
   async bulkAssignMechanics(assignments) {
     if (!assignments?.length)
@@ -970,11 +955,6 @@ Contoh: "Semua service selesai dikerjakan oleh Andi. Durasi pengerjaan 45 menit.
    * @param {Array<{orderId: string, mechanicId: string}>} orders - Array order yang akan dimulai
    * @returns {Promise<{summary: Object, details: Object}>} Ringkasan dan detail start
    * @throws {ApiError} 400 - Tidak ada order
-   *
-   * @example
-   * const result = await taskService.bulkStartOrders([
-   *   { orderId: "order-1", mechanicId: "mech-1" },
-   * ]);
    */
   async bulkStartOrders(orders) {
     if (!orders?.length)
@@ -1003,11 +983,6 @@ Contoh: "Semua service selesai dikerjakan oleh Andi. Durasi pengerjaan 45 menit.
    * @param {Array<{orderId: string, mechanicId: string}>} orders - Array order yang akan diselesaikan
    * @returns {Promise<{summary: Object, details: Object}>} Ringkasan dan detail complete
    * @throws {ApiError} 400 - Tidak ada order
-   *
-   * @example
-   * const result = await taskService.bulkCompleteOrders([
-   *   { orderId: "order-1", mechanicId: "mech-1" },
-   * ]);
    */
   async bulkCompleteOrders(orders) {
     if (!orders?.length)
@@ -1036,9 +1011,6 @@ Contoh: "Semua service selesai dikerjakan oleh Andi. Durasi pengerjaan 45 menit.
    * @param {string} mechanicId - ID mekanik
    * @param {Object} [query={}] - Parameter query
    * @returns {Promise<{data: Array, metadata: Object}>} Daftar task mekanik
-   *
-   * @example
-   * const { data } = await taskService.getMyTasks("mechanic-id", { page: 1 });
    */
   async getMyTasks(mechanicId, query = {}) {
     return this.taskRepo.findMyTasks(mechanicId, query);
@@ -1049,9 +1021,6 @@ Contoh: "Semua service selesai dikerjakan oleh Andi. Durasi pengerjaan 45 menit.
    * @param {string} mechanicId - ID mekanik
    * @param {Object} [query={}] - Parameter query
    * @returns {Promise<{data: Array, metadata: Object}>} Riwayat task mekanik
-   *
-   * @example
-   * const { data } = await taskService.getMyTaskHistory("mechanic-id", { page: 1 });
    */
   async getMyTaskHistory(mechanicId, query = {}) {
     return this.taskRepo.findHistoryByMechanic(mechanicId, query);

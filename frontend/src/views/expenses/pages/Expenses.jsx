@@ -1,3 +1,9 @@
+/**
+ * Expenses - Komponen halaman untuk mengelola pengeluaran kasir dengan filter dan pencarian.
+ *
+ * @component
+ * @returns {JSX.Element} Halaman pengeluaran
+ */
 import { useCallback, useMemo, useState } from "react";
 import { FilePenLine, ListFilter, Plus, RotateCcw, Trash2 } from "lucide-react";
 import {
@@ -78,6 +84,8 @@ const Expenses = () => {
       endDate: activeFilters.endDate
         ? activeFilters.endDate.toISOString()
         : undefined,
+      sortBy: activeFilters.sortBy || "date",
+      sortOrder: activeFilters.sortOrder || "desc",
     }),
     [page, limit, debouncedSearch, activeFilters]
   );
@@ -194,6 +202,28 @@ const Expenses = () => {
         {formatDateTime(row.date)}
       </Typography>,
 
+      <Box key={`receipt-${row.id}`}>
+        {row.receipt ? (
+          <Box
+            component="img"
+            src={row.receipt}
+            alt="Nota"
+            sx={{
+              width: 48,
+              height: 48,
+              borderRadius: `${theme.shape.borderRadius}px`,
+              objectFit: "cover",
+              border: "1px solid",
+              borderColor: alpha(theme.palette.divider, 0.8),
+            }}
+          />
+        ) : (
+          <Typography variant="body2" color="text.disabled" sx={{ fontWeight: 400 }}>
+            —
+          </Typography>
+        )}
+      </Box>,
+
       <Stack key={`action-${row.id}`} direction="row" sx={{ gap: 0.5 }}>
         <Tooltip title="Edit">
           <Box component="span" sx={{ display: "inline-flex" }}>
@@ -286,7 +316,7 @@ const Expenses = () => {
         data={tableData}
         emptyStateMessage="Tidak ada pengeluaran ditemukan"
         enableMultiSelect
-        headers={["Judul", "Jumlah", "Kategori", "Pencatat", "Tanggal", "Aksi"]}
+        headers={["Judul", "Jumlah", "Kategori", "Pencatat", "Tanggal", "Nota", "Aksi"]}
         isLoading={isLoading}
         onChange={handlePageChange}
         onRowDoubleClick={handleRowDoubleClick}

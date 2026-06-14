@@ -1,3 +1,9 @@
+/**
+ * Shifts - Komponen halaman untuk mengelola shift aktif dengan operasi kas dan filter.
+ *
+ * @component
+ * @returns {JSX.Element} Halaman daftar shift
+ */
 import { useCallback, useMemo, useState } from "react";
 import {
   ArrowDownCircle,
@@ -67,11 +73,17 @@ const Shifts = () => {
 
   const params = useMemo(
     () => ({
-      endDate: activeFilters.endDate ? activeFilters.endDate.toISOString() : undefined,
+      endDate: activeFilters.endDate
+        ? activeFilters.endDate.toISOString()
+        : undefined,
       limit,
       page,
-      startDate: activeFilters.startDate ? activeFilters.startDate.toISOString() : undefined,
+      startDate: activeFilters.startDate
+        ? activeFilters.startDate.toISOString()
+        : undefined,
       status: activeFilters.status || undefined,
+      sortBy: activeFilters.sortBy || "openedAt",
+      sortOrder: activeFilters.sortOrder || "desc",
     }),
     [page, limit, activeFilters]
   );
@@ -92,7 +104,9 @@ const Shifts = () => {
   }, [resetFilter]);
 
   const handleRowDoubleClick = useCallback(
-    (row) => { openDetailDialog(row.id); },
+    (row) => {
+      openDetailDialog(row.id);
+    },
     [openDetailDialog]
   );
 
@@ -131,11 +145,19 @@ const Shifts = () => {
           variant="outlined"
         />,
 
-        <Typography key={`open-${row.id}`} variant="body2" color="text.secondary">
+        <Typography
+          key={`open-${row.id}`}
+          variant="body2"
+          color="text.secondary"
+        >
           {formatDateTime(row.openedAt)}
         </Typography>,
 
-        <Typography key={`close-${row.id}`} variant="body2" color="text.secondary">
+        <Typography
+          key={`close-${row.id}`}
+          variant="body2"
+          color="text.secondary"
+        >
           {row.closedAt ? formatDateTime(row.closedAt) : "—"}
         </Typography>,
 
@@ -144,7 +166,9 @@ const Shifts = () => {
         </Typography>,
 
         <Typography key={`end-${row.id}`} variant="body2">
-          {row.endingCash !== null && row.endingCash !== undefined ? formatToIdr(row.endingCash) : "—"}
+          {row.endingCash !== null && row.endingCash !== undefined
+            ? formatToIdr(row.endingCash)
+            : "—"}
         </Typography>,
 
         <Box key={`sales-${row.id}`}>
@@ -180,16 +204,27 @@ const Shifts = () => {
                 aria-label="Kas Masuk"
                 sx={{
                   border: "1px solid",
-                  borderColor: isOpen ? alpha(theme.palette.divider, 0.8) : alpha(theme.palette.divider, 0.4),
+                  borderColor: isOpen
+                    ? alpha(theme.palette.divider, 0.8)
+                    : alpha(theme.palette.divider, 0.4),
                   borderRadius: `${theme.shape.borderRadius}px`,
-                  bgcolor: isOpen ? alpha(theme.palette.background.paper, 0.6) : "transparent",
-                  color: isOpen ? theme.palette.text.secondary : theme.palette.action.disabled,
-                  transition: theme.transitions.create(["background-color", "border-color", "color"], { duration: theme.transitions.duration.shorter }),
-                  "&:hover": isOpen ? {
-                    bgcolor: alpha(theme.palette.success.main, 0.06),
-                    borderColor: alpha(theme.palette.success.main, 0.4),
-                    color: theme.palette.success.main,
-                  } : {},
+                  bgcolor: isOpen
+                    ? alpha(theme.palette.background.paper, 0.6)
+                    : "transparent",
+                  color: isOpen
+                    ? theme.palette.text.secondary
+                    : theme.palette.action.disabled,
+                  transition: theme.transitions.create(
+                    ["background-color", "border-color", "color"],
+                    { duration: theme.transitions.duration.shorter }
+                  ),
+                  "&:hover": isOpen
+                    ? {
+                        bgcolor: alpha(theme.palette.success.main, 0.06),
+                        borderColor: alpha(theme.palette.success.main, 0.4),
+                        color: theme.palette.success.main,
+                      }
+                    : {},
                 }}
               >
                 <ArrowDownCircle size={16} strokeWidth={1.5} />
@@ -206,16 +241,27 @@ const Shifts = () => {
                 aria-label="Kas Keluar"
                 sx={{
                   border: "1px solid",
-                  borderColor: isOpen ? alpha(theme.palette.divider, 0.8) : alpha(theme.palette.divider, 0.4),
+                  borderColor: isOpen
+                    ? alpha(theme.palette.divider, 0.8)
+                    : alpha(theme.palette.divider, 0.4),
                   borderRadius: `${theme.shape.borderRadius}px`,
-                  bgcolor: isOpen ? alpha(theme.palette.background.paper, 0.6) : "transparent",
-                  color: isOpen ? theme.palette.text.secondary : theme.palette.action.disabled,
-                  transition: theme.transitions.create(["background-color", "border-color", "color"], { duration: theme.transitions.duration.shorter }),
-                  "&:hover": isOpen ? {
-                    bgcolor: alpha(theme.palette.error.main, 0.06),
-                    borderColor: alpha(theme.palette.error.main, 0.4),
-                    color: theme.palette.error.main,
-                  } : {},
+                  bgcolor: isOpen
+                    ? alpha(theme.palette.background.paper, 0.6)
+                    : "transparent",
+                  color: isOpen
+                    ? theme.palette.text.secondary
+                    : theme.palette.action.disabled,
+                  transition: theme.transitions.create(
+                    ["background-color", "border-color", "color"],
+                    { duration: theme.transitions.duration.shorter }
+                  ),
+                  "&:hover": isOpen
+                    ? {
+                        bgcolor: alpha(theme.palette.error.main, 0.06),
+                        borderColor: alpha(theme.palette.error.main, 0.4),
+                        color: theme.palette.error.main,
+                      }
+                    : {},
                 }}
               >
                 <ArrowUpCircle size={16} strokeWidth={1.5} />
@@ -232,16 +278,27 @@ const Shifts = () => {
                 aria-label="Tutup Shift"
                 sx={{
                   border: "1px solid",
-                  borderColor: isOpen ? alpha(theme.palette.divider, 0.8) : alpha(theme.palette.divider, 0.4),
+                  borderColor: isOpen
+                    ? alpha(theme.palette.divider, 0.8)
+                    : alpha(theme.palette.divider, 0.4),
                   borderRadius: `${theme.shape.borderRadius}px`,
-                  bgcolor: isOpen ? alpha(theme.palette.background.paper, 0.6) : "transparent",
-                  color: isOpen ? theme.palette.text.secondary : theme.palette.action.disabled,
-                  transition: theme.transitions.create(["background-color", "border-color", "color"], { duration: theme.transitions.duration.shorter }),
-                  "&:hover": isOpen ? {
-                    bgcolor: alpha(theme.palette.secondary.main, 0.06),
-                    borderColor: alpha(theme.palette.secondary.main, 0.4),
-                    color: theme.palette.secondary.main,
-                  } : {},
+                  bgcolor: isOpen
+                    ? alpha(theme.palette.background.paper, 0.6)
+                    : "transparent",
+                  color: isOpen
+                    ? theme.palette.text.secondary
+                    : theme.palette.action.disabled,
+                  transition: theme.transitions.create(
+                    ["background-color", "border-color", "color"],
+                    { duration: theme.transitions.duration.shorter }
+                  ),
+                  "&:hover": isOpen
+                    ? {
+                        bgcolor: alpha(theme.palette.secondary.main, 0.06),
+                        borderColor: alpha(theme.palette.secondary.main, 0.4),
+                        color: theme.palette.secondary.main,
+                      }
+                    : {},
                 }}
               >
                 <XCircle size={16} strokeWidth={1.5} />
@@ -263,8 +320,13 @@ const Shifts = () => {
     [openOpenDialog, openFilter, refetch]
   );
 
-  const handlePageChange = useCallback((event, newPage) => { setPage(newPage); }, []);
-  const handleRowsPerPageChange = useCallback((newLimit) => { setLimit(newLimit); setPage(1); }, []);
+  const handlePageChange = useCallback((event, newPage) => {
+    setPage(newPage);
+  }, []);
+  const handleRowsPerPageChange = useCallback((newLimit) => {
+    setLimit(newLimit);
+    setPage(1);
+  }, []);
 
   return (
     <>
@@ -273,7 +335,17 @@ const Shifts = () => {
         count={metadata.totalPages || 0}
         data={tableData}
         emptyStateMessage="Tidak ada shift ditemukan"
-        headers={["Kasir", "Status", "Waktu Buka", "Waktu Tutup", "Saldo Awal", "Saldo Akhir", "Penjualan Tunai", "Selisih", "Aksi"]}
+        headers={[
+          "Kasir",
+          "Status",
+          "Waktu Buka",
+          "Waktu Tutup",
+          "Saldo Awal",
+          "Saldo Akhir",
+          "Penjualan Tunai",
+          "Selisih",
+          "Aksi",
+        ]}
         isLoading={isLoading}
         onChange={handlePageChange}
         onRowDoubleClick={handleRowDoubleClick}
@@ -286,11 +358,32 @@ const Shifts = () => {
         title="Daftar Shift"
       />
 
-      <ShiftFilterDialog onApply={handleApplyFilter} onClose={closeFilter} onFilterChange={setTempFilters} onReset={handleResetFilter} open={filterOpen} tempFilters={tempFilters} />
+      <ShiftFilterDialog
+        hideCashier
+        onApply={handleApplyFilter}
+        onClose={closeFilter}
+        onFilterChange={setTempFilters}
+        onReset={handleResetFilter}
+        open={filterOpen}
+        tempFilters={tempFilters}
+      />
       <ShiftOpenDialog onClose={closeOpenDialog} open={openDialog} />
-      <ShiftCloseDialog onClose={closeCloseDialog} open={closeDialog} shiftId={selectedShiftId} />
-      <ShiftCashDialog onClose={closeCashDialog} open={cashDialog.open} shiftId={selectedShiftId} type={cashDialog.type} />
-      <ShiftDetailDialog onClose={closeDetailDialog} open={detailDialog.open} shiftId={detailDialog.shiftId} />
+      <ShiftCloseDialog
+        onClose={closeCloseDialog}
+        open={closeDialog}
+        shiftId={selectedShiftId}
+      />
+      <ShiftCashDialog
+        onClose={closeCashDialog}
+        open={cashDialog.open}
+        shiftId={selectedShiftId}
+        type={cashDialog.type}
+      />
+      <ShiftDetailDialog
+        onClose={closeDetailDialog}
+        open={detailDialog.open}
+        shiftId={detailDialog.shiftId}
+      />
     </>
   );
 };

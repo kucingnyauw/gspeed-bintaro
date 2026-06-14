@@ -75,7 +75,7 @@ const updateProductSchema = Joi.object({
     "number.min": "Harga modal tidak boleh negatif",
     "number.max": "Harga modal maksimal 99.999.999",
   }),
-  isActive: Joi.boolean().truthy("true").falsy("false").optional(),
+  isActive: Joi.boolean().optional(),
 })
   .min(1)
   .messages({
@@ -124,14 +124,15 @@ const getProductsQuerySchema = Joi.object({
     "number.integer": "Harga minimum harus berupa bilangan bulat",
     "number.min": "Harga minimum tidak boleh negatif",
   }),
-  maxPrice: Joi.number().integer().min(0).optional().messages({
+  maxPrice: Joi.number().integer().min(Joi.ref("minPrice")).optional().messages({
     "number.base": "Harga maksimum harus berupa angka",
     "number.integer": "Harga maksimum harus berupa bilangan bulat",
-    "number.min": "Harga maksimum tidak boleh negatif",
+    "number.min": "Harga maksimum tidak boleh kurang dari harga minimum",
   }),
   sortBy: Joi.string()
     .valid("name", "price", "stock", "createdAt")
     .optional()
+    .default("createdAt")
     .messages({
       "any.only": "Sort by harus name, price, stock, atau createdAt",
     }),
@@ -172,6 +173,23 @@ const productSkuParamSchema = Joi.object({
   }),
 });
 
+/**
+ * Schema untuk bulk deactivate/activate produk
+ */
+const bulkProductIdsSchema = Joi.object({
+  ids: Joi.array()
+    .items(Joi.string().required())
+    .min(1)
+    .max(100)
+    .required()
+    .messages({
+      "any.required": "Array ID produk harus diisi",
+      "array.min": "Minimal 1 produk harus dipilih",
+      "array.max": "Maksimal 100 produk per request",
+      "string.empty": "ID produk tidak boleh kosong",
+    }),
+});
+
 export {
   createProductSchema,
   updateProductSchema,
@@ -179,4 +197,5 @@ export {
   checkSkuAvailabilitySchema,
   productIdParamSchema,
   productSkuParamSchema,
+  bulkProductIdsSchema,
 };

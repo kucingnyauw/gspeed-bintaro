@@ -111,7 +111,7 @@ const getUsersQuerySchema = Joi.object({
     "string.max": "Pencarian maksimal 100 karakter",
   }),
   role: Joi.string()
-    .valid("ADMIN", "CASHIER", "MECHANIC")
+    .valid("CASHIER", "MECHANIC")
     .optional()
     .messages({
       "any.only": "Role harus ADMIN, CASHIER, atau MECHANIC",

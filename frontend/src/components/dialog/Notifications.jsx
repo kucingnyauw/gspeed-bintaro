@@ -1,11 +1,22 @@
 /**
  * NotificationHandler - Global notification handler supporting snackbar and dialog variants.
  *
+ * Mendukung dua variant:
+ * - `snackbar`: Notifikasi popup di bottom-right dengan animasi spring
+ * - `dialog`: Modal dialog untuk pesan penting yang memerlukan perhatian
+ *
+ * Fitur:
+ * - Animasi masuk/keluar dengan Framer Motion (snackbar)
+ * - Auto-hide dengan durasi yang dapat dikonfigurasi
+ * - Tombol "Segarkan" pada dialog untuk reload halaman
+ * - Tampilan responsif untuk mobile dan desktop
+ * - Warna dinamis berdasarkan tipe notifikasi (success/error/warning/info)
+ *
  * @component
- * @returns {JSX.Element|null} Rendered notification or null
+ * @returns {JSX.Element|null} Komponen notifikasi atau null jika tidak ada
  */
 import { useCallback, useEffect, useState } from "react";
-import { RotateCcw, X } from "lucide-react";
+import { X } from "lucide-react";
 import { motion } from "framer-motion";
 import {
   Snackbar,
@@ -35,78 +46,28 @@ import {
   selectNotificationVariant,
   selectNotificationAutoHide,
 } from "@store/notifications/notificationsSelector.js";
+import { useDevice } from "@hooks";
 
-/**
- * MotionAlert - Alert component dengan animasi Framer Motion.
- * Menggunakan spring animation untuk transisi masuk/keluar.
- *
- * @type {React.ComponentType}
- */
 const MotionAlert = motion.create(Alert);
 
-/**
- * NotificationHandler - Komponen global untuk menampilkan notifikasi.
- *
- * Mendukung dua variant:
- * - `snackbar`: Notifikasi popup di bottom-right dengan animasi spring
- * - `dialog`: Modal dialog untuk pesan penting yang memerlukan perhatian
- *
- * Fitur:
- * - Animasi masuk/keluar dengan Framer Motion (snackbar)
- * - Auto-hide dengan durasi yang dapat dikonfigurasi
- * - Tombol "Segarkan" pada dialog untuk reload halaman
- * - Tampilan responsif untuk mobile dan desktop
- * - Warna dinamis berdasarkan tipe notifikasi (success/error/warning/info)
- *
- * @component
- * @returns {JSX.Element|null} Komponen notifikasi atau null jika tidak ada
- */
 const NotificationHandler = () => {
   const theme = useTheme();
   const dispatch = useDispatch();
+  const { isMobile } = useDevice();
 
-  /** @type {boolean} Status notifikasi dari Redux store */
   const open = useSelector(selectNotificationOpen);
-
-  /** @type {string} Tipe notifikasi (success/error/warning/info) */
   const type = useSelector(selectNotificationType) || "info";
-
-  /** @type {string} Judul notifikasi */
   const title = useSelector(selectNotificationTitle);
-
-  /** @type {string} Pesan notifikasi */
   const message = useSelector(selectNotificationMessage);
-
-  /** @type {string} Variant notifikasi (snackbar/dialog) */
   const variant = useSelector(selectNotificationVariant);
-
-  /** @type {number} Durasi auto-hide dalam milidetik */
   const autoHide = useSelector(selectNotificationAutoHide);
 
-  /**
-   * State lokal untuk mengontrol animasi keluar.
-   * Dipisahkan dari Redux state agar animasi bisa selesai sebelum unmount.
-   * @type {[boolean, Function]}
-   */
   const [localOpen, setLocalOpen] = useState(false);
 
-  /**
-   * Effect: Sinkronisasi Redux open state ke local state.
-   * Memastikan animasi masuk terpicu saat notifikasi muncul.
-   */
   useEffect(() => {
-    if (open) {
-      setLocalOpen(true);
-    }
+    if (open) setLocalOpen(true);
   }, [open]);
 
-  /**
-   * Handler untuk menutup notifikasi.
-   * Menjalankan animasi keluar terlebih dahulu, lalu dispatch hideNotification.
-   *
-   * @param {Object} event - Event yang memicu penutupan
-   * @param {string} reason - Alasan penutupan ("clickaway" untuk mencegah tutup saat klik luar)
-   */
   const handleClose = useCallback(
     (event, reason) => {
       if (reason === "clickaway") return;
@@ -116,10 +77,6 @@ const NotificationHandler = () => {
     [dispatch]
   );
 
-  /**
-   * Handler untuk tombol "Segarkan" pada dialog.
-   * Menutup notifikasi lalu reload halaman.
-   */
   const handleRefresh = () => {
     setLocalOpen(false);
     setTimeout(() => {
@@ -132,21 +89,36 @@ const NotificationHandler = () => {
 
   if (variant === "dialog") {
     return (
-      <Dialog open={open} onClose={handleClose} maxWidth="xs" fullWidth>
+      <Dialog
+        open={open}
+        onClose={handleClose}
+        maxWidth="xs"
+        fullWidth
+        slotProps={{
+          paper: {
+            sx: {
+              borderRadius: `${theme.shape.borderRadius}px`,
+              overflow: "hidden",
+            },
+          },
+        }}
+      >
         {title && (
-          <DialogTitle sx={{ pb: 1.5 }}>
+          <DialogTitle sx={{ pb: 1.5, px: { xs: 2.5, sm: 3 } }}>
             <Stack
               direction="row"
               sx={{ justifyContent: "space-between", alignItems: "center" }}
             >
-              <Typography variant="h6" component="span" sx={{ fontWeight: 600 }}>
+              <Typography
+                variant="h6"
+                sx={{
+                  fontWeight: 600,
+                  fontSize: { xs: "1rem", sm: "1.125rem" },
+                }}
+              >
                 {title}
               </Typography>
-              <IconButton
-                onClick={handleClose}
-                size="small"
-                sx={{ mr: -0.5 }}
-              >
+              <IconButton onClick={handleClose} size="small" sx={{ mr: -0.5 }}>
                 <X size={18} strokeWidth={2} />
               </IconButton>
             </Stack>
@@ -155,15 +127,21 @@ const NotificationHandler = () => {
 
         <Divider />
 
-        <DialogContent sx={{ py: 3 }}>
-          <DialogContentText color="text.primary" sx={{ lineHeight: 1.7 }}>
+        <DialogContent sx={{ py: 3, px: { xs: 2.5, sm: 3 } }}>
+          <DialogContentText
+            color="text.primary"
+            sx={{
+              lineHeight: 1.7,
+              fontSize: { xs: "0.875rem", sm: "0.9375rem" },
+            }}
+          >
             {message}
           </DialogContentText>
         </DialogContent>
 
         <Divider />
 
-        <DialogActions sx={{ px: 3, py: 2.5 }}>
+        <DialogActions sx={{ px: { xs: 2.5, sm: 3 }, py: 2.5 }}>
           <Stack
             direction="row"
             sx={{
@@ -179,10 +157,8 @@ const NotificationHandler = () => {
                 fontWeight: 500,
                 textTransform: "none",
                 color: "text.secondary",
-                "&:hover": {
-                  color: "text.primary",
-                  bgcolor: "transparent",
-                },
+                fontSize: { xs: "0.8125rem", sm: "0.875rem" },
+                "&:hover": { color: "text.primary", bgcolor: "transparent" },
               }}
             >
               Segarkan
@@ -195,6 +171,9 @@ const NotificationHandler = () => {
               sx={{
                 fontWeight: 600,
                 textTransform: "none",
+                borderRadius: `${theme.shape.borderRadius}px`,
+                px: 2.5,
+                fontSize: { xs: "0.8125rem", sm: "0.875rem" },
               }}
             >
               Tutup
@@ -216,6 +195,8 @@ const NotificationHandler = () => {
       sx={{
         right: { xs: 16, sm: 24 },
         bottom: { xs: 16, sm: 24 },
+        left: { xs: 16, sm: "auto" },
+        maxWidth: { xs: "calc(100% - 32px)", sm: 400 },
       }}
     >
       <MotionAlert
@@ -224,22 +205,21 @@ const NotificationHandler = () => {
         initial={{ opacity: 0, x: 100, scale: 0.96 }}
         animate={{ opacity: 1, x: 0, scale: 1 }}
         exit={{ opacity: 0, x: 100, scale: 0.96 }}
-        transition={{
-          type: "spring",
-          stiffness: 400,
-          damping: 25,
-        }}
+        transition={{ type: "spring", stiffness: 400, damping: 25 }}
         sx={{
-          minWidth: { xs: 280, sm: 360 },
+          minWidth: { xs: 260, sm: 360 },
           borderRadius: `${theme.shape.borderRadius}px`,
           boxShadow: `0 8px 32px ${alpha(theme.palette.common.black, 0.12)}`,
           border: "1px solid",
-          borderColor: alpha(theme.palette[type].main, 0.15),
-          bgcolor: theme.palette.background.paper,
+          borderColor: alpha(
+            theme.palette[type]?.main || theme.palette.primary.main,
+            0.15
+          ),
+          bgcolor: "background.paper",
           color: "text.primary",
           alignItems: title ? "flex-start" : "center",
           "& .MuiAlert-icon": {
-            color: theme.palette[type].main,
+            color: theme.palette[type]?.main || theme.palette.primary.main,
             opacity: 0.9,
             alignItems: title ? "flex-start" : "center",
             pt: title ? 0.25 : 0,

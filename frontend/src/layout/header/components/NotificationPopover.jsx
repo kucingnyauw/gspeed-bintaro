@@ -4,10 +4,9 @@
  * Fitur:
  * - Infinite scroll untuk load more notifikasi
  * - Animasi fade-in untuk notifikasi baru
- * - Indikator unread dengan garis warna di kiri
  * - Mark as read (single & bulk)
  * - Delete notifikasi (single & bulk)
- * - Detail notifikasi dalam dialog
+ * - Detail notifikasi dalam dialog dengan markdown rendering
  * - Empty state dengan ilustrasi
  * - Loading skeleton
  * - Optimistic delete dengan animasi fade-out
@@ -18,84 +17,34 @@
 import { useRef, useCallback, useState, useEffect } from "react";
 import { CheckCheck, RotateCcw, Trash2, X, BellDot } from "lucide-react";
 import {
-  Box,
-  Button,
-  Chip,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Divider,
-  IconButton,
-  Popover,
-  Skeleton,
-  Stack,
-  Tooltip,
-  Typography,
-  keyframes,
-  useTheme,
+  Box, Button, Chip, Dialog, DialogTitle, DialogContent, DialogActions,
+  Divider, IconButton, Popover, Skeleton, Stack, Tooltip, Typography,
+  keyframes, useTheme,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
 
 import { formatRelativeTime } from "@shared/utils";
 import { notificationTypeColorMap } from "@shared/constant";
+import { useDevice } from "@hooks";
 
-/**
- * Keyframe animasi fade in dari bawah.
- *
- * @type {Object}
- */
 const fadeInUp = keyframes`
   from { opacity: 0; transform: translateY(12px); }
   to { opacity: 1; transform: translateY(0); }
 `;
 
-/**
- * EmptyNotificationSvg - Ilustrasi untuk state kosong notifikasi.
- *
- * @component
- * @param {Object} props - Props komponen
- * @param {number} [props.opacity=0.2] - Tingkat opacity ilustrasi
- * @returns {JSX.Element} Ilustrasi SVG
- */
 const EmptyNotificationSvg = ({ opacity = 0.2 }) => (
-  <Box
-    sx={(theme) => ({
-      display: "flex",
-      justifyContent: "center",
-      alignItems: "center",
-      width: 64,
-      height: 64,
-      borderRadius: "50%",
-      bgcolor: alpha(theme.palette.secondary.main, 0.08),
-      color: "text.secondary",
-      opacity,
-      mb: 1,
-    })}
-  >
+  <Box sx={(theme) => ({ display: "flex", justifyContent: "center", alignItems: "center", width: 64, height: 64, borderRadius: "50%", bgcolor: alpha(theme.palette.secondary.main, 0.08), color: "text.secondary", opacity, mb: 1 })}>
     <BellDot size={32} strokeWidth={1.5} />
   </Box>
 );
 
-/**
- * NotificationSkeleton - Komponen skeleton loading untuk daftar notifikasi.
- *
- * @component
- * @returns {JSX.Element} Skeleton notifikasi
- */
 const NotificationSkeleton = () => (
   <Stack spacing={0.5} sx={{ px: 1, py: 1 }}>
     {[1, 2, 3, 4].map((i) => (
-      <Box
-        key={i}
-        sx={(theme) => ({
-          p: 2,
-          borderRadius: `${theme.shape.borderRadius}px`,
-          display: "flex",
-          gap: 2,
-          bgcolor: alpha(theme.palette.secondary.main, 0.02),
-        })}
-      >
+      <Box key={i} sx={(theme) => ({ p: 2, borderRadius: `${theme.shape.borderRadius}px`, display: "flex", gap: 2, bgcolor: alpha(theme.palette.secondary.main, 0.02) })}>
         <Skeleton variant="circular" width={8} height={8} sx={{ mt: 0.5 }} />
         <Box sx={{ flex: 1 }}>
           <Skeleton variant="text" width="60%" height={20} />
@@ -107,89 +56,55 @@ const NotificationSkeleton = () => (
   </Stack>
 );
 
-/**
- * Mendapatkan warna chip berdasarkan tipe notifikasi.
- *
- * @param {string} type - Tipe notifikasi
- * @returns {string} Nama warna dari theme palette
- */
-const getNotifColor = (type) => {
-  return notificationTypeColorMap[type] || "default";
-};
+const getNotifColor = (type) => notificationTypeColorMap[type] || "default";
 
 /**
- * NotificationPopover - Popover yang menampilkan daftar notifikasi dengan fitur lengkap.
+ * MarkdownContent - Render markdown dengan styling minimalis untuk dialog detail.
  *
  * @component
- * @param {Object} props - Props komponen
- * @param {boolean} props.open - Status popover terbuka/tutup
- * @param {HTMLElement|null} props.anchorEl - Element anchor untuk popover
- * @param {Function} props.onClose - Handler tutup popover
- * @param {Array} props.notifications - Data notifikasi dari useInfiniteQuery
- * @param {boolean} props.isLoading - Status loading awal
- * @param {boolean} props.isFetchingNextPage - Status loading next page
- * @param {boolean} props.hasNextPage - Apakah masih ada halaman berikutnya
- * @param {Function} props.onFetchNextPage - Handler fetch halaman berikutnya
- * @param {Function} props.onMarkRead - Handler tandai satu notifikasi dibaca
- * @param {Function} props.onMarkAllRead - Handler tandai semua notifikasi dibaca
- * @param {Function} props.onDeleteAll - Handler hapus semua notifikasi
- * @param {Function} props.onDelete - Handler hapus satu notifikasi
- * @param {Function} props.onRefresh - Handler refresh notifikasi
- * @param {number} [props.unreadCount=0] - Jumlah notifikasi belum dibaca
- * @returns {JSX.Element} Popover notifikasi
+ * @param {Object} props
+ * @param {string} props.content - Konten markdown
+ * @returns {JSX.Element}
  */
-const NotificationPopover = ({
-  open,
-  anchorEl,
-  onClose,
-  notifications,
-  isLoading,
-  isFetchingNextPage,
-  hasNextPage,
-  onFetchNextPage,
-  onMarkRead,
-  onMarkAllRead,
-  onDeleteAll,
-  onDelete,
-  onRefresh,
-  unreadCount = 0,
-}) => {
+const MarkdownContent = ({ content }) => {
   const theme = useTheme();
+  const { isMobile } = useDevice();
 
-  /** @type {React.RefObject<HTMLDivElement>} */
+  const markdownStyles = {
+    "& p": { m: 0, lineHeight: 1.7, color: "inherit", fontSize: isMobile ? "0.8125rem" : "0.875rem" },
+    "& p:not(:last-child)": { mb: 1 },
+    "& ul, & ol": { m: 0, pl: 2.5, lineHeight: 1.7, color: "inherit" },
+    "& li:not(:last-child)": { mb: 0.25 },
+    "& strong": { fontWeight: 600, color: "inherit" },
+    "& em": { fontStyle: "italic" },
+    "& code": { px: 0.75, py: 0.25, borderRadius: 1, fontSize: "0.75rem", fontFamily: "monospace", bgcolor: alpha(theme.palette.common.black, 0.06), color: "inherit" },
+    "& pre": { m: 0, p: 1.5, borderRadius: 1.5, fontSize: "0.75rem", fontFamily: "monospace", bgcolor: alpha(theme.palette.common.black, 0.06), overflow: "auto" },
+    "& blockquote": { m: 0, pl: 2, py: 0.25, borderLeft: `2px solid ${alpha(theme.palette.secondary.main, 0.5)}`, opacity: 0.85, fontStyle: "italic" },
+    "& hr": { my: 1.5, border: "none", borderTop: `1px solid ${theme.palette.divider}` },
+    "& h1, & h2, & h3, & h4, & h5, & h6": { m: 0, mt: 1.25, mb: 0.5, fontWeight: 600, lineHeight: 1.3, color: "inherit", fontSize: "0.9375rem", "&:first-of-type": { mt: 0 } },
+  };
+
+  return (
+    <Box sx={markdownStyles}>
+      <ReactMarkdown remarkPlugins={[remarkGfm]} rehypePlugins={[rehypeRaw]}>{content}</ReactMarkdown>
+    </Box>
+  );
+};
+
+const NotificationPopover = ({ open, anchorEl, onClose, notifications, isLoading, isFetchingNextPage, hasNextPage, onFetchNextPage, onMarkRead, onMarkAllRead, onDeleteAll, onDelete, onRefresh, unreadCount = 0 }) => {
+  const theme = useTheme();
+  const { isMobile } = useDevice();
   const scrollRef = useRef(null);
-
-  /** @type {React.MutableRefObject<number>} */
   const prevScrollHeight = useRef(0);
-
-  /** @type {[number, Function]} */
   const [prevLength, setPrevLength] = useState(0);
-
-  /** @type {[string[], Function]} */
   const [newItemIds, setNewItemIds] = useState([]);
-
-  /** @type {[Object|null, Function]} */
   const [selectedNotif, setSelectedNotif] = useState(null);
-
-  /** @type {[string[], Function]} */
   const [deletingIds, setDeletingIds] = useState([]);
 
-  /**
-   * Semua notifikasi yang sudah di-flat dari struktur infinite query pages.
-   *
-   * @type {Array<Object>}
-   */
   const allNotifications = notifications?.pages?.flatMap((page) => page.data) || [];
-
-  /** @type {boolean} */
   const isAnyDeleting = deletingIds.length > 0;
-
-  /** @type {string} */
   const br = `${theme.shape.borderRadius}px`;
 
-  /**
-   * Effect: Deteksi notifikasi baru untuk animasi fade-in.
-   */
   useEffect(() => {
     if (allNotifications.length > prevLength) {
       const newIds = allNotifications.slice(prevLength).map((n) => n.id);
@@ -200,31 +115,19 @@ const NotificationPopover = ({
     setPrevLength(allNotifications.length);
   }, [allNotifications.length, prevLength]);
 
-  /**
-   * Effect: Bersihkan deleting IDs jika notifikasi sudah benar-benar hilang.
-   */
   useEffect(() => {
     if (deletingIds.length > 0) {
       const currentIds = allNotifications.map((n) => n.id);
-      const stillDeleting = deletingIds.some((id) => currentIds.includes(id));
-      if (!stillDeleting) setDeletingIds([]);
+      if (!deletingIds.some((id) => currentIds.includes(id))) setDeletingIds([]);
     }
   }, [allNotifications, deletingIds]);
 
-  /**
-   * Effect: Timeout fallback untuk membersihkan deleting IDs.
-   */
   useEffect(() => {
     let timer;
-    if (deletingIds.length > 0) {
-      timer = setTimeout(() => setDeletingIds([]), 3000);
-    }
+    if (deletingIds.length > 0) timer = setTimeout(() => setDeletingIds([]), 3000);
     return () => clearTimeout(timer);
   }, [deletingIds]);
 
-  /**
-   * Effect: Preserve scroll position saat load more.
-   */
   useEffect(() => {
     if (!isFetchingNextPage && prevScrollHeight.current > 0 && scrollRef.current) {
       requestAnimationFrame(() => {
@@ -237,40 +140,20 @@ const NotificationPopover = ({
     }
   }, [isFetchingNextPage]);
 
-  /**
-   * Handler scroll untuk infinite scroll.
-   *
-   * @param {React.UIEvent<HTMLDivElement>} e - Event scroll
-   */
-  const handleScroll = useCallback(
-    (e) => {
-      const target = e.currentTarget;
-      const { scrollTop, scrollHeight, clientHeight } = target;
-      if (scrollHeight - scrollTop <= clientHeight + 100 && hasNextPage && !isFetchingNextPage) {
-        prevScrollHeight.current = scrollHeight;
-        onFetchNextPage();
-      }
-    },
-    [hasNextPage, isFetchingNextPage, onFetchNextPage]
-  );
+  const handleScroll = useCallback((e) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+    if (scrollHeight - scrollTop <= clientHeight + 100 && hasNextPage && !isFetchingNextPage) {
+      prevScrollHeight.current = scrollHeight;
+      onFetchNextPage();
+    }
+  }, [hasNextPage, isFetchingNextPage, onFetchNextPage]);
 
-  /**
-   * Handler klik notifikasi.
-   *
-   * @param {Object} notif - Data notifikasi
-   */
   const handleNotifClick = (notif) => {
     if (isAnyDeleting) return;
     if (!notif.isRead) onMarkRead(notif.id);
     setSelectedNotif(notif);
   };
 
-  /**
-   * Handler hapus satu notifikasi.
-   *
-   * @param {React.MouseEvent} e - Event klik
-   * @param {string} id - ID notifikasi
-   */
   const handleDelete = (e, id) => {
     e.stopPropagation();
     if (isAnyDeleting) return;
@@ -278,388 +161,112 @@ const NotificationPopover = ({
     onDelete?.(id);
   };
 
-  /** Handler hapus semua notifikasi. */
   const handleDeleteAll = () => {
     if (isAnyDeleting) return;
-    const allIds = allNotifications.map((n) => n.id);
-    setDeletingIds(allIds);
+    setDeletingIds(allNotifications.map((n) => n.id));
     onDeleteAll?.();
   };
 
-  /** Handler tutup dialog detail. */
   const handleCloseDetail = () => setSelectedNotif(null);
 
-  /**
-   * Style untuk icon button di header — konsisten dengan header app.
-   *
-   * @type {Object}
-   */
   const iconBtnSx = {
-    color: "text.secondary",
-    borderRadius: br,
-    minWidth: 38,
-    minHeight: 38,
-    p: 0,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    border: "1px solid",
-    borderColor: alpha(theme.palette.divider, 0.8),
-    "&:hover": {
-      bgcolor: alpha(theme.palette.secondary.main, 0.08),
-      borderColor: alpha(theme.palette.secondary.main, 0.4),
-      color: theme.palette.secondary.main,
-    },
+    color: "text.secondary", borderRadius: br, minWidth: 38, minHeight: 38, p: 0,
+    display: "flex", alignItems: "center", justifyContent: "center",
+    border: "1px solid", borderColor: alpha(theme.palette.divider, 0.8),
+    "&:hover": { bgcolor: alpha(theme.palette.secondary.main, 0.08), borderColor: alpha(theme.palette.secondary.main, 0.4), color: theme.palette.secondary.main },
   };
 
   return (
     <>
-      <Popover
-        open={open}
-        anchorEl={anchorEl}
-        onClose={isAnyDeleting ? undefined : onClose}
-        anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
-        transformOrigin={{ vertical: "top", horizontal: "right" }}
-        slotProps={{
-          paper: {
-            sx: {
-              mt: 1.5,
-              width: 380,
-              maxWidth: "100%",
-              maxHeight: `calc(100vh - ${theme.spacing(12)})`,
-              borderRadius: br,
-              border: `1px solid ${theme.palette.divider}`,
-              boxShadow: theme.shadows[4],
-              overflow: "hidden",
-              display: "flex",
-              flexDirection: "column",
-              bgcolor: "background.paper",
-              backgroundImage: "none",
-            },
-          },
-        }}
-      >
+      <Popover open={open} anchorEl={anchorEl} onClose={isAnyDeleting ? undefined : onClose}
+        anchorOrigin={{ vertical: "bottom", horizontal: "right" }} transformOrigin={{ vertical: "top", horizontal: "right" }}
+        slotProps={{ paper: { sx: { mt: 1.5, width: { xs: 340, sm: 380 }, maxWidth: "100%", maxHeight: `calc(100vh - ${theme.spacing(12)})`, borderRadius: br, border: `1px solid ${theme.palette.divider}`, boxShadow: theme.shadows[4], overflow: "hidden", display: "flex", flexDirection: "column", bgcolor: "background.paper", backgroundImage: "none" } } }}>
         {/* Header */}
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            px: 2.5,
-            py: 2,
-            borderBottom: `1px solid ${theme.palette.divider}`,
-            flexShrink: 0,
-          }}
-        >
+        <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center", px: { xs: 2, sm: 2.5 }, py: { xs: 1.5, sm: 2 }, borderBottom: `1px solid ${theme.palette.divider}`, flexShrink: 0 }}>
           <Stack direction="row" sx={{ gap: 1.5, alignItems: "center" }}>
-            <Typography variant="subtitle1" sx={{ fontWeight: 600 }}>
-              Notifikasi
-            </Typography>
-            {unreadCount > 0 && (
-              <Chip
-                label={`${unreadCount} Baru`}
-                size="small"
-                sx={{
-                  bgcolor: alpha(theme.palette.error.main, 0.1),
-                  color: theme.palette.error.main,
-                  fontWeight: 600,
-                  height: 20,
-                  fontSize: "0.6875rem",
-                  "& .MuiChip-label": { px: 1 },
-                }}
-              />
-            )}
+            <Typography variant="subtitle1" sx={{ fontWeight: 600, fontSize: { xs: "0.875rem", sm: "0.9375rem" } }}>Notifikasi</Typography>
+            {unreadCount > 0 && <Chip label={`${unreadCount} Baru`} size="small" sx={{ bgcolor: alpha(theme.palette.error.main, 0.1), color: theme.palette.error.main, fontWeight: 600, height: 20, fontSize: "0.625rem", "& .MuiChip-label": { px: 1 } }} />}
           </Stack>
-
-          {/* Action Buttons */}
-          <Stack direction="row" sx={{ gap: "8px", alignItems: "center" }}>
-            {onRefresh && (
-              <Tooltip title="Segarkan" placement="bottom">
-                <IconButton
-                  size="small"
-                  onClick={onRefresh}
-                  disabled={isAnyDeleting}
-                  aria-label="Segarkan notifikasi"
-                  sx={iconBtnSx}
-                >
-                  <RotateCcw size={16} strokeWidth={2} />
-                </IconButton>
-              </Tooltip>
-            )}
-            {unreadCount > 0 && (
-              <Tooltip title="Tandai semua dibaca" placement="bottom">
-                <IconButton
-                  size="small"
-                  onClick={onMarkAllRead}
-                  disabled={isAnyDeleting}
-                  aria-label="Tandai semua notifikasi dibaca"
-                  sx={iconBtnSx}
-                >
-                  <CheckCheck size={16} strokeWidth={2} />
-                </IconButton>
-              </Tooltip>
-            )}
-            <Tooltip title="Tutup" placement="bottom">
-              <IconButton
-                size="small"
-                onClick={onClose}
-                disabled={isAnyDeleting}
-                aria-label="Tutup notifikasi"
-                sx={iconBtnSx}
-              >
-                <X size={16} strokeWidth={2} />
-              </IconButton>
-            </Tooltip>
+          <Stack direction="row" sx={{ gap: "6px", alignItems: "center" }}>
+            {onRefresh && <Tooltip title="Segarkan" placement="bottom"><IconButton size="small" onClick={onRefresh} disabled={isAnyDeleting} aria-label="Segarkan notifikasi" sx={iconBtnSx}><RotateCcw size={isMobile ? 14 : 16} strokeWidth={2} /></IconButton></Tooltip>}
+            {unreadCount > 0 && <Tooltip title="Tandai semua dibaca" placement="bottom"><IconButton size="small" onClick={onMarkAllRead} disabled={isAnyDeleting} aria-label="Tandai semua notifikasi dibaca" sx={iconBtnSx}><CheckCheck size={isMobile ? 14 : 16} strokeWidth={2} /></IconButton></Tooltip>}
+            <Tooltip title="Tutup" placement="bottom"><IconButton size="small" onClick={onClose} disabled={isAnyDeleting} aria-label="Tutup notifikasi" sx={iconBtnSx}><X size={isMobile ? 14 : 16} strokeWidth={2} /></IconButton></Tooltip>
           </Stack>
         </Box>
 
-        {/* Content - Scrollable List */}
-        <Box
-          ref={scrollRef}
-          onScroll={handleScroll}
-          sx={{
-            flex: 1,
-            overflowY: "auto",
-            overflowX: "hidden",
-            p: 1,
-            "&::-webkit-scrollbar": { width: 4 },
-            "&::-webkit-scrollbar-track": { bgcolor: "transparent" },
-            "&::-webkit-scrollbar-thumb": {
-              bgcolor: alpha(theme.palette.divider, 0.5),
-              borderRadius: 10,
-            },
-          }}
-        >
-          {isLoading ? (
-            <NotificationSkeleton />
-          ) : allNotifications.length === 0 ? (
-            <Box
-              sx={{
-                display: "flex",
-                flexDirection: "column",
-                alignItems: "center",
-                justifyContent: "center",
-                py: 8,
-                px: 3,
-                textAlign: "center",
-                minHeight: 280,
-              }}
-            >
+        {/* Content */}
+        <Box ref={scrollRef} onScroll={handleScroll}
+          sx={{ flex: 1, overflowY: "auto", overflowX: "hidden", p: 1,
+            "&::-webkit-scrollbar": { width: 4 }, "&::-webkit-scrollbar-track": { bgcolor: "transparent" },
+            "&::-webkit-scrollbar-thumb": { bgcolor: alpha(theme.palette.divider, 0.5), borderRadius: 10 } }}>
+          {isLoading ? <NotificationSkeleton /> : allNotifications.length === 0 ? (
+            <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", py: 8, px: 3, textAlign: "center", minHeight: 280 }}>
               <EmptyNotificationSvg opacity={0.4} />
-              <Typography variant="body2" color="text.primary" sx={{ fontWeight: 600, mt: 1 }}>
-                Belum Ada Notifikasi
-              </Typography>
-              <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5 }}>
-                Saat ini Anda sudah membaca semua pemberitahuan.
-              </Typography>
+              <Typography variant="body2" color="text.primary" sx={{ fontWeight: 600, mt: 1, fontSize: { xs: "0.8125rem", sm: "0.875rem" } }}>Belum Ada Notifikasi</Typography>
+              <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, fontSize: { xs: "0.6875rem", sm: "0.75rem" } }}>Saat ini Anda sudah membaca semua pemberitahuan.</Typography>
             </Box>
           ) : (
             <Stack spacing={0.5}>
               {allNotifications.map((notif) => {
                 const isDeleting = deletingIds.includes(notif.id);
-                const notifColor = getNotifColor(notif.type);
                 const isUnread = !notif.isRead;
+                const notifColor = getNotifColor(notif.type);
+                const resolvedColor = theme.palette[notifColor]?.main || theme.palette.secondary.main;
 
                 return (
-                  <Box
+                  <Stack
                     key={notif.id}
+                    direction="row"
                     onClick={() => handleNotifClick(notif)}
                     sx={{
-                      position: "relative",
-                      p: 1.5,
-                      pl: isUnread ? 2 : 1.5,
-                      borderRadius: br,
-                      cursor: isAnyDeleting ? "default" : "pointer",
-                      transition: "all 0.2s ease",
-                      bgcolor: isUnread
-                        ? alpha(theme.palette.secondary.main, 0.04)
-                        : "transparent",
+                      p: { xs: 1.5, sm: 2 }, borderRadius: br, cursor: isAnyDeleting ? "default" : "pointer",
+                      transition: "all 0.2s ease", alignItems: "center", gap: 1.5,
+                      bgcolor: isUnread ? alpha(theme.palette.secondary.main, 0.04) : "transparent",
                       opacity: isDeleting ? 0.4 : 1,
-                      animation:
-                        newItemIds.includes(notif.id)
-                          ? `${fadeInUp} 0.35s ease-out`
-                          : "none",
-                      border: "1px solid transparent",
+                      animation: newItemIds.includes(notif.id) ? `${fadeInUp} 0.35s ease-out` : "none",
                       "&:hover": {
-                        bgcolor: isAnyDeleting
-                          ? undefined
-                          : alpha(theme.palette.secondary.main, 0.06),
-                        borderColor: isAnyDeleting
-                          ? "transparent"
-                          : alpha(theme.palette.secondary.main, 0.1),
-                        "& .delete-btn-container": {
-                          opacity: 1,
-                          visibility: "visible",
-                        },
+                        bgcolor: isAnyDeleting ? undefined : alpha(theme.palette.secondary.main, 0.06),
+                        "& .delete-btn-container": { opacity: 1, visibility: "visible" },
                       },
-                      ...(isUnread && {
-                        "&::before": {
-                          content: '""',
-                          position: "absolute",
-                          left: 0,
-                          top: "15%",
-                          height: "70%",
-                          width: 3,
-                          borderTopRightRadius: 4,
-                          borderBottomRightRadius: 4,
-                          bgcolor:
-                            theme.palette[notifColor]?.main ||
-                            theme.palette.primary.main,
-                        },
-                      }),
-                    }}
-                  >
-                    <Stack direction="row" sx={{ gap: 1.5, alignItems: "flex-start" }}>
-                      <Box sx={{ flex: 1, minWidth: 0 }}>
-                        {/* Title & Time */}
-                        <Stack
-                          direction="row"
-                          sx={{
-                            justifyContent: "space-between",
-                            alignItems: "flex-start",
-                            gap: 1,
-                          }}
-                        >
-                          <Typography
-                            variant="body2"
-                            noWrap
-                            sx={{
-                              fontWeight: isUnread ? 600 : 500,
-                              color: isUnread ? "text.primary" : "text.secondary",
-                              flex: 1,
-                              minWidth: 0,
-                            }}
-                          >
-                            {notif.title}
-                          </Typography>
-                          <Typography
-                            variant="caption"
-                            sx={{
-                              color: isUnread
-                                ? theme.palette.primary.main
-                                : "text.disabled",
-                              fontWeight: isUnread ? 500 : 400,
-                              flexShrink: 0,
-                              mt: 0.25,
-                            }}
-                          >
-                            {formatRelativeTime(notif.createdAt)}
-                          </Typography>
-                        </Stack>
+                    }}>
+                    {/* Unread Dot */}
+                    {isUnread && (
+                      <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: resolvedColor, flexShrink: 0, boxShadow: `0 0 6px ${alpha(resolvedColor, 0.4)}` }} />
+                    )}
 
-                        {/* Message */}
-                        <Typography
-                          variant="caption"
-                          sx={{
-                            color: "text.secondary",
-                            display: "-webkit-box",
-                            WebkitLineClamp: 2,
-                            WebkitBoxOrient: "vertical",
-                            overflow: "hidden",
-                            lineHeight: 1.4,
-                            mt: 0.5,
-                          }}
-                        >
-                          {notif.message}
-                        </Typography>
+                    {/* Title */}
+                    <Typography variant="body2" noWrap
+                      sx={{ flex: 1, minWidth: 0, fontWeight: isUnread ? 600 : 500, color: isUnread ? "text.primary" : "text.secondary", fontSize: { xs: "0.75rem", sm: "0.8125rem" } }}>
+                      {notif.title}
+                    </Typography>
 
-                        {/* Type Chip & Delete Button */}
-                        <Stack
-                          direction="row"
-                          sx={{
-                            justifyContent: "space-between",
-                            alignItems: "center",
-                            mt: 1.5,
-                          }}
-                        >
-                          <Chip
-                            label={notif.type}
-                            size="small"
-                            sx={{
-                              bgcolor: alpha(
-                                theme.palette[notifColor]?.main ||
-                                  theme.palette.secondary.main,
-                                0.1
-                              ),
-                              color:
-                                theme.palette[notifColor]?.main ||
-                                theme.palette.secondary.main,
-                              fontWeight: 500,
-                              height: 20,
-                              fontSize: "0.625rem",
-                            }}
-                          />
-                          <Box
-                            className="delete-btn-container"
-                            onClick={(e) => e.stopPropagation()}
-                            sx={{
-                              opacity: 0,
-                              visibility: "hidden",
-                              transition: "all 0.2s ease",
-                            }}
-                          >
-                            <IconButton
-                              size="small"
-                              onClick={(e) => handleDelete(e, notif.id)}
-                              disabled={isAnyDeleting}
-                              sx={{
-                                color: "text.secondary",
-                                p: 0.5,
-                                borderRadius: 1,
-                                "&:hover": {
-                                  bgcolor: alpha(theme.palette.error.main, 0.08),
-                                  color: theme.palette.error.main,
-                                },
-                              }}
-                            >
-                              <Trash2 size={14} strokeWidth={2} />
-                            </IconButton>
-                          </Box>
-                        </Stack>
-                      </Box>
-                    </Stack>
-                  </Box>
+                    {/* Time */}
+                    <Typography variant="caption" noWrap
+                      sx={{ color: isUnread ? theme.palette.secondary.main : "text.disabled", fontWeight: isUnread ? 500 : 400, fontSize: { xs: "0.625rem", sm: "0.6875rem" }, flexShrink: 0 }}>
+                      {formatRelativeTime(notif.createdAt)}
+                    </Typography>
+
+                    {/* Delete Button */}
+                    <Box className="delete-btn-container" onClick={(e) => e.stopPropagation()}
+                      sx={{ opacity: 0, visibility: "hidden", transition: "all 0.2s ease", flexShrink: 0 }}>
+                      <IconButton size="small" onClick={(e) => handleDelete(e, notif.id)} disabled={isAnyDeleting}
+                        sx={{ color: "text.secondary", p: 0.25, borderRadius: 1, "&:hover": { bgcolor: alpha(theme.palette.error.main, 0.08), color: theme.palette.error.main } }}>
+                        <Trash2 size={12} strokeWidth={2} />
+                      </IconButton>
+                    </Box>
+                  </Stack>
                 );
               })}
             </Stack>
           )}
-
-          {/* Loading More Indicator */}
-          {isFetchingNextPage && (
-            <Box sx={{ pt: 1 }}>
-              <NotificationSkeleton />
-            </Box>
-          )}
+          {isFetchingNextPage && <Box sx={{ pt: 1 }}><NotificationSkeleton /></Box>}
         </Box>
 
-        {/* Footer - Delete All */}
+        {/* Footer */}
         {allNotifications.length > 0 && (
-          <Box
-            sx={{
-              borderTop: `1px solid ${theme.palette.divider}`,
-              p: 1.5,
-              display: "flex",
-              justifyContent: "center",
-              flexShrink: 0,
-            }}
-          >
-            <Button
-              size="small"
-              disabled={isAnyDeleting}
-              onClick={handleDeleteAll}
-              sx={{
-                color: "text.secondary",
-                fontSize: "0.75rem",
-                textTransform: "none",
-                fontWeight: 500,
-                px: 2,
-                "&:hover": {
-                  bgcolor: "transparent",
-                  color: theme.palette.error.main,
-                  textDecoration: "underline",
-                },
-              }}
-            >
+          <Box sx={{ borderTop: `1px solid ${theme.palette.divider}`, p: { xs: 1.25, sm: 1.5 }, display: "flex", justifyContent: "center", flexShrink: 0 }}>
+            <Button size="small" disabled={isAnyDeleting} onClick={handleDeleteAll}
+              sx={{ color: "text.secondary", fontSize: { xs: "0.6875rem", sm: "0.75rem" }, textTransform: "none", fontWeight: 500, px: 2, "&:hover": { bgcolor: "transparent", color: theme.palette.error.main, textDecoration: "underline" } }}>
               Bersihkan Semua Notifikasi
             </Button>
           </Box>
@@ -667,47 +274,27 @@ const NotificationPopover = ({
       </Popover>
 
       {/* Detail Dialog */}
-      <Dialog
-        open={!!selectedNotif}
-        onClose={handleCloseDetail}
-        maxWidth="xs"
-        fullWidth
-        slotProps={{
-          paper: {
-            sx: {
-              borderRadius: br,
-            },
-          },
-        }}
-      >
-        <DialogTitle sx={{ pb: 1.5 }}>
-          <Stack
-            direction="row"
-            sx={{ justifyContent: "space-between", alignItems: "center" }}
-          >
-            <Typography variant="h6" component="span" sx={{ fontWeight: 600 }}>
-              {selectedNotif?.title}
-            </Typography>
-            <IconButton onClick={handleCloseDetail} size="small" sx={{ mr: -0.5 }}>
-              <X size={18} strokeWidth={2} />
-            </IconButton>
+      <Dialog open={!!selectedNotif} onClose={handleCloseDetail} maxWidth="xs" fullWidth
+        slotProps={{ paper: { sx: { borderRadius: br, overflow: "hidden" } } }}>
+        <DialogTitle sx={{ pb: 1.5, px: { xs: 2.5, sm: 3 } }}>
+          <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center" }}>
+            <Stack direction="row" sx={{ gap: 1.5, alignItems: "center", minWidth: 0 }}>
+              <Typography variant="h6" noWrap sx={{ fontWeight: 600, fontSize: { xs: "1rem", sm: "1.125rem" }, flex: 1, minWidth: 0 }}>{selectedNotif?.title}</Typography>
+              {selectedNotif?.type && (
+                <Chip label={selectedNotif.type} size="small"
+                  sx={{ bgcolor: alpha(theme.palette[getNotifColor(selectedNotif.type)]?.main || theme.palette.secondary.main, 0.1), color: theme.palette[getNotifColor(selectedNotif.type)]?.main || theme.palette.secondary.main, fontWeight: 500, height: 22, fontSize: "0.625rem", flexShrink: 0, "& .MuiChip-label": { px: 1 } }} />
+              )}
+            </Stack>
+            <IconButton onClick={handleCloseDetail} size="small" sx={{ mr: -0.5, flexShrink: 0 }}><X size={18} strokeWidth={2} /></IconButton>
           </Stack>
         </DialogTitle>
         <Divider />
-        <DialogContent sx={{ pt: 2.5, pb: 3 }}>
-          <Typography variant="body1" color="text.primary" sx={{ lineHeight: 1.7 }}>
-            {selectedNotif?.message}
-          </Typography>
+        <DialogContent sx={{ py: 3, px: { xs: 2.5, sm: 3 } }}>
+          <MarkdownContent content={selectedNotif?.message || ""} />
         </DialogContent>
         <Divider />
-        <DialogActions sx={{ px: 3, py: 2.5 }}>
-          <Button
-            variant="outlined"
-            onClick={handleCloseDetail}
-            sx={{ fontWeight: 500, textTransform: "none" }}
-          >
-            Tutup
-          </Button>
+        <DialogActions sx={{ px: { xs: 2.5, sm: 3 }, py: 2.5 }}>
+          <Button variant="outlined" onClick={handleCloseDetail} sx={{ fontWeight: 500, textTransform: "none", borderRadius: br, px: 3, fontSize: { xs: "0.8125rem", sm: "0.875rem" } }}>Tutup</Button>
         </DialogActions>
       </Dialog>
     </>

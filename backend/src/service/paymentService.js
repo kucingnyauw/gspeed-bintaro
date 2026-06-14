@@ -61,21 +61,24 @@ class PaymentService {
   }
 
   /**
-   * Format daftar item untuk notifikasi
+   * Format daftar item dalam Markdown
    * @param {Array} items - Array item pesanan
    * @returns {string} String format item
    * @private
    */
   #formatItemDetails(items) {
     if (!items?.length) return "";
-    return items
-      .map(
-        (item, i) =>
-          `  ${i + 1}. ${item.productNameSnapshot}${
-            item.quantity > 1 ? ` (x${item.quantity})` : ""
-          } = ${Currency.toIDR(item.subtotal)}`
-      )
-      .join("\n");
+
+    let table = "| # | Item | Qty | Harga |\n";
+    table += "|---|------|-----|-------|\n";
+
+    items.forEach((item, i) => {
+      table += `| ${i + 1} | ${item.productNameSnapshot}${
+        item.quantity > 1 ? ` (x${item.quantity})` : ""
+      } | ${item.quantity} | ${Currency.toIDR(item.subtotal)} |\n`;
+    });
+
+    return table;
   }
 
   /**
@@ -89,9 +92,10 @@ class PaymentService {
    */
   #formatVehicleInfo(vehicle) {
     if (!vehicle) return "Tidak ada kendaraan";
-    return `${vehicle.plateNumber} - ${vehicle.brand || ""} ${
-      vehicle.model || ""
-    }`.trim();
+    const parts = [vehicle.plateNumber, vehicle.brand, vehicle.model].filter(
+      Boolean
+    );
+    return parts.join(" - ");
   }
 
   /**
@@ -114,6 +118,59 @@ class PaymentService {
    */
   #getStatusAfterPayment(order) {
     return this.#hasServiceItem(order) ? "QUEUED" : "COMPLETED";
+  }
+
+  /**
+   * Build notifikasi pembayaran dalam format Markdown
+   * @param {Object} params
+   * @param {string} params.eventTitle
+   * @param {Object} params.order
+   * @param {string} [params.method]
+   * @param {string} [params.amountPaid]
+   * @param {string} [params.change]
+   * @param {string} [params.newStatus]
+   * @param {string} [params.note]
+   * @param {Array} [params.items]
+   * @returns {string}
+   * @private
+   */
+  #buildPaymentNotification({
+    eventTitle,
+    order,
+    method,
+    amountPaid,
+    change,
+    newStatus,
+    note,
+    items,
+  }) {
+    const lines = [];
+
+    lines.push(`## ${eventTitle}`);
+    lines.push("");
+
+    lines.push(`**Nomor Pesanan:** ${order.orderNumber}`);
+    lines.push(`**Total:** ${Currency.toIDR(order.total)}`);
+
+    if (method) lines.push(`**Metode:** ${method}`);
+    if (amountPaid) lines.push(`**Dibayar:** ${Currency.toIDR(amountPaid)}`);
+    if (change !== undefined)
+      lines.push(`**Kembalian:** ${Currency.toIDR(change)}`);
+    if (newStatus) lines.push(`**Status Pesanan:** ${newStatus}`);
+
+    lines.push("");
+
+    if (items?.length) {
+      lines.push("### Rincian");
+      lines.push(this.#formatItemDetails(items));
+      lines.push("");
+    }
+
+    if (note) {
+      lines.push(`> ${note}`);
+    }
+
+    return lines.join("\n");
   }
 
   /**
@@ -143,7 +200,7 @@ Konteks:
 - Nomor Pesanan: ${context.orderNumber || "-"}
 - Alasan: ${context.reason || "-"}
 
-Contoh: "Pembayaran QRIS gagal (expired). Pesanan tetap draft."`,
+Contoh: "Pembayaran QRIS gagal (expired). Stok sparepart dikembalikan."`,
 
         refund: `Buatkan catatan singkat (1-2 kalimat, maksimal 100 karakter) dalam bahasa Indonesia tentang refund pembayaran.
 
@@ -152,7 +209,7 @@ Konteks:
 - Jumlah: ${context.amount || "-"}
 - Alasan: ${context.reason || "-"}
 
-Contoh: "Pembayaran direfund. Pesanan dibatalkan."`,
+Contoh: "Pembayaran direfund. Stok sparepart dikembalikan, pesanan dibatalkan."`,
       };
 
       const prompt = prompts[action] || prompts.payment_success;
@@ -205,12 +262,65 @@ Contoh: "Pembayaran direfund. Pesanan dibatalkan."`,
       }.`,
       payment_failed: `Pembayaran ${context.method || "-"} gagal (${
         context.reason || "-"
-      }). Pesanan tetap draft.`,
-      refund: `Pembayaran direfund. Alasan: ${
-        context.reason || "-"
-      }. Pesanan dibatalkan.`,
+      }). Stok sparepart dikembalikan.`,
+      refund: `Pembayaran direfund. Stok sparepart dikembalikan, pesanan dibatalkan.`,
     };
     return notes[action] || "Status pembayaran diperbarui.";
+  }
+
+  /**
+   * Kembalikan stok sparepart yang sudah dipotong saat order dibuat
+   * @param {Array} sparepartItems - Array item sparepart
+   * @param {Object} tx - Prisma transaction client
+   * @param {string} orderNumber - Nomor pesanan
+   * @param {string} recordedById - User ID
+   * @returns {Promise<void>}
+   * @private
+   */
+  async #restoreSparePartStock(sparepartItems, tx, orderNumber, recordedById) {
+    if (!sparepartItems.length) return;
+
+    await Promise.all(
+      sparepartItems.map((item) =>
+        tx.product.update({
+          where: { id: item.productId },
+          data: { stock: { increment: item.quantity } },
+        })
+      )
+    );
+
+    await Promise.all(
+      sparepartItems.map((item) =>
+        tx.stockMovement.create({
+          data: {
+            productId: item.productId,
+            type: "IN",
+            sourceType: "RETURN",
+            quantity: item.quantity,
+            orderItemId: item.id,
+            recordedById,
+            note: `Retur dari pembatalan/pembayaran gagal - Order #${orderNumber}`,
+          },
+        })
+      )
+    );
+  }
+
+  /**
+   * Dapatkan item sparepart dari order
+   * @param {string} orderId
+   * @returns {Promise<Array>}
+   * @private
+   */
+  async #getSparepartItems(orderId) {
+    return prisma.orderItem
+      .findMany({
+        where: { orderId },
+        include: { product: { select: { type: true } } },
+      })
+      .then((items) =>
+        items.filter((item) => item.product?.type === "SPAREPART")
+      );
   }
 
   /**
@@ -235,14 +345,14 @@ Contoh: "Pembayaran direfund. Pesanan dibatalkan."`,
         mechanic.id,
         `Task Baru - #${orderNumber}`,
         [
-          `Pesanan Baru Siap Dikerjakan`,
+          `## Pesanan Baru Siap Dikerjakan`,
           ``,
-          `Pesanan: #${orderNumber}`,
-          `Pelanggan: ${order.customer?.name || "-"}`,
-          `Kendaraan: ${this.#formatVehicleInfo(order.vehicle)}`,
+          `**Pesanan:** #${orderNumber}`,
+          `**Pelanggan:** ${order.customer?.name || "-"}`,
+          `**Kendaraan:** ${this.#formatVehicleInfo(order.vehicle)}`,
           ``,
-          `Service:`,
-          `${this.#formatItemDetails(serviceItems)}`,
+          `### Service`,
+          this.#formatItemDetails(serviceItems),
         ].join("\n"),
         "INFO"
       );
@@ -341,7 +451,8 @@ Contoh: "Pembayaran direfund. Pesanan dibatalkan."`,
           ...(newStatus === "COMPLETED" && { completedAt: new Date() }),
         },
       });
-      if (hasService)
+
+      if (hasService) {
         await tx.orderStatusHistory.create({
           data: {
             orderId,
@@ -350,6 +461,7 @@ Contoh: "Pembayaran direfund. Pesanan dibatalkan."`,
             note,
           },
         });
+      }
 
       return tx.payment.create({
         data: {
@@ -403,27 +515,29 @@ Contoh: "Pembayaran direfund. Pesanan dibatalkan."`,
 
     await this.#invalidateOrderHistoryCache(order.orderNumber);
 
+    const notificationMessage = this.#buildPaymentNotification({
+      eventTitle: "Pembayaran Tunai Berhasil",
+      order,
+      method: "CASH",
+      amountPaid: String(amountPaid),
+      change: String(change),
+      newStatus,
+      note: hasService
+        ? "Pesanan masuk antrian mekanik."
+        : "Pesanan sparepart selesai.",
+      items: order.items,
+    });
+
     await this.#sendNotification(
       order.cashierId,
       `Pembayaran Tunai - #${order.orderNumber}`,
-      [
-        `Pembayaran Tunai Berhasil`,
-        ``,
-        `Pesanan: #${order.orderNumber}`,
-        `Total: ${Currency.toIDR(order.total)}`,
-        `Dibayar: ${Currency.toIDR(amountPaid)}`,
-        `Kembalian: ${Currency.toIDR(change)}`,
-        ``,
-        `Status: ${newStatus}`,
-        hasService
-          ? `Pesanan masuk antrian mekanik.`
-          : `Pesanan sparepart selesai.`,
-      ].join("\n"),
+      notificationMessage,
       "SUCCESS"
     );
 
-    if (hasService)
+    if (hasService) {
       await this.#notifyMechanicsNewTask(order, order.orderNumber);
+    }
 
     logger.info("Pembayaran CASH berhasil", {
       orderId,
@@ -510,18 +624,17 @@ Contoh: "Pembayaran direfund. Pesanan dibatalkan."`,
       status: "PENDING",
     });
 
+    const notificationMessage = this.#buildPaymentNotification({
+      eventTitle: "Pembayaran QRIS Menunggu",
+      order,
+      method: "QRIS",
+      note: `Batas waktu: ${formatted}. Silakan scan QR Code.`,
+    });
+
     await this.#sendNotification(
       order.cashierId,
       `QRIS Pending - #${order.orderNumber}`,
-      [
-        `Pembayaran QRIS Menunggu`,
-        ``,
-        `Pesanan: #${order.orderNumber}`,
-        `Total: ${Currency.toIDR(order.total)}`,
-        ``,
-        `Batas Waktu: ${formatted}`,
-        `Silakan scan QR Code.`,
-      ].join("\n"),
+      notificationMessage,
       "INFO"
     );
 
@@ -783,7 +896,7 @@ Contoh: "Pembayaran direfund. Pesanan dibatalkan."`,
             ...(newStatus === "COMPLETED" && { completedAt: new Date() }),
           },
         });
-        if (hasService)
+        if (hasService) {
           await tx.orderStatusHistory.create({
             data: {
               orderId: order.id,
@@ -792,25 +905,29 @@ Contoh: "Pembayaran direfund. Pesanan dibatalkan."`,
               note,
             },
           });
+        }
       });
 
       await this.#invalidateOrderHistoryCache(orderNumber);
+
+      const notificationMessage = this.#buildPaymentNotification({
+        eventTitle: "Pembayaran QRIS Berhasil",
+        order,
+        method: "QRIS",
+        newStatus,
+        note: hasService
+          ? "Pesanan masuk antrian mekanik."
+          : "Pesanan sparepart selesai.",
+        items: order.items,
+      });
+
       await this.#sendNotification(
         order.cashierId,
         `QRIS Berhasil - #${orderNumber}`,
-        [
-          `Pembayaran QRIS Berhasil`,
-          ``,
-          `Pesanan: #${orderNumber}`,
-          `Total: ${Currency.toIDR(grossAmount)}`,
-          ``,
-          `Status: ${newStatus}`,
-          hasService
-            ? `Pesanan masuk antrian mekanik.`
-            : `Pesanan sparepart selesai.`,
-        ].join("\n"),
+        notificationMessage,
         "SUCCESS"
       );
+
       if (hasService) await this.#notifyMechanicsNewTask(order, orderNumber);
       this.#emitSocket(order.id, orderNumber, "PAID", "Lunas");
 
@@ -820,6 +937,7 @@ Contoh: "Pembayaran direfund. Pesanan dibatalkan."`,
         newStatus,
       });
     } else if (isFailed) {
+      const sparepartItems = await this.#getSparepartItems(order.id);
       const note = await this.#generatePaymentNote("payment_failed", {
         method: "QRIS",
         orderNumber,
@@ -827,11 +945,19 @@ Contoh: "Pembayaran direfund. Pesanan dibatalkan."`,
       });
 
       await prisma.$transaction(async (tx) => {
+        await this.#restoreSparePartStock(
+          sparepartItems,
+          tx,
+          orderNumber,
+          order.cashierId
+        );
+
         await tx.payment.update({
           where: { id: payment.id },
           data: { status: "REFUNDED" },
         });
-        if (hasService)
+
+        if (hasService) {
           await tx.orderStatusHistory.create({
             data: {
               orderId: order.id,
@@ -840,29 +966,36 @@ Contoh: "Pembayaran direfund. Pesanan dibatalkan."`,
               note,
             },
           });
+        }
       });
 
       await this.#invalidateOrderHistoryCache(orderNumber);
+
+      const notificationMessage = this.#buildPaymentNotification({
+        eventTitle: "Pembayaran QRIS Gagal",
+        order,
+        method: "QRIS",
+        note: `Status: ${txnStatus}. Stok sparepart dikembalikan. Pesanan tetap draft.`,
+      });
+
       await this.#sendNotification(
         order.cashierId,
         `QRIS Gagal - #${orderNumber}`,
-        [
-          `Pembayaran QRIS Gagal`,
-          ``,
-          `Pesanan: #${orderNumber}`,
-          `Status: ${txnStatus}`,
-          `Pesanan tetap draft.`,
-        ].join("\n"),
+        notificationMessage,
         "ERROR"
       );
       this.#emitSocket(order.id, orderNumber, "REFUNDED", "Gagal");
 
-      logger.warn("QRIS gagal via webhook", { orderNumber, txnStatus });
+      logger.warn("QRIS gagal via webhook, stok dikembalikan", {
+        orderNumber,
+        txnStatus,
+        restoredItems: sparepartItems.length,
+      });
     }
   }
 
   /**
-   * Refund pembayaran
+   * Refund pembayaran (kembalikan stok + batalkan pesanan)
    * @param {string} paymentId - ID pembayaran
    * @param {Object} [payload={}] - Data refund
    * @param {string} [payload.reason] - Alasan refund
@@ -885,7 +1018,16 @@ Contoh: "Pembayaran direfund. Pesanan dibatalkan."`,
       reason,
     });
 
+    const sparepartItems = await this.#getSparepartItems(payment.order?.id);
+
     const updated = await prisma.$transaction(async (tx) => {
+      await this.#restoreSparePartStock(
+        sparepartItems,
+        tx,
+        payment.order?.orderNumber,
+        userId || payment.order?.cashierId
+      );
+
       const refunded = await tx.payment.update({
         where: { id: paymentId },
         data: { status: "REFUNDED" },
@@ -897,48 +1039,58 @@ Contoh: "Pembayaran direfund. Pesanan dibatalkan."`,
           paidAt: true,
         },
       });
+
       await tx.order.update({
         where: { id: payment.order.id },
         data: { status: "CANCELLED" },
       });
-      if (payment.order?.items?.some((i) => i.product?.type === "SERVICE")) {
-        await tx.orderStatusHistory.create({
-          data: {
-            orderId: payment.order.id,
-            status: "CANCELLED",
-            changedById: userId || payment.order.cashierId,
-            note,
-          },
+
+      await tx.orderStatusHistory.create({
+        data: {
+          orderId: payment.order.id,
+          status: "CANCELLED",
+          changedById: userId || payment.order.cashierId,
+          note,
+        },
+      });
+
+      if (payment.order?.shiftId) {
+        await tx.shift.update({
+          where: { id: payment.order.shiftId },
+          data: { cashSales: { decrement: payment.order.total } },
         });
       }
+
       return refunded;
     });
 
     await this.#invalidateOrderHistoryCache(payment.order?.orderNumber);
+
+    const notificationMessage = this.#buildPaymentNotification({
+      eventTitle: "Pembayaran Direfund",
+      order: payment.order,
+      amountPaid: String(payment.amountPaid),
+      note: `Alasan: ${reason}. Stok sparepart dikembalikan. Pesanan dibatalkan.`,
+    });
+
     await this.#sendNotification(
       payment.order?.cashierId || userId,
       `Refund - #${payment.order?.orderNumber}`,
-      [
-        `Pembayaran Direfund`,
-        ``,
-        `Pesanan: #${payment.order?.orderNumber}`,
-        `Jumlah: ${Currency.toIDR(payment.amountPaid)}`,
-        `Alasan: ${reason}`,
-        `Status: CANCELLED`,
-      ].join("\n"),
+      notificationMessage,
       "WARNING"
     );
 
-    logger.warn("Pembayaran direfund", {
+    logger.warn("Pembayaran direfund, stok dikembalikan", {
       paymentId,
       orderId: payment.order?.id,
       amount: payment.amountPaid,
+      restoredItems: sparepartItems.length,
     });
     return updated;
   }
 
   /**
-   * Bulk refund pembayaran
+   * Bulk refund pembayaran (kembalikan stok)
    * @param {string[]} paymentIds - Array ID pembayaran
    * @param {string} userId - ID user yang melakukan refund
    * @returns {Promise<{summary: Object, details: Object}>} Ringkasan dan detail refund
@@ -975,13 +1127,41 @@ Contoh: "Pembayaran direfund. Pesanan dibatalkan."`,
       });
 
     const user = await this.userRepo.findById(userId);
-    const note = `Direfund oleh ${user.fullName} via refund massal.`;
+    const note = `Direfund oleh ${
+      user?.fullName || "-"
+    } via refund massal. Stok sparepart dikembalikan.`;
+
+    let totalRestored = 0;
+
     const results = await this.paymentRepo.refundMany(validIds, note, userId);
 
     for (const id of results.success) {
       const p = await this.paymentRepo.findById(id);
-      if (p?.order?.orderNumber)
-        await this.#invalidateOrderHistoryCache(p.order.orderNumber);
+      if (p?.order) {
+        const sparepartItems = await this.#getSparepartItems(p.order.id);
+
+        await prisma.$transaction(async (tx) => {
+          await this.#restoreSparePartStock(
+            sparepartItems,
+            tx,
+            p.order.orderNumber,
+            userId
+          );
+
+          if (p.order.shiftId) {
+            await tx.shift.update({
+              where: { id: p.order.shiftId },
+              data: { cashSales: { decrement: p.order.total } },
+            });
+          }
+        });
+
+        totalRestored += sparepartItems.length;
+
+        if (p.order.orderNumber) {
+          await this.#invalidateOrderHistoryCache(p.order.orderNumber);
+        }
+      }
     }
 
     return {
@@ -991,6 +1171,7 @@ Contoh: "Pembayaran direfund. Pesanan dibatalkan."`,
         skipped: skipped.length,
         refunded: results.success.length,
         failed: results.failed.length,
+        totalItemsRestored: totalRestored,
       },
       details: { refunded: results.success, failed: results.failed, skipped },
     };

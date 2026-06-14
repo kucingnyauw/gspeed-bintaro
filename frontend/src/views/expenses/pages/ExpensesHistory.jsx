@@ -7,6 +7,7 @@
 import { useCallback, useMemo, useState } from "react";
 import { ListFilter, RotateCcw } from "lucide-react";
 import { Box, Chip, Typography, useTheme } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 
 import { AppTable } from "@components";
 import { useDebounce } from "@hooks";
@@ -54,6 +55,8 @@ const ExpenseHistory = () => {
       endDate: activeFilters.endDate
         ? activeFilters.endDate.toISOString()
         : undefined,
+      sortBy: activeFilters.sortBy || "date",
+      sortOrder: activeFilters.sortOrder || "desc",
     }),
     [page, limit, debouncedSearch, activeFilters]
   );
@@ -63,33 +66,21 @@ const ExpenseHistory = () => {
   const tableData = data?.data || [];
   const metadata = data?.metadata || {};
 
-  /**
-   * Terapkan filter dan reset ke halaman pertama
-   */
   const handleApplyFilter = useCallback(() => {
     applyFilter();
     setPage(1);
   }, [applyFilter]);
 
-  /**
-   * Reset filter dan kembali ke halaman pertama
-   */
   const handleResetFilter = useCallback(() => {
     resetFilter();
     setPage(1);
   }, [resetFilter]);
 
-  /**
-   * Handler klik ganda baris untuk membuka dialog detail
-   */
   const handleRowDoubleClick = useCallback(
     (row) => openDetailDialog(row),
     [openDetailDialog]
   );
 
-  /**
-   * Render baris kustom untuk tabel riwayat pengeluaran
-   */
   const renderRow = useCallback(
     (row) => [
       <Box key={`title-${row.id}`}>
@@ -127,6 +118,17 @@ const ExpenseHistory = () => {
         sx={{ fontWeight: 400 }}
       />,
 
+      <Box key={`shift-${row.id}`}>
+        <Typography variant="body2" sx={{ fontWeight: 400 }}>
+          {row.shift?.id ? formatDateTime(row.shift.openedAt) : "—"}
+        </Typography>
+        {row.shift?.id && (
+          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 400 }}>
+            {row.shift.closedAt ? `s/d ${formatDateTime(row.shift.closedAt)}` : "Masih berjalan"}
+          </Typography>
+        )}
+      </Box>,
+
       <Typography key={`recordedBy-${row.id}`} variant="body2" sx={{ fontWeight: 400 }}>
         {row.recordedBy?.fullName || "—"}
       </Typography>,
@@ -134,13 +136,32 @@ const ExpenseHistory = () => {
       <Typography key={`date-${row.id}`} variant="body2" color="text.secondary" sx={{ fontWeight: 400 }}>
         {formatDateTime(row.date)}
       </Typography>,
+
+      <Box key={`receipt-${row.id}`}>
+        {row.receipt ? (
+          <Box
+            component="img"
+            src={row.receipt}
+            alt="Nota"
+            sx={{
+              width: 48,
+              height: 48,
+              borderRadius: `${theme.shape.borderRadius}px`,
+              objectFit: "cover",
+              border: "1px solid",
+              borderColor: alpha(theme.palette.divider, 0.8),
+            }}
+          />
+        ) : (
+          <Typography variant="body2" color="text.disabled" sx={{ fontWeight: 400 }}>
+            —
+          </Typography>
+        )}
+      </Box>,
     ],
-    []
+    [theme]
   );
 
-  /**
-   * Konfigurasi tombol aksi tabel
-   */
   const tableActions = useMemo(
     () => [
       { icon: ListFilter, label: "Filter", onClick: openFilter },
@@ -149,24 +170,15 @@ const ExpenseHistory = () => {
     [openFilter, refetch]
   );
 
-  /**
-   * Handler perubahan halaman
-   */
   const handlePageChange = useCallback((event, newPage) => {
     setPage(newPage);
   }, []);
 
-  /**
-   * Handler perubahan jumlah baris per halaman
-   */
   const handleRowsPerPageChange = useCallback((newLimit) => {
     setLimit(newLimit);
     setPage(1);
   }, []);
 
-  /**
-   * Handler perubahan input pencarian
-   */
   const onSearchChange = useCallback((e) => {
     setSearch(e.target.value);
     setPage(1);
@@ -179,7 +191,7 @@ const ExpenseHistory = () => {
         count={metadata.totalPages || 0}
         data={tableData}
         emptyStateMessage="Tidak ada riwayat pengeluaran"
-        headers={["Judul", "Jumlah", "Kategori", "Pencatat", "Tanggal"]}
+        headers={["Judul", "Jumlah", "Kategori", "Shift", "Pencatat", "Tanggal", "Nota"]}
         isLoading={isLoading}
         onChange={handlePageChange}
         onRowDoubleClick={handleRowDoubleClick}
