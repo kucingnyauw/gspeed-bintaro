@@ -26,7 +26,6 @@ import {
   Card,
   Checkbox,
   Collapse,
-  Divider,
   IconButton,
   ListItemIcon,
   ListItemText,
@@ -324,7 +323,6 @@ const AppTable = memo(
     const handleCopyCell = () => copyToClipboard(contextMenu?.cellText);
     const handleCopyRow = () => copyToClipboard(contextMenu?.rowText);
 
-    /** Style untuk icon button konsisten */
     const iconBtnWrapperSx = (isActive = false) => ({
       display: "inline-flex",
       borderRadius: br,
@@ -383,12 +381,9 @@ const AppTable = memo(
       );
     });
 
-/** Cell style — tingkatkan py untuk menambah tinggi row */
-const cellSx = { py: 2.5, px: { xs: 1.5, sm: 2 } };
-const headerCellSx = { ...cellSx, fontWeight: 600, whiteSpace: "nowrap" };
+    const cellSx = { py: 2.5, px: { xs: 1.5, sm: 2 } };
+    const headerCellSx = { ...cellSx, fontWeight: 600, whiteSpace: "nowrap" };
 
-
-    // Rendered Headers
     const renderedHeaders = (
       <TableRow>
         {hasExpandable && <TableCell sx={{ ...cellSx, width: 48 }} />}
@@ -444,7 +439,6 @@ const headerCellSx = { ...cellSx, fontWeight: 600, whiteSpace: "nowrap" };
       </TableRow>
     );
 
-    // Rendered Skeletons
     const renderedSkeletons = Array.from({ length: rowsSkeletonCount }).map(
       (_, idx) => (
         <TableRow key={`skeleton-${idx}`}>
@@ -483,7 +477,6 @@ const headerCellSx = { ...cellSx, fontWeight: 600, whiteSpace: "nowrap" };
       )
     );
 
-    // Rendered Rows
     let renderedRows;
     if (!isLoading && data.length === 0) {
       renderedRows = (
@@ -675,7 +668,6 @@ const headerCellSx = { ...cellSx, fontWeight: 600, whiteSpace: "nowrap" };
           overflow: "visible",
         }}
       >
-        {/* Bulk Action Bar */}
         {selectedRows.length > 0 && bulkActions.length > 0 && (
           <Box
             sx={{
@@ -734,136 +726,136 @@ const headerCellSx = { ...cellSx, fontWeight: 600, whiteSpace: "nowrap" };
         )}
 
         {hasHeader && (
-          <>
+          <Stack
+            sx={{
+              flexDirection: { xs: "column", sm: "row" },
+              alignItems: { xs: "stretch", sm: "center" },
+              justifyContent: "space-between",
+              gap: { xs: 3, sm: 3 },
+              px: { xs: 3, sm: 3 },
+              py: { xs: 3, sm: 6 },
+            }}
+          >
+            <Box sx={{ minWidth: 0, flex: { sm: 1 }, mr: { sm: 3 } }}>
+              {title && (
+                <Typography
+                  variant="h6"
+                  sx={{
+                    fontWeight: 600,
+                    fontSize: { xs: "1rem", sm: "1.125rem" },
+                    wordBreak: "break-word",
+                  }}
+                  noWrap
+                >
+                  {title}
+                </Typography>
+              )}
+              {subtitle && (
+                <Typography
+                  variant="body2"
+                  color="text.secondary"
+                  sx={{
+                    mt: 0.5,
+                    fontSize: { xs: "0.75rem", sm: "0.875rem" },
+                  }}
+                  noWrap
+                >
+                  {subtitle}
+                </Typography>
+              )}
+            </Box>
             <Stack
               sx={{
                 flexDirection: { xs: "column", sm: "row" },
                 alignItems: { xs: "stretch", sm: "center" },
-                justifyContent: "space-between",
                 gap: { xs: 2, sm: 2 },
-                px: { xs: 2, sm: 3 },
-                py: { xs: 2, sm: 2.5 },
+                flexShrink: 0,
+                flexWrap: "wrap",
               }}
             >
-              <Box sx={{ minWidth: 0, width: "100%", flex: { sm: 1 } }}>
-                {title && (
-                  <Typography
-                    variant="h6"
-                    sx={{
-                      fontWeight: 600,
-                      fontSize: { xs: "1rem", sm: "1.125rem" },
-                    }}
-                  >
-                    {title}
-                  </Typography>
-                )}
-                {subtitle && (
-                  <Typography
-                    variant="body2"
-                    color="text.secondary"
-                    sx={{
-                      mt: 0.5,
-                      fontSize: { xs: "0.75rem", sm: "0.875rem" },
-                    }}
-                  >
-                    {subtitle}
-                  </Typography>
-                )}
-              </Box>
               <Stack
                 sx={{
-                  flexDirection: { xs: "column", sm: "row" },
-                  alignItems: { xs: "stretch", sm: "center" },
-                  gap: { xs: 1.5, sm: 1.5 },
-                  width: { xs: "100%", sm: "auto" },
-                  flexShrink: 0,
+                  flexDirection: "row",
+                  flexWrap: "wrap",
+                  gap: "8px",
+                  justifyContent: "flex-end",
+                  order: { xs: 1, sm: 2 },
                 }}
               >
-                <Stack
+                {headers.length > 0 && (
+                  <Tooltip arrow placement="top" title="Atur Kolom">
+                    <Box
+                      component="span"
+                      sx={iconBtnWrapperSx(Boolean(colToggleAnchor))}
+                    >
+                      <IconButton
+                        onClick={handleOpenColToggle}
+                        size="small"
+                        aria-label="Toggle Columns"
+                        sx={{
+                          borderRadius: "inherit",
+                          minWidth: 38,
+                          minHeight: 38,
+                          p: 0,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                        }}
+                      >
+                        <Columns size={18} strokeWidth={1.5} />
+                      </IconButton>
+                    </Box>
+                  </Tooltip>
+                )}
+                {actionButtons}
+              </Stack>
+              {onSearchChange && (
+                <Box
                   sx={{
-                    flexDirection: "row",
-                    flexWrap: "wrap",
-                    gap: "8px",
-                    justifyContent: "flex-end",
-                    order: { xs: 1, sm: 2 },
+                    order: { xs: 2, sm: 1 },
+                    width: { xs: "100%", sm: 220 },
+                    flexShrink: 0,
                   }}
                 >
-                  {headers.length > 0 && (
-                    <Tooltip arrow placement="top" title="Atur Kolom">
-                      <Box
-                        component="span"
-                        sx={iconBtnWrapperSx(Boolean(colToggleAnchor))}
-                      >
-                        <IconButton
-                          onClick={handleOpenColToggle}
-                          size="small"
-                          aria-label="Toggle Columns"
-                          sx={{
-                            borderRadius: "inherit",
-                            minWidth: 38,
-                            minHeight: 38,
-                            p: 0,
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                          }}
-                        >
-                          <Columns size={18} strokeWidth={1.5} />
-                        </IconButton>
-                      </Box>
-                    </Tooltip>
-                  )}
-                  {actionButtons}
-                </Stack>
-                {onSearchChange && (
-                  <Box
-                    sx={{
-                      order: { xs: 2, sm: 1 },
-                      width: { xs: "100%", sm: "auto" },
+                  <TextField
+                    fullWidth
+                    size="small"
+                    value={searchVal || ""}
+                    onChange={onSearchChange}
+                    placeholder={searchPlaceholder}
+                    slotProps={{
+                      input: {
+                        startAdornment: (
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "center",
+                              width: 32,
+                              height: 26,
+                              borderRadius: br,
+                              bgcolor: alpha(
+                                theme.palette.secondary.main,
+                                0.08
+                              ),
+                              color: theme.palette.secondary.main,
+                              mr: 1,
+                            }}
+                          >
+                            <Search size={15} strokeWidth={1.5} />
+                          </Box>
+                        ),
+                      },
                     }}
-                  >
-                    <TextField
-                      fullWidth
-                      size="small"
-                      value={searchVal || ""}
-                      onChange={onSearchChange}
-                      placeholder={searchPlaceholder}
-                      slotProps={{
-                        input: {
-                          startAdornment: (
-                            <Box
-                              sx={{
-                                display: "flex",
-                                alignItems: "center",
-                                justifyContent: "center",
-                                width: 32,
-                                height: 26,
-                                borderRadius: br,
-                                bgcolor: alpha(
-                                  theme.palette.secondary.main,
-                                  0.08
-                                ),
-                                color: theme.palette.secondary.main,
-                                mr: 1,
-                              }}
-                            >
-                              <Search size={15} strokeWidth={1.5} />
-                            </Box>
-                          ),
-                        },
-                      }}
-                      sx={{
-                        minWidth: { sm: 200 },
-                        width: "100%",
-                        "& .MuiOutlinedInput-root": { borderRadius: br },
-                      }}
-                    />
-                  </Box>
-                )}
-              </Stack>
+                    sx={{
+                      width: "100%",
+                      "& .MuiOutlinedInput-root": { borderRadius: br },
+                    }}
+                  />
+                </Box>
+              )}
             </Stack>
-            <Divider />
-          </>
+          </Stack>
         )}
 
         <TableContainer
@@ -885,141 +877,138 @@ const headerCellSx = { ...cellSx, fontWeight: 600, whiteSpace: "nowrap" };
         </TableContainer>
 
         {(isLoading || count > 1) && (
-          <>
-            <Divider />
-            <Stack
+          <Stack
+            sx={{
+              flexDirection: { xs: "column", sm: "row" },
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: { xs: 3, sm: 3 },
+              px: { xs: 3, sm: 3 },
+              py: { xs: 3, sm: 6 },
+            }}
+          >
+            <Box
               sx={{
-                flexDirection: { xs: "column", sm: "row" },
-                alignItems: "center",
-                justifyContent: "space-between",
-                gap: { xs: 2, sm: 2 },
-                px: { xs: 2, sm: 3 },
-                py: { xs: 2, sm: 2 },
+                order: { xs: 2, sm: 1 },
+                width: { xs: "100%", sm: "auto" },
               }}
             >
-              <Box
-                sx={{
-                  order: { xs: 2, sm: 1 },
-                  width: { xs: "100%", sm: "auto" },
-                }}
-              >
-                {onRowsPerPageChange && !hideRowsPerPage && (
-                  <Stack
+              {onRowsPerPageChange && !hideRowsPerPage && (
+                <Stack
+                  sx={{
+                    flexDirection: "row",
+                    alignItems: "center",
+                    justifyContent: { xs: "center", sm: "flex-start" },
+                    gap: 1.5,
+                  }}
+                >
+                  <Typography
+                    variant="caption"
+                    color="text.secondary"
+                    sx={{ whiteSpace: "nowrap", fontWeight: 500 }}
+                  >
+                    Baris per halaman
+                  </Typography>
+                  <TextField
+                    select
+                    size="small"
+                    value={rowsPerPage}
+                    onChange={(e) =>
+                      onRowsPerPageChange(Number(e.target.value))
+                    }
+                    slotProps={{ select: { native: true } }}
                     sx={{
-                      flexDirection: "row",
-                      alignItems: "center",
-                      justifyContent: { xs: "center", sm: "flex-start" },
-                      gap: 1.5,
+                      minWidth: 80,
+                      "& .MuiOutlinedInput-root": { borderRadius: br },
+                      "& .MuiNativeSelect-select": {
+                        py: 0.75,
+                        pl: 1.5,
+                        pr: 3,
+                        fontSize: "0.875rem",
+                      },
                     }}
                   >
-                    <Typography
-                      variant="caption"
-                      color="text.secondary"
-                      sx={{ whiteSpace: "nowrap", fontWeight: 500 }}
-                    >
-                      Baris per halaman
-                    </Typography>
-                    <TextField
-                      select
-                      size="small"
-                      value={rowsPerPage}
-                      onChange={(e) =>
-                        onRowsPerPageChange(Number(e.target.value))
-                      }
-                      slotProps={{ select: { native: true } }}
-                      sx={{
-                        minWidth: 80,
-                        "& .MuiOutlinedInput-root": { borderRadius: br },
-                        "& .MuiNativeSelect-select": {
-                          py: 0.75,
-                          pl: 1.5,
-                          pr: 3,
-                          fontSize: "0.875rem",
-                        },
-                      }}
-                    >
-                      {rowsPerPageOptions.map((option) => (
-                        <option key={option} value={option}>
-                          {option}
-                        </option>
-                      ))}
-                    </TextField>
-                  </Stack>
-                )}
-              </Box>
-              <Box
-                sx={{
-                  order: { xs: 1, sm: 2 },
-                  width: { xs: "100%", sm: "auto" },
-                  display: "flex",
-                  justifyContent: { xs: "center", sm: "flex-end" },
-                }}
-              >
-                {isLoading ? (
-                  <Skeleton
-                    height={36}
-                    variant="rounded"
-                    width={isMobile ? 200 : 260}
-                    sx={{ borderRadius: br }}
-                  />
-                ) : (
-                  <Pagination
-                    count={count}
-                    page={page}
-                    onChange={onChange}
-                    showFirstButton={!isMobile}
-                    showLastButton={!isMobile}
-                    shape="rounded"
-                    size={isMobile ? "medium" : "small"}
-                    siblingCount={isMobile ? 0 : 1}
-                    boundaryCount={1}
-                    sx={{
-                      "& .MuiPaginationItem-root": {
-                        fontSize: "0.875rem",
-                        minWidth: { xs: 34, sm: 32 },
-                        height: { xs: 34, sm: 32 },
-                        borderRadius: br,
-                        border: `1px solid ${theme.palette.divider}`,
-                        bgcolor: "background.paper",
-                        color: "text.secondary",
-                        transition: theme.transitions.create(
-                          [
-                            "background-color",
-                            "border-color",
-                            "color",
-                            "box-shadow",
-                          ],
-                          { duration: theme.transitions.duration.shorter }
-                        ),
-                        "&:hover": {
-                          bgcolor: alpha(theme.palette.secondary.main, 0.06),
-                          borderColor: alpha(theme.palette.secondary.main, 0.4),
-                          color: theme.palette.secondary.main,
-                        },
-                        "&.Mui-selected": {
-                          bgcolor: theme.palette.secondary.main,
-                          color: theme.palette.secondary.contrastText,
-                          borderColor: theme.palette.secondary.main,
-                          fontWeight: 600,
-                          boxShadow: `0 2px 8px ${alpha(
-                            theme.palette.secondary.main,
-                            0.3
-                          )}`,
-                          "&:hover": { bgcolor: theme.palette.secondary.dark },
-                        },
+                    {rowsPerPageOptions.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </TextField>
+                </Stack>
+              )}
+            </Box>
+            <Box
+              sx={{
+                order: { xs: 1, sm: 2 },
+                width: { xs: "100%", sm: "auto" },
+                display: "flex",
+                justifyContent: { xs: "center", sm: "flex-end" },
+              }}
+            >
+              {isLoading ? (
+                <Skeleton
+                  height={36}
+                  variant="rounded"
+                  width={isMobile ? 200 : 260}
+                  sx={{ borderRadius: br }}
+                />
+              ) : (
+                <Pagination
+                  count={count}
+                  page={page}
+                  onChange={onChange}
+                  showFirstButton={!isMobile}
+                  showLastButton={!isMobile}
+                  shape="rounded"
+                  size={isMobile ? "medium" : "small"}
+                  siblingCount={isMobile ? 0 : 1}
+                  boundaryCount={1}
+                  sx={{
+                    "& .MuiPaginationItem-root": {
+                      fontSize: "0.875rem",
+                      minWidth: { xs: 34, sm: 32 },
+                      height: { xs: 34, sm: 32 },
+                      borderRadius: br,
+                      border: `1px solid ${theme.palette.divider}`,
+                      bgcolor: "background.paper",
+                      color: "text.secondary",
+                      transition: theme.transitions.create(
+                        [
+                          "background-color",
+                          "border-color",
+                          "color",
+                          "box-shadow",
+                        ],
+                        { duration: theme.transitions.duration.shorter }
+                      ),
+                      "&:hover": {
+                        bgcolor: alpha(theme.palette.secondary.main, 0.06),
+                        borderColor: alpha(theme.palette.secondary.main, 0.4),
+                        color: theme.palette.secondary.main,
                       },
-                      "& .MuiPaginationItem-ellipsis": {
-                        border: "none",
-                        bgcolor: "transparent",
-                        "&:hover": { bgcolor: "transparent" },
+                      "&.Mui-selected": {
+                        bgcolor: theme.palette.secondary.main,
+                        color: theme.palette.secondary.contrastText,
+                        borderColor: theme.palette.secondary.main,
+                        fontWeight: 600,
+                        boxShadow: `0 2px 8px ${alpha(
+                          theme.palette.secondary.main,
+                          0.3
+                        )}`,
+                        "&:hover": { bgcolor: theme.palette.secondary.dark },
                       },
-                      "& .MuiPagination-ul": { gap: { xs: 0.75, sm: 0.5 } },
-                    }}
-                  />
-                )}
-              </Box>
-            </Stack>
-          </>
+                    },
+                    "& .MuiPaginationItem-ellipsis": {
+                      border: "none",
+                      bgcolor: "transparent",
+                      "&:hover": { bgcolor: "transparent" },
+                    },
+                    "& .MuiPagination-ul": { gap: { xs: 0.75, sm: 0.5 } },
+                  }}
+                />
+              )}
+            </Box>
+          </Stack>
         )}
 
         <Popover

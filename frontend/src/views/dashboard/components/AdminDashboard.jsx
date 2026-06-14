@@ -13,7 +13,6 @@ import PropTypes from "prop-types";
 import {
   Box,
   Card,
-  Divider,
   IconButton,
   LinearProgress,
   Skeleton,
@@ -33,6 +32,9 @@ import {
   Users,
   AlertCircle,
   Car,
+  BarChart3,
+  Target,
+  CalendarDays,
 } from "lucide-react";
 
 import { formatDate, formatToIdr } from "@shared/utils";
@@ -218,7 +220,17 @@ const iconBtnSx = (theme) => ({
   },
 });
 
-// ==================== SKELETONS ====================
+const sectionIconSx = (theme) => ({
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: 38,
+  height: 38,
+  borderRadius: `${theme.shape.borderRadius}px`,
+  bgcolor: alpha(theme.palette.secondary.main, 0.08),
+  color: theme.palette.secondary.main,
+  flexShrink: 0,
+});
 
 const HeaderSkeleton = () => {
   const theme = useTheme();
@@ -227,32 +239,86 @@ const HeaderSkeleton = () => {
   return (
     <Card sx={{ borderRadius: br }}>
       <Box sx={{ p: { xs: 2, sm: 2.5, md: 3 } }}>
-        <Stack sx={{ gap: { xs: 2, sm: 2.5 } }}>
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Skeleton
-              variant="text"
-              width={isMobile ? 180 : 240}
-              height={isMobile ? 28 : 32}
-              sx={{ minWidth: 120 }}
-            />
-            <Skeleton
-              variant="text"
-              width={isMobile ? 240 : 320}
-              height={isMobile ? 16 : 20}
-              sx={{ mt: 0.5, minWidth: 160 }}
-            />
-          </Box>
-          <Stack direction="row" sx={{ justifyContent: "flex-end" }}>
-            <Skeleton
-              variant="rounded"
-              width={38}
-              height={38}
-              sx={{ borderRadius: br, flexShrink: 0 }}
-            />
+        <Stack sx={{ gap: { xs: 1.5, sm: 0 } }}>
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            sx={{
+              justifyContent: "space-between",
+              alignItems: { xs: "flex-start", sm: "center" },
+            }}
+          >
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Skeleton
+                variant="text"
+                width={isMobile ? 180 : 240}
+                height={isMobile ? 28 : 32}
+                sx={{ minWidth: 120 }}
+              />
+              <Skeleton
+                variant="text"
+                width={isMobile ? 240 : 320}
+                height={isMobile ? 16 : 20}
+                sx={{ mt: 0.5, minWidth: 160 }}
+              />
+            </Box>
+            {!isMobile && (
+              <Skeleton
+                variant="rounded"
+                width={38}
+                height={38}
+                sx={{ borderRadius: br, flexShrink: 0, ml: 2 }}
+              />
+            )}
           </Stack>
+          {isMobile && (
+            <Stack direction="row" sx={{ justifyContent: "flex-end" }}>
+              <Skeleton
+                variant="rounded"
+                width={38}
+                height={38}
+                sx={{ borderRadius: br, flexShrink: 0 }}
+              />
+            </Stack>
+          )}
         </Stack>
       </Box>
     </Card>
+  );
+};
+
+const SectionHeaderSkeleton = () => {
+  const theme = useTheme();
+  const { isMobile } = useDevice();
+  const br = `${theme.shape.borderRadius}px`;
+  return (
+    <Stack
+      direction="row"
+      sx={{
+        justifyContent: "space-between",
+        alignItems: "flex-start",
+      }}
+    >
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Skeleton
+          variant="text"
+          width={isMobile ? 140 : 160}
+          height={isMobile ? 24 : 28}
+          sx={{ minWidth: 100 }}
+        />
+        <Skeleton
+          variant="text"
+          width={isMobile ? 180 : 220}
+          height={16}
+          sx={{ mt: 0.5, minWidth: 120 }}
+        />
+      </Box>
+      <Skeleton
+        variant="rounded"
+        width={38}
+        height={38}
+        sx={{ borderRadius: br, flexShrink: 0, ml: 2 }}
+      />
+    </Stack>
   );
 };
 
@@ -297,7 +363,6 @@ const SummaryCardSkeleton = () => {
 
 const ChartSkeleton = () => {
   const theme = useTheme();
-  const { isMobile } = useDevice();
   const br = `${theme.shape.borderRadius}px`;
   return (
     <Card
@@ -310,20 +375,8 @@ const ChartSkeleton = () => {
       }}
     >
       <Box sx={{ p: { xs: 2, sm: 2.5, md: 3 }, pb: 2 }}>
-        <Skeleton
-          variant="text"
-          width={isMobile ? 160 : 200}
-          height={isMobile ? 24 : 28}
-          sx={{ minWidth: 120 }}
-        />
-        <Skeleton
-          variant="text"
-          width={isMobile ? 200 : 260}
-          height={16}
-          sx={{ mt: 0.5, minWidth: 140 }}
-        />
+        <SectionHeaderSkeleton />
       </Box>
-      <Divider />
       <Box
         sx={{
           p: { xs: 2, sm: 2.5, md: 3 },
@@ -371,25 +424,12 @@ const StatCardSkeleton = () => {
 
 const TargetCardSkeleton = () => {
   const theme = useTheme();
-  const { isMobile } = useDevice();
   const br = `${theme.shape.borderRadius}px`;
   return (
     <Card sx={{ borderRadius: br, display: "flex", flexDirection: "column" }}>
       <Box sx={{ p: { xs: 2, sm: 2.5, md: 3 }, pb: 2 }}>
-        <Skeleton
-          variant="text"
-          width={isMobile ? 140 : 160}
-          height={isMobile ? 24 : 28}
-          sx={{ minWidth: 100 }}
-        />
-        <Skeleton
-          variant="text"
-          width={isMobile ? 180 : 220}
-          height={16}
-          sx={{ mt: 0.5, minWidth: 120 }}
-        />
+        <SectionHeaderSkeleton />
       </Box>
-      <Divider />
       <Box
         sx={{
           p: { xs: 2, sm: 2.5, md: 3 },
@@ -418,20 +458,8 @@ const YearlyTargetSkeleton = () => {
   return (
     <Card sx={{ borderRadius: br }}>
       <Box sx={{ p: { xs: 2, sm: 2.5, md: 3 }, pb: 2 }}>
-        <Skeleton
-          variant="text"
-          width={isMobile ? 140 : 160}
-          height={isMobile ? 24 : 28}
-          sx={{ minWidth: 100 }}
-        />
-        <Skeleton
-          variant="text"
-          width={isMobile ? 180 : 220}
-          height={16}
-          sx={{ mt: 0.5, minWidth: 120 }}
-        />
+        <SectionHeaderSkeleton />
       </Box>
-      <Divider />
       <Box sx={{ p: { xs: 2, sm: 2.5, md: 3 } }}>
         <Stack
           direction={{ xs: "column", md: "row" }}
@@ -463,10 +491,6 @@ const YearlyTargetSkeleton = () => {
               sx={{ borderRadius: br }}
             />
           </Box>
-          <Divider
-            orientation={isMobile ? "horizontal" : "vertical"}
-            flexItem
-          />
           <Box
             sx={{
               flex: 1,
@@ -475,9 +499,9 @@ const YearlyTargetSkeleton = () => {
             }}
           >
             <Stack
-              direction={{ xs: "row", md: "column" }}
+              direction="row"
               sx={{
-                gap: { xs: 4, md: 3 },
+                gap: { xs: 4, md: 6 },
                 alignItems: "center",
                 justifyContent: "center",
                 textAlign: "center",
@@ -508,8 +532,6 @@ const YearlyTargetSkeleton = () => {
     </Card>
   );
 };
-
-// ==================== MAIN COMPONENT ====================
 
 const AdminDashboard = ({ data, isLoading, refetch }) => {
   const theme = useTheme();
@@ -670,56 +692,73 @@ const AdminDashboard = ({ data, isLoading, refetch }) => {
 
   return (
     <Stack sx={{ gap: { xs: 2, sm: 3, md: 4 } }}>
-      {/* Header — Mobile: title+subtitle di atas, icon refresh di kanan bawah */}
       <Card sx={{ borderRadius: `${theme.shape.borderRadius}px` }}>
         <Box sx={{ p: { xs: 2, sm: 2.5, md: 3 } }}>
-          <Stack sx={{ gap: { xs: 2, sm: 2.5 } }}>
-            {/* Baris 1: Title & Subtitle */}
-            <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Typography
-                variant={isMobile ? "h6" : "h5"}
-                color="text.primary"
-                sx={{
-                  fontWeight: 600,
-                  letterSpacing: "-0.01em",
-                  wordBreak: "break-word",
-                }}
-              >
-                Dashboard Admin
-              </Typography>
-              <Typography
-                variant={isMobile ? "caption" : "body2"}
-                color="text.secondary"
-                sx={{ mt: 0.5 }}
-              >
-                {data?.activeShift
-                  ? `Shift aktif · ${data.activeShift.cashier}`
-                  : "Belum ada shift aktif"}{" "}
-                ·{" "}
-                {formatDate(new Date(), {
-                  dateStyle: isMobile ? "medium" : "full",
-                })}
-              </Typography>
-            </Box>
-
-            {/* Baris 2: Icon refresh di kanan */}
-            <Stack direction="row" sx={{ justifyContent: "flex-end" }}>
-              <Tooltip title="Refresh data" placement="bottom">
-                <IconButton
-                  onClick={() => refetch?.()}
-                  size={isMobile ? "small" : "medium"}
-                  aria-label="Refresh data"
-                  sx={iconBtnSx(theme)}
+          <Stack sx={{ gap: { xs: 1.5, sm: 0 } }}>
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              sx={{
+                justifyContent: "space-between",
+                alignItems: { xs: "flex-start", sm: "center" },
+              }}
+            >
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography
+                  variant={isMobile ? "h6" : "h5"}
+                  color="text.primary"
+                  sx={{
+                    fontWeight: 600,
+                    letterSpacing: "-0.01em",
+                    wordBreak: "break-word",
+                  }}
                 >
-                  <RotateCcw size={isMobile ? 16 : 18} strokeWidth={2} />
-                </IconButton>
-              </Tooltip>
+                  Dashboard Admin
+                </Typography>
+                <Typography
+                  variant={isMobile ? "caption" : "body2"}
+                  color="text.secondary"
+                  sx={{ mt: 0.5 }}
+                >
+                  {data?.activeShift
+                    ? `Shift aktif · ${data.activeShift.cashier}`
+                    : "Belum ada shift aktif"}{" "}
+                  ·{" "}
+                  {formatDate(new Date(), {
+                    dateStyle: isMobile ? "medium" : "full",
+                  })}
+                </Typography>
+              </Box>
+              {!isMobile && (
+                <Tooltip title="Refresh data" placement="bottom">
+                  <IconButton
+                    onClick={() => refetch?.()}
+                    size="medium"
+                    aria-label="Refresh data"
+                    sx={{ ...iconBtnSx(theme), ml: 2, flexShrink: 0 }}
+                  >
+                    <RotateCcw size={18} strokeWidth={2} />
+                  </IconButton>
+                </Tooltip>
+              )}
             </Stack>
+            {isMobile && (
+              <Stack direction="row" sx={{ justifyContent: "flex-end" }}>
+                <Tooltip title="Refresh data" placement="bottom">
+                  <IconButton
+                    onClick={() => refetch?.()}
+                    size="small"
+                    aria-label="Refresh data"
+                    sx={iconBtnSx(theme)}
+                  >
+                    <RotateCcw size={16} strokeWidth={2} />
+                  </IconButton>
+                </Tooltip>
+              </Stack>
+            )}
           </Stack>
         </Box>
       </Card>
 
-      {/* Summary Row 1 */}
       <Box
         sx={{
           display: "grid",
@@ -773,7 +812,6 @@ const AdminDashboard = ({ data, isLoading, refetch }) => {
         />
       </Box>
 
-      {/* Stok Chart + Inventory Stats */}
       <Box
         sx={{
           display: "grid",
@@ -790,22 +828,34 @@ const AdminDashboard = ({ data, isLoading, refetch }) => {
           }}
         >
           <Box sx={{ p: { xs: 2, sm: 2.5, md: 3 }, pb: 2 }}>
-            <Typography
-              variant={isMobile ? "subtitle1" : "h6"}
-              color="text.primary"
-              sx={{ fontWeight: 600, letterSpacing: "-0.01em" }}
+            <Stack
+              direction="row"
+              sx={{
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+              }}
             >
-              Stok Menipis & Habis
-            </Typography>
-            <Typography
-              variant={isMobile ? "caption" : "body2"}
-              color="text.secondary"
-              sx={{ mt: 0.5 }}
-            >
-              {data?.inventory?.lowStockCount || 0} item butuh restock
-            </Typography>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography
+                  variant={isMobile ? "subtitle1" : "h6"}
+                  color="text.primary"
+                  sx={{ fontWeight: 600, letterSpacing: "-0.01em" }}
+                >
+                  Stok Menipis & Habis
+                </Typography>
+                <Typography
+                  variant={isMobile ? "caption" : "body2"}
+                  color="text.secondary"
+                  sx={{ mt: 0.5 }}
+                >
+                  {data?.inventory?.lowStockCount || 0} item butuh restock
+                </Typography>
+              </Box>
+              <Box sx={sectionIconSx(theme)}>
+                <BarChart3 size={18} strokeWidth={1.5} />
+              </Box>
+            </Stack>
           </Box>
-          <Divider />
           <Box
             sx={{
               p: { xs: 2, sm: 2.5, md: 3 },
@@ -860,7 +910,6 @@ const AdminDashboard = ({ data, isLoading, refetch }) => {
         </Stack>
       </Box>
 
-      {/* Summary Row 2 */}
       <Box
         sx={{
           display: "grid",
@@ -906,7 +955,6 @@ const AdminDashboard = ({ data, isLoading, refetch }) => {
         />
       </Box>
 
-      {/* Target Section */}
       <Box
         sx={{
           display: "grid",
@@ -916,22 +964,34 @@ const AdminDashboard = ({ data, isLoading, refetch }) => {
       >
         <Card sx={{ borderRadius: `${theme.shape.borderRadius}px` }}>
           <Box sx={{ p: { xs: 2, sm: 2.5, md: 3 }, pb: 2 }}>
-            <Typography
-              variant={isMobile ? "subtitle1" : "h6"}
-              color="text.primary"
-              sx={{ fontWeight: 600, letterSpacing: "-0.01em" }}
+            <Stack
+              direction="row"
+              sx={{
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+              }}
             >
-              Target Harian
-            </Typography>
-            <Typography
-              variant={isMobile ? "caption" : "body2"}
-              color="text.secondary"
-              sx={{ mt: 0.5 }}
-            >
-              Capaian vs target hari ini
-            </Typography>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography
+                  variant={isMobile ? "subtitle1" : "h6"}
+                  color="text.primary"
+                  sx={{ fontWeight: 600, letterSpacing: "-0.01em" }}
+                >
+                  Target Harian
+                </Typography>
+                <Typography
+                  variant={isMobile ? "caption" : "body2"}
+                  color="text.secondary"
+                  sx={{ mt: 0.5 }}
+                >
+                  Capaian vs target hari ini
+                </Typography>
+              </Box>
+              <Box sx={sectionIconSx(theme)}>
+                <Target size={18} strokeWidth={1.5} />
+              </Box>
+            </Stack>
           </Box>
-          <Divider />
           <Box
             sx={{
               p: { xs: 2, sm: 2.5, md: 3 },
@@ -949,22 +1009,34 @@ const AdminDashboard = ({ data, isLoading, refetch }) => {
         </Card>
         <Card sx={{ borderRadius: `${theme.shape.borderRadius}px` }}>
           <Box sx={{ p: { xs: 2, sm: 2.5, md: 3 }, pb: 2 }}>
-            <Typography
-              variant={isMobile ? "subtitle1" : "h6"}
-              color="text.primary"
-              sx={{ fontWeight: 600, letterSpacing: "-0.01em" }}
+            <Stack
+              direction="row"
+              sx={{
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+              }}
             >
-              Target Bulanan
-            </Typography>
-            <Typography
-              variant={isMobile ? "caption" : "body2"}
-              color="text.secondary"
-              sx={{ mt: 0.5 }}
-            >
-              Capaian vs target bulan ini
-            </Typography>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography
+                  variant={isMobile ? "subtitle1" : "h6"}
+                  color="text.primary"
+                  sx={{ fontWeight: 600, letterSpacing: "-0.01em" }}
+                >
+                  Target Bulanan
+                </Typography>
+                <Typography
+                  variant={isMobile ? "caption" : "body2"}
+                  color="text.secondary"
+                  sx={{ mt: 0.5 }}
+                >
+                  Capaian vs target bulan ini
+                </Typography>
+              </Box>
+              <Box sx={sectionIconSx(theme)}>
+                <CalendarDays size={18} strokeWidth={1.5} />
+              </Box>
+            </Stack>
           </Box>
-          <Divider />
           <Box
             sx={{
               p: { xs: 2, sm: 2.5, md: 3 },
@@ -982,97 +1054,138 @@ const AdminDashboard = ({ data, isLoading, refetch }) => {
         </Card>
       </Box>
 
-      {/* Target Tahunan */}
       <Card sx={{ borderRadius: `${theme.shape.borderRadius}px` }}>
-        <Box sx={{ p: { xs: 2, sm: 2.5, md: 3 }, pb: 2 }}>
-          <Typography
-            variant={isMobile ? "subtitle1" : "h6"}
-            color="text.primary"
-            sx={{ fontWeight: 600, letterSpacing: "-0.01em" }}
-          >
-            Target Tahunan
-          </Typography>
-          <Typography
-            variant={isMobile ? "caption" : "body2"}
-            color="text.secondary"
-            sx={{ mt: 0.5 }}
-          >
-            Capaian vs target tahun ini
-          </Typography>
-        </Box>
-        <Divider />
-        <Box sx={{ p: { xs: 2, sm: 2.5, md: 3 } }}>
-          <Stack
-            direction={{ xs: "column", md: "row" }}
+  <Box sx={{ p: { xs: 2, sm: 2.5, md: 3 }, pb: 2 }}>
+    <Stack
+      direction="row"
+      sx={{
+        justifyContent: "space-between",
+        alignItems: "flex-start",
+      }}
+    >
+      <Box sx={{ flex: 1, minWidth: 0 }}>
+        <Typography
+          variant={isMobile ? "subtitle1" : "h6"}
+          color="text.primary"
+          sx={{ fontWeight: 600, letterSpacing: "-0.01em" }}
+        >
+          Target Tahunan
+        </Typography>
+        <Typography
+          variant={isMobile ? "caption" : "body2"}
+          color="text.secondary"
+          sx={{ mt: 0.5 }}
+        >
+          Capaian vs target tahun ini
+        </Typography>
+      </Box>
+      <Box sx={sectionIconSx(theme)}>
+        <Target size={18} strokeWidth={1.5} />
+      </Box>
+    </Stack>
+  </Box>
+  <Box sx={{ p: { xs: 2, sm: 2.5, md: 3 } }}>
+    <Stack
+      direction={{ xs: "column", md: "row" }}
+      sx={{
+        justifyContent: "space-between",
+        alignItems: { xs: "stretch", md: "center" },
+        flexWrap: "wrap",
+        gap: { xs: 3, md: 4 },
+      }}
+    >
+      <Box sx={{ flex: 2, minWidth: { xs: "100%", md: 280 } }}>
+        <TargetItem
+          label="Pendapatan"
+          actual={data?.targets?.yearly?.revenue?.actual || 0}
+          target={data?.targets?.yearly?.revenue?.target || 0}
+          percentage={data?.targets?.yearly?.revenue?.percentage || 0}
+          isCurrency
+        />
+      </Box>
+      <Box
+        sx={{
+          flex: 1,
+          minWidth: { xs: "100%", md: 140 },
+          alignSelf: "center",
+        }}
+      >
+        <Stack
+          direction="row"
+          sx={{
+            gap: { xs: 2, md: 0 },
+            alignItems: "stretch",
+            justifyContent: "stretch",
+          }}
+        >
+          <Box
             sx={{
-              justifyContent: "space-between",
-              alignItems: { xs: "stretch", md: "center" },
-              flexWrap: "wrap",
-              gap: { xs: 3, md: 4 },
+              flex: 1,
+              py: { xs: 1.5, sm: 2 },
+              px: { xs: 2, sm: 2.5 },
+              borderRadius: `${theme.shape.borderRadius}px`,
+              border: "1px solid",
+              borderColor: alpha(theme.palette.divider, 0.8),
+              textAlign: "center",
             }}
           >
-            <Box sx={{ flex: 2, minWidth: { xs: "100%", md: 280 } }}>
-              <TargetItem
-                label="Pendapatan"
-                actual={data?.targets?.yearly?.revenue?.actual || 0}
-                target={data?.targets?.yearly?.revenue?.target || 0}
-                percentage={data?.targets?.yearly?.revenue?.percentage || 0}
-                isCurrency
-              />
-            </Box>
-            <Divider
-              orientation={isMobile ? "horizontal" : "vertical"}
-              flexItem
-            />
+            <Typography
+              variant={isMobile ? "h6" : "h5"}
+              sx={{ fontWeight: 700 }}
+            >
+              {data?.thisYear?.orders || 0}
+            </Typography>
+            <Typography
+              variant={isMobile ? "caption" : "body2"}
+              color="text.secondary"
+            >
+              Pesanan
+            </Typography>
+          </Box>
+          <Box
+            sx={{
+              display: { xs: "none", md: "flex" },
+              alignItems: "center",
+              px: 2,
+            }}
+          >
             <Box
               sx={{
-                flex: 1,
-                minWidth: { xs: "100%", md: 140 },
-                alignSelf: "center",
+                width: "1px",
+                height: 48,
+                bgcolor: alpha(theme.palette.divider, 0.8),
               }}
+            />
+          </Box>
+          <Box
+            sx={{
+              flex: 1,
+              py: { xs: 1.5, sm: 2 },
+              px: { xs: 2, sm: 2.5 },
+              borderRadius: `${theme.shape.borderRadius}px`,
+              border: "1px solid",
+              borderColor: alpha(theme.palette.divider, 0.8),
+              textAlign: "center",
+            }}
+          >
+            <Typography
+              variant={isMobile ? "h6" : "h5"}
+              sx={{ fontWeight: 700 }}
             >
-              <Stack
-                direction={{ xs: "row", md: "column" }}
-                sx={{
-                  gap: { xs: 4, md: 3 },
-                  alignItems: "center",
-                  textAlign: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Box>
-                  <Typography
-                    variant={isMobile ? "h6" : "h5"}
-                    sx={{ fontWeight: 700 }}
-                  >
-                    {data?.thisYear?.orders || 0}
-                  </Typography>
-                  <Typography
-                    variant={isMobile ? "caption" : "body2"}
-                    color="text.secondary"
-                  >
-                    Pesanan
-                  </Typography>
-                </Box>
-                <Box>
-                  <Typography
-                    variant={isMobile ? "h6" : "h5"}
-                    sx={{ fontWeight: 700 }}
-                  >
-                    {fmt(data?.thisYear?.averageOrderValue || 0)}
-                  </Typography>
-                  <Typography
-                    variant={isMobile ? "caption" : "body2"}
-                    color="text.secondary"
-                  >
-                    Rata-rata
-                  </Typography>
-                </Box>
-              </Stack>
-            </Box>
-          </Stack>
-        </Box>
-      </Card>
+              {fmt(data?.thisYear?.averageOrderValue || 0)}
+            </Typography>
+            <Typography
+              variant={isMobile ? "caption" : "body2"}
+              color="text.secondary"
+            >
+              Rata-rata
+            </Typography>
+          </Box>
+        </Stack>
+      </Box>
+    </Stack>
+  </Box>
+</Card>
     </Stack>
   );
 };

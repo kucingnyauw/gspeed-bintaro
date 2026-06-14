@@ -13,7 +13,7 @@ import { useMemo } from "react";
 import PropTypes from "prop-types";
 import { Box, Card, Chip, Divider, IconButton, Skeleton, Stack, Tooltip, Typography, useTheme } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import { Clock, DollarSign, RotateCcw, ShoppingCart } from "lucide-react";
+import { BarChart3, Clock, DollarSign, PieChart, RotateCcw, ShoppingCart } from "lucide-react";
 
 import { formatDate, formatToIdr } from "@shared/utils";
 import { OrderStatus, statusColorMap } from "@shared/constant";
@@ -53,6 +53,18 @@ const EmptyState = ({ title, description, children }) => {
 
 EmptyState.propTypes = { title: PropTypes.string.isRequired, description: PropTypes.string.isRequired, children: PropTypes.node.isRequired };
 
+const sectionIconSx = (theme) => ({
+  display: "flex",
+  alignItems: "center",
+  justifyContent: "center",
+  width: 38,
+  height: 38,
+  borderRadius: `${theme.shape.borderRadius}px`,
+  bgcolor: alpha(theme.palette.secondary.main, 0.08),
+  color: theme.palette.secondary.main,
+  flexShrink: 0,
+});
+
 const iconBtnSx = (theme) => ({
   border: "1px solid", borderColor: alpha(theme.palette.divider, 0.8), borderRadius: `${theme.shape.borderRadius}px`, color: "text.secondary",
   minWidth: 38, minHeight: 38, p: 0, display: "flex", alignItems: "center", justifyContent: "center",
@@ -67,14 +79,27 @@ const HeaderSkeleton = () => {
   return (
     <Card sx={{ borderRadius: br }}>
       <Box sx={{ p: { xs: 2, sm: 2.5, md: 3 } }}>
-        <Stack sx={{ gap: { xs: 2, sm: 2.5 } }}>
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Skeleton variant="text" width={isMobile ? 160 : 200} height={isMobile ? 28 : 32} sx={{ minWidth: 120 }} />
-            <Skeleton variant="text" width={isMobile ? 220 : 280} height={isMobile ? 16 : 20} sx={{ mt: 0.5, minWidth: 140 }} />
-          </Box>
-          <Stack direction="row" sx={{ justifyContent: "flex-end" }}>
-            <Skeleton variant="rounded" width={38} height={38} sx={{ borderRadius: br, flexShrink: 0 }} />
+        <Stack sx={{ gap: { xs: 1.5, sm: 0 } }}>
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            sx={{
+              justifyContent: "space-between",
+              alignItems: { xs: "flex-start", sm: "center" },
+            }}
+          >
+            <Box sx={{ flex: 1, minWidth: 0 }}>
+              <Skeleton variant="text" width={isMobile ? 160 : 200} height={isMobile ? 28 : 32} sx={{ minWidth: 120 }} />
+              <Skeleton variant="text" width={isMobile ? 220 : 280} height={isMobile ? 16 : 20} sx={{ mt: 0.5, minWidth: 140 }} />
+            </Box>
+            {!isMobile && (
+              <Skeleton variant="rounded" width={38} height={38} sx={{ borderRadius: br, flexShrink: 0, ml: 2 }} />
+            )}
           </Stack>
+          {isMobile && (
+            <Stack direction="row" sx={{ justifyContent: "flex-end" }}>
+              <Skeleton variant="rounded" width={38} height={38} sx={{ borderRadius: br, flexShrink: 0 }} />
+            </Stack>
+          )}
         </Stack>
       </Box>
     </Card>
@@ -99,21 +124,24 @@ const ShiftInfoSkeleton = () => {
   return (
     <Card sx={{ borderRadius: br, height: "100%" }}>
       <Box sx={{ p: { xs: 2, sm: 2.5, md: 3 }, pb: 2 }}>
-        <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center" }}>
-          <Skeleton variant="text" width={100} height={28} sx={{ minWidth: 80 }} />
-          <Skeleton variant="circular" width={8} height={8} />
+        <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "flex-start" }}>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Skeleton variant="text" width={100} height={28} sx={{ minWidth: 80 }} />
+            <Skeleton variant="text" width={140} height={16} sx={{ mt: 0.5, minWidth: 100 }} />
+          </Box>
+          <Skeleton variant="rounded" width={38} height={38} sx={{ borderRadius: br, ml: 2, flexShrink: 0 }} />
         </Stack>
       </Box>
-      <Divider />
+   
       <Box sx={{ p: { xs: 2, sm: 2.5, md: 3 } }}>
-        <Stack sx={{ gap: 2 }}>
+        <Stack sx={{ gap: { xs: 2.5, sm: 5 } }}>
           {[1, 2, 3, 4].map((i) => (
             <Box key={i}>
-              <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center" }}>
+              <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", py: 1 }}>
                 <Skeleton variant="text" width="30%" height={20} />
                 <Skeleton variant="text" width="25%" height={20} />
               </Stack>
-              {i < 4 && <Divider sx={{ mt: 2 }} />}
+              {i < 4 && <Divider sx={{ my: { xs: 1, sm: 2.5 } }} />}
             </Box>
           ))}
         </Stack>
@@ -127,10 +155,15 @@ const ProgressOrderSkeleton = () => {
   return (
     <Card sx={{ borderRadius: br, height: "100%" }}>
       <Box sx={{ p: { xs: 2, sm: 2.5, md: 3 }, pb: 2 }}>
-        <Skeleton variant="text" width={isMobile ? 120 : 140} height={28} sx={{ minWidth: 100 }} />
-        <Skeleton variant="text" width={isMobile ? 160 : 200} height={16} sx={{ mt: 0.5, minWidth: 120 }} />
+        <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "flex-start" }}>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Skeleton variant="text" width={isMobile ? 120 : 140} height={28} sx={{ minWidth: 100 }} />
+            <Skeleton variant="text" width={isMobile ? 160 : 200} height={16} sx={{ mt: 0.5, minWidth: 120 }} />
+          </Box>
+          <Skeleton variant="rounded" width={38} height={38} sx={{ borderRadius: br, ml: 2, flexShrink: 0 }} />
+        </Stack>
       </Box>
-      <Divider />
+   
       <Box sx={{ p: { xs: 2, sm: 2.5, md: 3 }, display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
         <Skeleton variant="circular" width={isMobile ? 140 : 180} height={isMobile ? 140 : 180} />
         <Stack direction="row" sx={{ gap: 2, width: "100%" }}>
@@ -150,7 +183,7 @@ const TableSkeleton = () => {
         <Skeleton variant="text" width={140} height={28} sx={{ minWidth: 100 }} />
         <Skeleton variant="text" width={180} height={16} sx={{ mt: 0.5, minWidth: 120 }} />
       </Box>
-      <Divider />
+   
       <Box sx={{ p: { xs: 2, sm: 2.5, md: 3 } }}>
         <Skeleton variant="rounded" width="100%" height={44} sx={{ borderRadius: br }} />
       </Box>
@@ -198,59 +231,77 @@ const CashierDashboard = ({ data, isLoading, refetch }) => {
 
   return (
     <Stack sx={{ gap: { xs: 3, sm: 4, md: 5 } }}>
-      {/* Header — Mobile: title+subtitle di atas, icon refresh di kanan bawah */}
       <Card sx={{ borderRadius: `${theme.shape.borderRadius}px` }}>
         <Box sx={{ p: { xs: 2, sm: 2.5, md: 3 } }}>
-          <Stack sx={{ gap: { xs: 2, sm: 2.5 } }}>
-            {/* Baris 1: Title & Subtitle */}
-            <Box sx={{ flex: 1, minWidth: 0 }}>
-              <Typography variant={isMobile ? "h6" : "h5"} color="text.primary" sx={{ fontWeight: 600, letterSpacing: "-0.01em", wordBreak: "break-word" }}>
-                Dashboard Kasir
-              </Typography>
-              <Typography variant={isMobile ? "caption" : "body2"} color="text.secondary" sx={{ mt: 0.5 }}>
-                {data?.activeShift ? `Shift aktif · ${data.activeShift.id?.slice(0, 8)}` : "Belum ada shift"} · {formatDate(new Date(), { dateStyle: isMobile ? "medium" : "full" })}
-              </Typography>
-            </Box>
-
-            {/* Baris 2: Icon refresh di kanan */}
-            <Stack direction="row" sx={{ justifyContent: "flex-end" }}>
-              <Tooltip title="Refresh data" placement="bottom">
-                <IconButton onClick={() => refetch?.()} size={isMobile ? "small" : "medium"} aria-label="Refresh data" sx={iconBtnSx(theme)}>
-                  <RotateCcw size={isMobile ? 16 : 18} strokeWidth={2} />
-                </IconButton>
-              </Tooltip>
+          <Stack sx={{ gap: { xs: 1.5, sm: 0 } }}>
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              sx={{
+                justifyContent: "space-between",
+                alignItems: { xs: "flex-start", sm: "center" },
+              }}
+            >
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography variant={isMobile ? "h6" : "h5"} color="text.primary" sx={{ fontWeight: 600, letterSpacing: "-0.01em", wordBreak: "break-word" }}>
+                  Dashboard Kasir
+                </Typography>
+                <Typography variant={isMobile ? "caption" : "body2"} color="text.secondary" sx={{ mt: 0.5 }}>
+                  {data?.activeShift ? `Shift aktif · ${data.activeShift.id?.slice(0, 8)}` : "Belum ada shift"} · {formatDate(new Date(), { dateStyle: isMobile ? "medium" : "full" })}
+                </Typography>
+              </Box>
+              {!isMobile && (
+                <Tooltip title="Refresh data" placement="bottom">
+                  <IconButton onClick={() => refetch?.()} size="medium" aria-label="Refresh data" sx={{ ...iconBtnSx(theme), ml: 2, flexShrink: 0 }}>
+                    <RotateCcw size={18} strokeWidth={2} />
+                  </IconButton>
+                </Tooltip>
+              )}
             </Stack>
+            {isMobile && (
+              <Stack direction="row" sx={{ justifyContent: "flex-end" }}>
+                <Tooltip title="Refresh data" placement="bottom">
+                  <IconButton onClick={() => refetch?.()} size="small" aria-label="Refresh data" sx={iconBtnSx(theme)}>
+                    <RotateCcw size={16} strokeWidth={2} />
+                  </IconButton>
+                </Tooltip>
+              </Stack>
+            )}
           </Stack>
         </Box>
       </Card>
 
-      {/* Summary Cards */}
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", sm: "repeat(3, 1fr)" }, gap: { xs: 2, sm: 2.5, md: 3 } }}>
         <SummaryCard color="secondary" icon={ShoppingCart} title="Pesanan Hari Ini" value={(data?.todaySales?.todayOrders || 0) + (data?.todaySales?.pendingOrders || 0)} subtitle={`${data?.todaySales?.todayOrders || 0} selesai, ${data?.todaySales?.pendingOrders || 0} pending`} index={0} />
         <SummaryCard color="secondary" icon={DollarSign} title="Pendapatan Hari Ini" value={formatToIdr(data?.todaySales?.todaySales || 0)} subtitle="Total pemasukan" index={1} />
         <SummaryCard color="secondary" icon={Clock} title="Status Shift" value={data?.activeShift ? "Aktif" : "Belum"} subtitle={data?.activeShift ? `Shift #${data.activeShift.id?.slice(0, 8)}` : "Buka shift"} index={2} />
       </Box>
 
-      {/* Shift Info | Progress Order */}
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: { xs: 2, sm: 2.5, md: 3 } }}>
         <Card sx={{ borderRadius: `${theme.shape.borderRadius}px`, height: "100%" }}>
           <Box sx={{ p: { xs: 2, sm: 2.5, md: 3 }, pb: 2 }}>
-            <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center" }}>
-              <Typography variant={isMobile ? "subtitle1" : "h6"} color="text.primary" sx={{ fontWeight: 600, letterSpacing: "-0.01em" }}>Shift Aktif</Typography>
-              {data?.activeShift && <Box sx={{ width: { xs: 6, sm: 8 }, height: { xs: 6, sm: 8 }, borderRadius: "50%", bgcolor: theme.palette.success.main, boxShadow: `0 0 6px ${alpha(theme.palette.success.main, 0.4)}` }} />}
+            <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "flex-start" }}>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography variant={isMobile ? "subtitle1" : "h6"} color="text.primary" sx={{ fontWeight: 600, letterSpacing: "-0.01em" }}>Shift Aktif</Typography>
+                <Typography variant={isMobile ? "caption" : "body2"} color="text.secondary" sx={{ mt: 0.5 }}>
+                  {data?.activeShift ? `Shift #${data.activeShift.id?.slice(0, 8)}` : "Belum ada shift aktif"}
+                </Typography>
+              </Box>
+              <Box sx={sectionIconSx(theme)}>
+                <BarChart3 size={18} strokeWidth={1.5} />
+              </Box>
             </Stack>
           </Box>
-          <Divider />
+       
           <Box sx={{ p: { xs: 2, sm: 2.5, md: 3 } }}>
             {data?.activeShift ? (
-              <Stack sx={{ gap: { xs: 1.5, sm: 2 } }}>
+              <Stack sx={{ gap: { xs: 2.5, sm: 5 } }}>
                 {[["Saldo Awal", formatToIdr(data.activeShift.startingCash), true], ["Penjualan Tunai", formatToIdr(data.activeShift.currentCashSales || 0)], ["Total Order", `${data.activeShift.orderCount || 0} Pesanan`], ["Waktu Buka", formatDate(data.activeShift.openedAt, { timeStyle: "short" })],].map(([label, value, bold], i) => (
                   <Box key={i}>
-                    <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1 }}>
+                    <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 1, py: 1 }}>
                       <Typography variant={isMobile ? "caption" : "body2"} color="text.secondary">{label}</Typography>
                       <Typography variant={isMobile ? "body2" : "body1"} sx={{ fontWeight: bold ? 600 : 400 }}>{value}</Typography>
                     </Stack>
-                    {i < 3 && <Divider sx={{ mt: 2 }} />}
+                    {i < 3 && <Divider sx={{ my: { xs: 1, sm: 2.5 } }} />}
                   </Box>
                 ))}
               </Stack>
@@ -260,10 +311,17 @@ const CashierDashboard = ({ data, isLoading, refetch }) => {
 
         <Card sx={{ borderRadius: `${theme.shape.borderRadius}px`, height: "100%" }}>
           <Box sx={{ p: { xs: 2, sm: 2.5, md: 3 }, pb: 2 }}>
-            <Typography variant={isMobile ? "subtitle1" : "h6"} color="text.primary" sx={{ fontWeight: 600, letterSpacing: "-0.01em" }}>Progress Order</Typography>
-            <Typography variant={isMobile ? "caption" : "body2"} color="text.secondary" sx={{ mt: 0.5 }}>Selesai vs pending hari ini</Typography>
+            <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "flex-start" }}>
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <Typography variant={isMobile ? "subtitle1" : "h6"} color="text.primary" sx={{ fontWeight: 600, letterSpacing: "-0.01em" }}>Progress Order</Typography>
+                <Typography variant={isMobile ? "caption" : "body2"} color="text.secondary" sx={{ mt: 0.5 }}>Selesai vs pending hari ini</Typography>
+              </Box>
+              <Box sx={sectionIconSx(theme)}>
+                <PieChart size={18} strokeWidth={1.5} />
+              </Box>
+            </Stack>
           </Box>
-          <Divider />
+       
           <Box sx={{ p: { xs: 2, sm: 2.5, md: 3 }, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: { xs: 2, sm: 3 }, flexGrow: 1 }}>
             {(data?.todaySales?.todayOrders || 0) + (data?.todaySales?.pendingOrders || 0) > 0 ? (
               <>
@@ -271,11 +329,11 @@ const CashierDashboard = ({ data, isLoading, refetch }) => {
                   <DoughnutChart labels={orderProgress.labels} datasets={orderProgress.datasets} height={isMobile ? 140 : isTablet ? 180 : 200} centerText={orderProgress.centerText} centerSubtext={orderProgress.centerSubtext} />
                 </Box>
                 <Stack direction="row" sx={{ gap: { xs: 1.5, sm: 2 }, width: "100%" }}>
-                  <Box sx={{ flex: 1, p: { xs: 1.5, sm: 2 }, borderRadius: `${theme.shape.borderRadius}px`, textAlign: "center" }}>
+                  <Box sx={{ flex: 1, p: { xs: 1.5, sm: 2 }, borderRadius: `${theme.shape.borderRadius}px`, textAlign: "center", border: "1px solid", borderColor: alpha(theme.palette.divider, 0.8) }}>
                     <Typography variant={isMobile ? "h6" : "h5"} component="span" sx={{ fontWeight: 600, color: theme.palette.secondary.main }}>{data?.todaySales?.todayOrders || 0}</Typography>
                     <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>Selesai</Typography>
                   </Box>
-                  <Box sx={{ flex: 1, p: { xs: 1.5, sm: 2 }, borderRadius: `${theme.shape.borderRadius}px`, textAlign: "center" }}>
+                  <Box sx={{ flex: 1, p: { xs: 1.5, sm: 2 }, borderRadius: `${theme.shape.borderRadius}px`, textAlign: "center", border: "1px solid", borderColor: alpha(theme.palette.divider, 0.8) }}>
                     <Typography variant={isMobile ? "h6" : "h5"} component="span" sx={{ fontWeight: 600, color: alpha(theme.palette.secondary.main, 0.5) }}>{data?.todaySales?.pendingOrders || 0}</Typography>
                     <Typography variant="caption" color="text.secondary" sx={{ display: "block", mt: 0.5 }}>Pending</Typography>
                   </Box>

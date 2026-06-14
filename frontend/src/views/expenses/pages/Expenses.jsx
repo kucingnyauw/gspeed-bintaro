@@ -203,10 +203,10 @@ const Expenses = () => {
       </Typography>,
 
       <Box key={`receipt-${row.id}`}>
-        {row.receipt ? (
+        {row.receipt?.url ? (
           <Box
             component="img"
-            src={row.receipt}
+            src={row.receipt.url}
             alt="Nota"
             sx={{
               width: 48,
