@@ -1,7 +1,6 @@
 /**
  * Header - Application header dengan branding, search, notifikasi, dan action icons.
  * Mobile/tablet: search menutupi seluruh header dengan icon dalam TextField.
- * Sepenuhnya mengandalkan nilai dari theme MUI untuk styling.
  *
  * @component
  * @returns {JSX.Element} Rendered header component
@@ -33,7 +32,6 @@ import {
   Maximize,
   Minimize,
   X,
-  ChevronDown,
 } from "lucide-react";
 
 import { selectCartItems } from "@store/cart/cartSelector.js";
@@ -69,8 +67,6 @@ const Header = () => {
   const navigate = useNavigate();
   const { isMobile, isTablet } = useDevice();
   const isCashier = usePermission({ role: "CASHIER" });
-
-  /** Device kecil: mobile + tablet */
   const isSmallDevice = isMobile || isTablet;
 
   const items = useSelector(selectCartItems);
@@ -111,46 +107,26 @@ const Header = () => {
   const deleteOne = useDeleteNotification();
 
   useEffect(() => {
-    const handleFullscreenChange = () => {
+    const handleFullscreenChange = () =>
       setIsFullscreen(!!document.fullscreenElement);
-    };
-
     document.addEventListener("fullscreenchange", handleFullscreenChange);
-    return () => {
+    return () =>
       document.removeEventListener("fullscreenchange", handleFullscreenChange);
-    };
   }, []);
 
-  /**
-   * Toggle fullscreen mode.
-   */
   const handleToggleFullscreen = () => {
     if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen().catch((err) => {
-        console.error(`Error attempting to enable fullscreen: ${err.message}`);
-      });
+      document.documentElement
+        .requestFullscreen()
+        .catch((err) => console.error(err.message));
     } else {
-      if (document.exitFullscreen) {
-        document.exitFullscreen();
-      }
+      if (document.exitFullscreen) document.exitFullscreen();
     }
   };
 
-  /**
-   * Mark single notification as read.
-   *
-   * @param {string} id - Notification ID
-   */
   const handleMarkRead = (id) => markAsRead.mutate(id);
-
-  /** Mark all notifications as read. */
   const handleMarkAllRead = () => markAllAsRead.mutate();
 
-  /**
-   * Delete single notification.
-   *
-   * @param {string} id - Notification ID
-   */
   const handleDelete = (id) => {
     deleteOne.mutate(id, {
       onSuccess: () =>
@@ -176,7 +152,6 @@ const Header = () => {
     });
   };
 
-  /** Delete all notifications. */
   const handleDeleteAll = () => {
     deleteAll.mutate(undefined, {
       onSuccess: () =>
@@ -202,86 +177,45 @@ const Header = () => {
     });
   };
 
-  /** Toggle sidebar visibility. */
   const handleToggleSidebar = () => dispatch(toggleSidebar());
-
-  /**
-   * Toggle cart drawer (cashier only).
-   */
   const handleToggleCart = useCallback(() => {
     if (isCashier) setCartOpen((prev) => !prev);
   }, [isCashier]);
-
-  /** Toggle theme between light and dark mode. */
   const handleToggleTheme = () => dispatch(toggleTheme());
-
-  /**
-   * Open profile popover.
-   *
-   * @param {React.MouseEvent<HTMLElement>} e - Mouse event
-   */
   const handleProfileOpen = (e) => setProfileAnchorEl(e.currentTarget);
-
-  /** Close profile popover. */
   const handleProfileClose = () => setProfileAnchorEl(null);
-
-  /**
-   * Open notification popover.
-   *
-   * @param {React.MouseEvent<HTMLElement>} e - Mouse event
-   */
   const handleNotifOpen = (e) => {
     setNotifAnchorEl(e.currentTarget);
     setNotifOpen(true);
   };
-
-  /** Close notification popover. */
   const handleNotifClose = () => {
     setNotifAnchorEl(null);
     setNotifOpen(false);
   };
-
-  /** Refresh notifications. */
   const handleRefresh = () => refetch();
-
-  /**
-   * Toggle mobile/tablet search overlay.
-   */
   const handleToggleMobileSearch = () => {
     setShowMobileSearch((prev) => !prev);
     setSearchVal("");
   };
 
+  const iconBtnStyle = {
+    border: "1px solid",
+    borderColor: alpha(theme.palette.divider, 0.8),
+    borderRadius: `${theme.shape.borderRadius}px`,
+    color: "text.secondary",
+    minWidth: 38,
+    minHeight: 38,
+    p: 0,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    "&:hover": {
+      bgcolor: alpha(theme.palette.secondary.main, 0.08),
+      borderColor: alpha(theme.palette.secondary.main, 0.4),
+      color: theme.palette.secondary.main,
+    },
+  };
 
-  /**
- * Style untuk icon button konsisten.
- *
- * @type {Object}
- */
-const iconBtnStyle = {
-  border: "1px solid",
-  borderColor: alpha(theme.palette.divider, 0.8),
-  borderRadius: `${theme.shape.borderRadius}px`,
-  color: "text.secondary",
-  minWidth: 38,
-  minHeight: 38,
-  p: 0,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  "&:hover": {
-    bgcolor: alpha(theme.palette.secondary.main, 0.08),
-    borderColor: alpha(theme.palette.secondary.main, 0.4),
-    color: theme.palette.secondary.main,
-  },
-};
-
-
-  /**
-   * Style untuk icon wrapper di dalam TextField (search & close).
-   *
-   * @type {Object}
-   */
   const adornmentIconWrapperStyle = {
     display: "flex",
     alignItems: "center",
@@ -291,43 +225,8 @@ const iconBtnStyle = {
     borderRadius: `${theme.shape.borderRadius}px`,
   };
 
-  /**
-   * Padding left logo/menu header agar sejajar dengan menu items collapsed sidebar.
-   *
-   * @type {string}
-   */
   const logoPl = `${3 * 8 - 4}px`;
-
-  /**
-   * Padding left untuk menu toggle button.
-   *
-   * @type {string}
-   */
   const menuPl = `${2 * 8 - 4}px`;
-
-  /**
-   * Style wrapper profil.
-   *
-   * @type {Object}
-   */
-  const profileWrapperStyle = {
-    display: "flex",
-    alignItems: "center",
-    gap: { xs: 0, md: 1.5 },
-    cursor: "pointer",
-    px: { xs: 0, md: 1.5 },
-    py: 1,
-    borderRadius: `${theme.shape.borderRadius}px`,
-    border: { xs: "none", md: `1px solid ${alpha(theme.palette.divider, 0.8)}` },
-    transition: "all 0.15s ease",
-    "&:hover": {
-      bgcolor: {
-        xs: "transparent",
-        md: alpha(theme.palette.secondary.main, 0.06),
-      },
-      borderColor: alpha(theme.palette.secondary.main, 0.4),
-    },
-  };
 
   return (
     <>
@@ -433,7 +332,7 @@ const iconBtnStyle = {
             gap: { xs: 1, sm: 2 },
           }}
         >
-          {/* LEFT BOX — Logo & Sidebar Toggle */}
+          {/* LEFT */}
           <Box
             sx={{
               display: "flex",
@@ -472,8 +371,7 @@ const iconBtnStyle = {
               </IconButton>
             </Tooltip>
           </Box>
-
-          {/* CENTER BOX — Search Bar (Desktop only) */}
+          {/* CENTER */}
           <Box
             sx={{
               flex: 1,
@@ -510,9 +408,7 @@ const iconBtnStyle = {
                       sx={{
                         ml: 0.5,
                         color: "text.secondary",
-                        "&:hover": {
-                          color: theme.palette.secondary.main,
-                        },
+                        "&:hover": { color: theme.palette.secondary.main },
                       }}
                     >
                       <X size={14} strokeWidth={1.5} />
@@ -577,16 +473,9 @@ const iconBtnStyle = {
               </Box>
             )}
           </Box>
-
-          {/* SPACER — Mobile only */}
-          <Box
-            sx={{
-              flexGrow: 1,
-              display: { xs: "block", md: "none" },
-            }}
-          />
-
-          {/* RIGHT BOX — Action Icons */}
+          {/* SPACER */}
+          <Box sx={{ flexGrow: 1, display: { xs: "block", md: "none" } }} />
+          {/* RIGHT */}
           <Box
             sx={{
               display: "flex",
@@ -596,7 +485,6 @@ const iconBtnStyle = {
               flexShrink: 0,
             }}
           >
-            {/* Search — Mobile/tablet only */}
             <Tooltip title="Pencarian" enterDelay={300} leaveDelay={0}>
               <IconButton
                 onClick={handleToggleMobileSearch}
@@ -608,8 +496,6 @@ const iconBtnStyle = {
                 <Search size={18} strokeWidth={1.5} />
               </IconButton>
             </Tooltip>
-
-            {/* Fullscreen */}
             <Tooltip
               title={isFullscreen ? "Keluar Layar Penuh" : "Layar Penuh"}
               enterDelay={300}
@@ -629,8 +515,6 @@ const iconBtnStyle = {
                 )}
               </IconButton>
             </Tooltip>
-
-            {/* Theme */}
             <Tooltip
               title={mode === "dark" ? "Mode Terang" : "Mode Gelap"}
               enterDelay={300}
@@ -650,8 +534,6 @@ const iconBtnStyle = {
                 )}
               </IconButton>
             </Tooltip>
-
-            {/* Notifikasi */}
             <Tooltip title="Notifikasi" enterDelay={300} leaveDelay={0}>
               <IconButton onClick={handleNotifOpen} sx={iconBtnStyle}>
                 <Badge
@@ -670,8 +552,6 @@ const iconBtnStyle = {
                 </Badge>
               </IconButton>
             </Tooltip>
-
-            {/* Keranjang — Cashier only */}
             {isCashier && (
               <Tooltip title="Keranjang" enterDelay={300} leaveDelay={0}>
                 <IconButton
@@ -698,84 +578,32 @@ const iconBtnStyle = {
                 </IconButton>
               </Tooltip>
             )}
-
             <Divider
               orientation="vertical"
               flexItem
               sx={{ height: 24, alignSelf: "center", mx: "2px" }}
             />
-
-            {/* Profil */}
+            {/* Avatar Circle Only */}
             <Tooltip title="Profil Pengguna" enterDelay={300} leaveDelay={0}>
-              <Box onClick={handleProfileOpen} sx={profileWrapperStyle}>
-                <Avatar
-                  src={getAvatarUrl(user?.fullName)}
-                  variant="circular"
-                  sx={{
-                    width: 32,
-                    height: 32 ,
-                    flexShrink: 0,
-                    fontSize: "0.875rem",
-                    fontWeight: 500,
-                    borderRadius : "50%",
-                    border: "2px solid",
-                    borderColor: alpha(theme.palette.divider, 0.6),
-                    "&:hover": {
-                      borderColor: alpha(theme.palette.secondary.main, 0.4),
-                    },
-                  }}
-                />
-
-                {/* Name & Role — Desktop only */}
-                <Box
-                  sx={{
-                    display: { xs: "none", md: "flex" },
-                    flexDirection: "column",
-                    minWidth: 0,
-                    maxWidth: 140,
-                    
-                  }}
-                >
-                  <Typography
-                    variant="body2"
-                    noWrap
-                    sx={{
-                      lineHeight: 1.3,
-                      fontSize: "0.8125rem",
-                      fontWeight: 600,
-                      color: "text.primary",
-                      letterSpacing: "-0.01em",
-                    }}
-                  >
-                    {user?.fullName || "Pengguna"}
-                  </Typography>
-                  <Typography
-                    variant="caption"
-                    noWrap
-                    sx={{
-                      lineHeight: 1.3,
-                      fontSize: "0.6875rem",
-                      color: "text.secondary",
-                      textTransform: "capitalize",
-                      fontWeight: 400,
-                    }}
-                  >
-                    {user?.role?.toLowerCase() || "user"}
-                  </Typography>
-                </Box>
-
-                {/* Chevron Down — Desktop only */}
-                <ChevronDown
-                  size={14}
-                  strokeWidth={2}
-                  style={{
-                    display: isSmallDevice ? "none" : "block",
-                    color: theme.palette.text.secondary,
-                    marginLeft: 8,
-                    flexShrink: 0,
-                  }}
-                />
-              </Box>
+              <Avatar
+                src={getAvatarUrl(user?.fullName)}
+                variant="circular"
+                onClick={handleProfileOpen}
+                sx={{
+                  width: 36,
+                  height: 36,
+                  cursor: "pointer",
+                  flexShrink: 0,
+                  fontSize: "0.875rem",
+                  fontWeight: 500,
+                  border: "2px solid",
+                  borderRadius : "50%",
+                  borderColor: alpha(theme.palette.divider, 0.6),
+                  "&:hover": {
+                    borderColor: alpha(theme.palette.secondary.main, 0.4),
+                  },
+                }}
+              />
             </Tooltip>
           </Box>
         </Toolbar>

@@ -1,6 +1,15 @@
+/**
+ * TaskDetailDialog - Dialog untuk menampilkan detail tugas per order.
+ *
+ * @component
+ * @param {Object} props
+ * @param {boolean} props.open - Status dialog
+ * @param {string} props.orderId - ID order
+ * @param {Function} props.onClose - Handler tutup dialog
+ * @returns {JSX.Element}
+ */
 import { useState } from "react";
 import { ChevronDown, ChevronUp, X } from "lucide-react";
-
 import {
   Avatar,
   Box,
@@ -24,18 +33,21 @@ import { alpha } from "@mui/material/styles";
 import { formatToIdr, formatDateTime, normalizeEnumText } from "@shared/utils";
 import { OrderStatus, statusColorMap } from "@shared/constant";
 import { useTasksByOrderQuery } from "@views/tasks/hooks";
+import { useDevice } from "@hooks";
 
 const DetailSkeleton = () => (
-  <Stack sx={{ gap: 3 }}>
-    <Skeleton variant="rounded" height={100} />
-    <Skeleton variant="rounded" height={180} />
+  <Stack sx={{ gap: 4 }}>
+    <Skeleton variant="rounded" height={120} sx={{ minHeight: 100 }} />
+    <Skeleton variant="rounded" height={200} sx={{ minHeight: 180 }} />
   </Stack>
 );
 
 const TaskDetailDialog = ({ open, orderId, onClose }) => {
   const theme = useTheme();
+  const { isMobile } = useDevice();
   const { data, isLoading } = useTasksByOrderQuery(orderId, open);
   const [expandedServices, setExpandedServices] = useState({});
+  const br = `${theme.shape.borderRadius}px`;
 
   const toggleService = (orderItemId) => {
     setExpandedServices((prev) => ({
@@ -57,10 +69,23 @@ const TaskDetailDialog = ({ open, orderId, onClose }) => {
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle sx={{ pb: 1.5 }}>
-        <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center" }}>
-          <Typography variant="h6" component="span" sx={{ fontWeight: 600 }}>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="sm"
+      fullWidth
+      slotProps={{ paper: { sx: { borderRadius: br, overflow: "hidden" } } }}
+    >
+      {/* Header */}
+      <DialogTitle sx={{ pb: 1.5, px: { xs: 2.5, sm: 3 } }}>
+        <Stack
+          direction="row"
+          sx={{ justifyContent: "space-between", alignItems: "center" }}
+        >
+          <Typography
+            variant="h6"
+            sx={{ fontWeight: 600, fontSize: { xs: "1rem", sm: "1.125rem" } }}
+          >
             Detail Tugas
           </Typography>
           <IconButton onClick={onClose} size="small" sx={{ mr: -0.5 }}>
@@ -71,71 +96,127 @@ const TaskDetailDialog = ({ open, orderId, onClose }) => {
 
       <Divider />
 
-      <DialogContent sx={{ pt: 3, px: { xs: 2.5, sm: 3 } }}>
+      <DialogContent sx={{ pt: 3, px: { xs: 2.5, sm: 3 }, pb: 3 }}>
         {isLoading ? (
           <DetailSkeleton />
         ) : data ? (
-          <Stack sx={{ gap: 3 }}>
+          <Stack sx={{ gap: 4 }}>
             {/* Order Header */}
             <Card
               sx={{
                 border: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
                 boxShadow: "none",
-                borderRadius: `${theme.shape.borderRadius}px`,
+                borderRadius: br,
               }}
             >
-              <Box sx={{ p: 3 }}>
-                <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "flex-start" }}>
+              <Box sx={{ p: { xs: 2.5, sm: 3 } }}>
+                <Stack
+                  direction="row"
+                  sx={{
+                    justifyContent: "space-between",
+                    alignItems: "flex-start",
+                    flexWrap: "wrap",
+                    gap: 2,
+                  }}
+                >
                   <Box>
-                    <Typography variant="body1" sx={{ fontWeight: 600, mb: 0.5 }}>
+                    <Typography
+                      variant="body1"
+                      sx={{
+                        fontWeight: 600,
+                        mb: 1,
+                        fontSize: { xs: "0.9375rem", sm: "1rem" },
+                      }}
+                    >
                       {data.orderNumber}
                     </Typography>
                     <Chip
-                      label={normalizeEnumText(OrderStatus[data.status] || data.status)}
+                      label={normalizeEnumText(
+                        OrderStatus[data.status] || data.status
+                      )}
                       color={statusColorMap[data.status] || "default"}
                       size="small"
                       variant="outlined"
                       sx={{ fontWeight: 500, fontSize: "0.75rem", height: 24 }}
                     />
                   </Box>
-                  <Typography variant="h6" component="span" sx={{ fontWeight: 700, color: theme.palette.secondary.main }}>
+                  <Typography
+                    variant="h6"
+                    sx={{
+                      fontWeight: 700,
+                      color: theme.palette.secondary.main,
+                      fontSize: { xs: "1.125rem", sm: "1.25rem" },
+                    }}
+                  >
                     {formatToIdr(data.total || 0)}
                   </Typography>
                 </Stack>
 
-                <Divider sx={{ my: 2.5 }} />
+                <Divider sx={{ my: 3 }} />
 
-                <Stack sx={{ gap: 2 }}>
-                  <Stack direction="row" sx={{ justifyContent: "space-between" }}>
-                    <Typography variant="body2" color="text.secondary">Pelanggan</Typography>
-                    <Typography variant="body2" sx={{ fontWeight: 500 }}>{data.customer?.name || "—"}</Typography>
-                  </Stack>
-                  {data.vehicle && (
-                    <Stack direction="row" sx={{ justifyContent: "space-between" }}>
-                      <Typography variant="body2" color="text.secondary">Kendaraan</Typography>
-                      <Typography variant="body2" sx={{ fontWeight: 500 }}>
-                        {data.vehicle.plateNumber} · {data.vehicle.brand} {data.vehicle.model || ""}
+                <Stack sx={{ gap: 2.5 }}>
+                  {[
+                    {
+                      label: "Pelanggan",
+                      value: data.customer?.name || "—",
+                      bold: true,
+                    },
+                    ...(data.vehicle
+                      ? [
+                          {
+                            label: "Kendaraan",
+                            value: `${data.vehicle.plateNumber} · ${
+                              data.vehicle.brand
+                            } ${data.vehicle.model || ""}`,
+                          },
+                        ]
+                      : []),
+                    {
+                      label: "Dibuat",
+                      value: data.createdAt
+                        ? formatDateTime(data.createdAt)
+                        : "—",
+                    },
+                    ...(data.startedAt
+                      ? [
+                          {
+                            label: "Dimulai",
+                            value: formatDateTime(data.startedAt),
+                          },
+                        ]
+                      : []),
+                    ...(data.completedAt
+                      ? [
+                          {
+                            label: "Selesai",
+                            value: formatDateTime(data.completedAt),
+                          },
+                        ]
+                      : []),
+                  ].map((item, i) => (
+                    <Stack
+                      key={i}
+                      direction="row"
+                      sx={{
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <Typography variant="body2" color="text.secondary">
+                        {item.label}
+                      </Typography>
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          fontWeight: item.bold ? 500 : 400,
+                          maxWidth: "65%",
+                          textAlign: "right",
+                        }}
+                      >
+                        {item.value}
                       </Typography>
                     </Stack>
-                  )}
-                  <Stack direction="row" sx={{ justifyContent: "space-between" }}>
-                    <Typography variant="body2" color="text.secondary">Dibuat</Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {data.createdAt ? formatDateTime(data.createdAt) : "—"}
-                    </Typography>
-                  </Stack>
-                  {data.startedAt && (
-                    <Stack direction="row" sx={{ justifyContent: "space-between" }}>
-                      <Typography variant="body2" color="text.secondary">Dimulai</Typography>
-                      <Typography variant="body2" color="text.secondary">{formatDateTime(data.startedAt)}</Typography>
-                    </Stack>
-                  )}
-                  {data.completedAt && (
-                    <Stack direction="row" sx={{ justifyContent: "space-between" }}>
-                      <Typography variant="body2" color="text.secondary">Selesai</Typography>
-                      <Typography variant="body2" color="text.secondary">{formatDateTime(data.completedAt)}</Typography>
-                    </Stack>
-                  )}
+                  ))}
                 </Stack>
               </Box>
             </Card>
@@ -145,11 +226,18 @@ const TaskDetailDialog = ({ open, orderId, onClose }) => {
               sx={{
                 border: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
                 boxShadow: "none",
-                borderRadius: `${theme.shape.borderRadius}px`,
+                borderRadius: br,
+                overflow: "hidden",
               }}
             >
-              <Box sx={{ p: 3, pb:  4 }}>
-                <Typography variant="subtitle2" component="span" sx={{ fontWeight: 600 }}>
+              <Box sx={{ p: { xs: 2.5, sm: 3 }, pb: 2 }}>
+                <Typography
+                  variant="subtitle2"
+                  sx={{
+                    fontWeight: 600,
+                    fontSize: { xs: "0.8125rem", sm: "0.875rem" },
+                  }}
+                >
                   Layanan ({data.services?.length || 0})
                 </Typography>
               </Box>
@@ -168,70 +256,132 @@ const TaskDetailDialog = ({ open, orderId, onClose }) => {
                         justifyContent: "space-between",
                         alignItems: "center",
                         cursor: "pointer",
-                        px: 3,
+                        px: { xs: 2.5, sm: 3 },
                         py: 3,
-                        transition: theme.transitions.create("background-color", {
-                          duration: theme.transitions.duration.shorter,
-                        }),
-                        "&:hover": { bgcolor: alpha(theme.palette.secondary.main, 0.03) },
+                        transition: theme.transitions.create(
+                          "background-color",
+                          { duration: theme.transitions.duration.shorter }
+                        ),
+                        "&:hover": {
+                          bgcolor: alpha(theme.palette.secondary.main, 0.03),
+                        },
                       }}
                     >
-                      <Stack direction="row" sx={{ gap: 2, flex: 1, alignItems: "center" }}>
+                      <Stack
+                        direction="row"
+                        sx={{
+                          gap: 2,
+                          flex: 1,
+                          alignItems: "center",
+                          minWidth: 0,
+                        }}
+                      >
                         <Avatar
                           src={service.product?.image || ""}
                           variant="rounded"
                           sx={{
-                            width: 40,
-                            height: 40,
-                            borderRadius: `${theme.shape.borderRadius}px`,
-                            bgcolor: !service.product?.image ? alpha(theme.palette.secondary.main, 0.08) : "transparent",
-                            color: !service.product?.image ? theme.palette.secondary.main : "transparent",
+                            width: { xs: 36, sm: 40 },
+                            height: { xs: 36, sm: 40 },
+                            borderRadius: br,
+                            flexShrink: 0,
+                            bgcolor: !service.product?.image
+                              ? alpha(theme.palette.secondary.main, 0.08)
+                              : "transparent",
+                            color: !service.product?.image
+                              ? theme.palette.secondary.main
+                              : "transparent",
                             fontSize: "0.875rem",
                             fontWeight: 600,
                           }}
                         >
-                          {!service.product?.image && service.serviceName?.charAt(0)?.toUpperCase()}
+                          {!service.product?.image &&
+                            service.serviceName?.charAt(0)?.toUpperCase()}
                         </Avatar>
-                        <Box>
-                          <Typography variant="body2" sx={{ fontWeight: 500, mb: 0.25 }}>
+                        <Box sx={{ minWidth: 0 }}>
+                          <Typography
+                            variant="body2"
+                            sx={{ fontWeight: 500, mb: 0.5 }}
+                            noWrap
+                          >
                             {service.serviceName}
                           </Typography>
                           <Typography variant="caption" color="text.secondary">
-                            {service.quantity} × {formatToIdr(service.unitPrice)}
+                            {service.quantity} ×{" "}
+                            {formatToIdr(service.unitPrice)}
                           </Typography>
                         </Box>
                       </Stack>
-                      <Stack direction="row" sx={{ alignItems: "center", gap: 1.5 }}>
+                      <Stack
+                        direction="row"
+                        sx={{
+                          alignItems: "center",
+                          gap: 1.5,
+                          flexShrink: 0,
+                          ml: 2,
+                        }}
+                      >
                         {assignments.length > 0 && (
-                          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 500 }}>
+                          <Typography
+                            variant="caption"
+                            color="text.secondary"
+                            sx={{ fontWeight: 500 }}
+                          >
                             {assignments.length} mekanik
                           </Typography>
                         )}
-                        {isExpanded ? <ChevronUp size={16} strokeWidth={1.5} /> : <ChevronDown size={16} strokeWidth={1.5} />}
+                        {isExpanded ? (
+                          <ChevronUp size={16} strokeWidth={1.5} />
+                        ) : (
+                          <ChevronDown size={16} strokeWidth={1.5} />
+                        )}
                       </Stack>
                     </Box>
 
                     <Collapse in={isExpanded}>
                       <Divider />
-                      <Box sx={{ px: 3, py: 2.5, bgcolor: alpha(theme.palette.secondary.main, 0.02) }}>
+                      <Box
+                        sx={{
+                          px: { xs: 2.5, sm: 3 },
+                          py: 3,
+                          bgcolor: alpha(theme.palette.secondary.main, 0.02),
+                        }}
+                      >
                         {assignments.length > 0 ? (
-                          <Stack sx={{ gap: 1.5 }}>
+                          <Stack sx={{ gap: 2 }}>
                             {assignments.map((a) => (
-                              <Stack key={a.id} direction="row" sx={{ justifyContent: "space-between", alignItems: "center" }}>
-                                <Stack direction="row" sx={{ alignItems: "center", gap: 1.5 }}>
+                              <Stack
+                                key={a.id}
+                                direction="row"
+                                sx={{
+                                  justifyContent: "space-between",
+                                  alignItems: "center",
+                                }}
+                              >
+                                <Stack
+                                  direction="row"
+                                  sx={{ alignItems: "center", gap: 1.5 }}
+                                >
                                   <Avatar
                                     sx={{
                                       width: 28,
                                       height: 28,
                                       fontSize: "0.75rem",
                                       fontWeight: 600,
-                                      bgcolor: alpha(theme.palette.secondary.main, 0.1),
+                                      bgcolor: alpha(
+                                        theme.palette.secondary.main,
+                                        0.1
+                                      ),
                                       color: theme.palette.secondary.main,
                                     }}
                                   >
-                                    {a.mechanic?.fullName?.charAt(0)?.toUpperCase() || "?"}
+                                    {a.mechanic?.fullName
+                                      ?.charAt(0)
+                                      ?.toUpperCase() || "?"}
                                   </Avatar>
-                                  <Typography variant="body2" sx={{ fontWeight: 500 }}>
+                                  <Typography
+                                    variant="body2"
+                                    sx={{ fontWeight: 500 }}
+                                  >
                                     {a.mechanic?.fullName || "—"}
                                   </Typography>
                                 </Stack>
@@ -240,13 +390,21 @@ const TaskDetailDialog = ({ open, orderId, onClose }) => {
                                   color={getAssignmentStatusColor(a.status)}
                                   size="small"
                                   variant="outlined"
-                                  sx={{ fontWeight: 500, fontSize: "0.75rem", height: 24 }}
+                                  sx={{
+                                    fontWeight: 500,
+                                    fontSize: "0.75rem",
+                                    height: 24,
+                                  }}
                                 />
                               </Stack>
                             ))}
                           </Stack>
                         ) : (
-                          <Typography variant="body2" color="text.disabled" sx={{ fontStyle: "italic" }}>
+                          <Typography
+                            variant="body2"
+                            color="text.disabled"
+                            sx={{ fontStyle: "italic" }}
+                          >
                             Belum ada mekanik ditugaskan
                           </Typography>
                         )}
@@ -257,8 +415,10 @@ const TaskDetailDialog = ({ open, orderId, onClose }) => {
               })}
 
               {(!data.services || data.services.length === 0) && (
-                <Box sx={{ p: 3 }}>
-                  <Typography variant="body2" color="text.secondary">Tidak ada layanan</Typography>
+                <Box sx={{ p: { xs: 2.5, sm: 3 }, pt: 0 }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Tidak ada layanan
+                  </Typography>
                 </Box>
               )}
             </Card>
@@ -268,8 +428,17 @@ const TaskDetailDialog = ({ open, orderId, onClose }) => {
 
       <Divider />
 
-      <DialogActions sx={{ px: 3, py: 2.5 }}>
-        <Button variant="outlined" onClick={onClose} size="medium" sx={{ fontWeight: 500, textTransform: "none" }}>
+      <DialogActions sx={{ px: { xs: 2.5, sm: 3 }, py: 2.5 }}>
+        <Button
+          variant="outlined"
+          onClick={onClose}
+          sx={{
+            fontWeight: 500,
+            textTransform: "none",
+            borderRadius: br,
+            px: 3,
+          }}
+        >
           Tutup
         </Button>
       </DialogActions>

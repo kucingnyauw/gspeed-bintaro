@@ -383,9 +383,10 @@ const AppTable = memo(
       );
     });
 
-    /** Cell style dengan minHeight */
-    const cellSx = { py: 1.5, px: { xs: 1.5, sm: 2 }, minHeight: 52 };
-    const headerCellSx = { ...cellSx, fontWeight: 600, whiteSpace: "nowrap" };
+/** Cell style — tingkatkan py untuk menambah tinggi row */
+const cellSx = { py: 2.5, px: { xs: 1.5, sm: 2 } };
+const headerCellSx = { ...cellSx, fontWeight: 600, whiteSpace: "nowrap" };
+
 
     // Rendered Headers
     const renderedHeaders = (

@@ -8,38 +8,33 @@
  * @component
  * @returns {JSX.Element} Rendered footer
  */
-import { Box, Divider, Stack, Typography, useTheme } from "@mui/material";
-import { alpha } from "@mui/material/styles";
+import { Box, Stack, Typography, useTheme } from "@mui/material";
 import INFO from "@/data/Info.js";
 
 const Footer = () => {
   const theme = useTheme();
-
-  /** @type {number} Tahun saat ini untuk copyright */
   const currentYear = new Date().getFullYear();
 
   return (
-    <Box
-      component="footer"
-      sx={{
-        flexShrink: 0,
-
-
-      }}
-    >
+    <Box component="footer" sx={{ flexShrink: 0, mt: "auto" }}>
       <Stack
-        direction="row"
+        direction={{ xs: "column", sm: "row" }}
         sx={{
           justifyContent: "space-between",
           alignItems: { xs: "center", sm: "center" },
-          gap: { xs: 0.5, sm: 0 },
-          p : 4
+          gap: { xs: 1, sm: 0 },
+          px: { xs: 2.5, sm: 3, md: 4 },
+          py: { xs: 2, sm: 2.5 },
         }}
       >
         <Typography
           variant="caption"
           color="text.disabled"
-          sx={{ fontWeight: 400 }}
+          sx={{
+            fontWeight: 400,
+            fontSize: { xs: "0.6875rem", sm: "0.75rem" },
+            textAlign: { xs: "center", sm: "left" },
+          }}
         >
           &copy; {currentYear} {INFO.name}. All rights reserved.
         </Typography>
@@ -47,7 +42,11 @@ const Footer = () => {
         <Typography
           variant="caption"
           color="text.disabled"
-          sx={{ fontWeight: 400 }}
+          sx={{
+            fontWeight: 400,
+            fontSize: { xs: "0.6875rem", sm: "0.75rem" },
+            textAlign: { xs: "center", sm: "right" },
+          }}
         >
           Powered by G-Speed Technology
         </Typography>
