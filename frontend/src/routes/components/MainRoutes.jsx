@@ -1,5 +1,5 @@
 import { lazy } from "react";
-import { RoleRoutes, PrivateRoutes } from "@routes/guard";
+import { RoleGuard, PrivateGuard } from "@routes/guard";
 import { AppLoadable } from "@components";
 import { Role } from "@shared/constant";
 import MainLayout from "@layout/MainLayout.jsx";
@@ -101,305 +101,296 @@ const MainRoutes = {
   path: "/",
   element: <MainLayout />,
   children: [
-    {
-      index: true,
-      element: (
-        <PrivateRoutes>
-          <RoleRoutes allowedRoles={[Role.ADMIN, Role.CASHIER, Role.MECHANIC]}>
-            <Dashboard />
-          </RoleRoutes>
-        </PrivateRoutes>
-      ),
-    },
+  
     {
       path: "dashboard",
       element: (
-        <PrivateRoutes>
-          <RoleRoutes allowedRoles={[Role.ADMIN, Role.CASHIER, Role.MECHANIC]}>
+        <PrivateGuard>
+          <RoleGuard allowedRoles={[Role.ADMIN, Role.CASHIER, Role.MECHANIC]}>
             <Dashboard />
-          </RoleRoutes>
-        </PrivateRoutes>
+          </RoleGuard>
+        </PrivateGuard>
       ),
     },
     {
       path: "pos",
       element: (
-        <PrivateRoutes>
-          <RoleRoutes allowedRoles={[Role.CASHIER]}>
+        <PrivateGuard>
+          <RoleGuard allowedRoles={[Role.CASHIER]}>
             <POS />
-          </RoleRoutes>
-        </PrivateRoutes>
+          </RoleGuard>
+        </PrivateGuard>
       ),
     },
     {
       path: "orders",
       element: (
-        <PrivateRoutes>
-          <RoleRoutes allowedRoles={[Role.CASHIER]}>
+        <PrivateGuard>
+          <RoleGuard allowedRoles={[Role.CASHIER]}>
             <Orders />
-          </RoleRoutes>
-        </PrivateRoutes>
+          </RoleGuard>
+        </PrivateGuard>
       ),
     },
     {
       path: "orders/history",
       element: (
-        <PrivateRoutes>
-          <RoleRoutes allowedRoles={[Role.ADMIN, Role.CASHIER]}>
+        <PrivateGuard>
+          <RoleGuard allowedRoles={[Role.ADMIN, Role.CASHIER]}>
             <OrderHistory />
-          </RoleRoutes>
-        </PrivateRoutes>
+          </RoleGuard>
+        </PrivateGuard>
       ),
     },
     {
       path: "customers",
       element: (
-        <PrivateRoutes>
-          <RoleRoutes allowedRoles={[ Role.CASHIER]}>
+        <PrivateGuard>
+          <RoleGuard allowedRoles={[Role.CASHIER]}>
             <Customers />
-          </RoleRoutes>
-        </PrivateRoutes>
+          </RoleGuard>
+        </PrivateGuard>
       ),
     },
     {
       path: "vehicles",
       element: (
-        <PrivateRoutes>
-          <RoleRoutes allowedRoles={[ Role.CASHIER]}>
+        <PrivateGuard>
+          <RoleGuard allowedRoles={[Role.CASHIER]}>
             <Vehicles />
-          </RoleRoutes>
-        </PrivateRoutes>
+          </RoleGuard>
+        </PrivateGuard>
       ),
     },
     {
       path: "tasks",
       element: (
-        <PrivateRoutes>
-          <RoleRoutes allowedRoles={[Role.ADMIN]}>
+        <PrivateGuard>
+          <RoleGuard allowedRoles={[Role.ADMIN]}>
             <Tasks />
-          </RoleRoutes>
-        </PrivateRoutes>
+          </RoleGuard>
+        </PrivateGuard>
       ),
     },
     {
       path: "tasks/mechanic",
       element: (
-        <PrivateRoutes>
-          <RoleRoutes allowedRoles={[ Role.MECHANIC]}>
+        <PrivateGuard>
+          <RoleGuard allowedRoles={[Role.MECHANIC]}>
             <MechanicTasks />
-          </RoleRoutes>
-        </PrivateRoutes>
+          </RoleGuard>
+        </PrivateGuard>
       ),
     },
     {
       path: "tasks/history",
       element: (
-        <PrivateRoutes>
-          <RoleRoutes allowedRoles={[Role.ADMIN, Role.MECHANIC]}>
+        <PrivateGuard>
+          <RoleGuard allowedRoles={[Role.ADMIN, Role.MECHANIC]}>
             <TaskHistory />
-          </RoleRoutes>
-        </PrivateRoutes>
+          </RoleGuard>
+        </PrivateGuard>
       ),
     },
     {
       path: "tasks/unassigned",
       element: (
-        <PrivateRoutes>
-          <RoleRoutes allowedRoles={[Role.CASHIER]}>
+        <PrivateGuard>
+          <RoleGuard allowedRoles={[Role.CASHIER]}>
             <UnassignedTasks />
-          </RoleRoutes>
-        </PrivateRoutes>
+          </RoleGuard>
+        </PrivateGuard>
       ),
     },
     {
       path: "tasks/mechanics/available",
       element: (
-        <PrivateRoutes>
-          <RoleRoutes allowedRoles={[ Role.CASHIER]}>
+        <PrivateGuard>
+          <RoleGuard allowedRoles={[Role.CASHIER]}>
             <AvailableMechanics />
-          </RoleRoutes>
-        </PrivateRoutes>
+          </RoleGuard>
+        </PrivateGuard>
       ),
     },
     {
       path: "products",
       element: (
-        <PrivateRoutes>
-          <RoleRoutes allowedRoles={[Role.ADMIN]}>
+        <PrivateGuard>
+          <RoleGuard allowedRoles={[Role.ADMIN]}>
             <Products />
-          </RoleRoutes>
-        </PrivateRoutes>
+          </RoleGuard>
+        </PrivateGuard>
       ),
     },
     {
       path: "stock/movements",
       element: (
-        <PrivateRoutes>
-          <RoleRoutes allowedRoles={[Role.ADMIN]}>
+        <PrivateGuard>
+          <RoleGuard allowedRoles={[Role.ADMIN]}>
             <StockMovements />
-          </RoleRoutes>
-        </PrivateRoutes>
+          </RoleGuard>
+        </PrivateGuard>
       ),
     },
     {
       path: "payments",
       element: (
-        <PrivateRoutes>
-          <RoleRoutes allowedRoles={[Role.ADMIN, Role.CASHIER]}>
+        <PrivateGuard>
+          <RoleGuard allowedRoles={[Role.ADMIN, Role.CASHIER]}>
             <Payments />
-          </RoleRoutes>
-        </PrivateRoutes>
+          </RoleGuard>
+        </PrivateGuard>
       ),
     },
     {
       path: "expenses",
       element: (
-        <PrivateRoutes>
-          <RoleRoutes allowedRoles={[Role.ADMIN, Role.CASHIER]}>
+        <PrivateGuard>
+          <RoleGuard allowedRoles={[Role.ADMIN, Role.CASHIER]}>
             <Expenses />
-          </RoleRoutes>
-        </PrivateRoutes>
+          </RoleGuard>
+        </PrivateGuard>
       ),
     },
     {
       path: "expenses/history",
       element: (
-        <PrivateRoutes>
-          <RoleRoutes allowedRoles={[Role.ADMIN]}>
+        <PrivateGuard>
+          <RoleGuard allowedRoles={[Role.ADMIN]}>
             <ExpensesHistory />
-          </RoleRoutes>
-        </PrivateRoutes>
+          </RoleGuard>
+        </PrivateGuard>
       ),
     },
     {
       path: "shifts",
       element: (
-        <PrivateRoutes>
-          <RoleRoutes allowedRoles={[Role.ADMIN, Role.CASHIER]}>
+        <PrivateGuard>
+          <RoleGuard allowedRoles={[Role.ADMIN, Role.CASHIER]}>
             <Shifts />
-          </RoleRoutes>
-        </PrivateRoutes>
+          </RoleGuard>
+        </PrivateGuard>
       ),
     },
     {
       path: "shifts/all",
       element: (
-        <PrivateRoutes>
-          <RoleRoutes allowedRoles={[Role.ADMIN]}>
+        <PrivateGuard>
+          <RoleGuard allowedRoles={[Role.ADMIN]}>
             <AllShifts />
-          </RoleRoutes>
-        </PrivateRoutes>
+          </RoleGuard>
+        </PrivateGuard>
       ),
     },
     // Reports
     {
       path: "reports/sales",
       element: (
-        <PrivateRoutes>
-          <RoleRoutes allowedRoles={[Role.ADMIN]}>
+        <PrivateGuard>
+          <RoleGuard allowedRoles={[Role.ADMIN]}>
             <SalesReport />
-          </RoleRoutes>
-        </PrivateRoutes>
+          </RoleGuard>
+        </PrivateGuard>
       ),
     },
     {
       path: "reports/profit-loss",
       element: (
-        <PrivateRoutes>
-          <RoleRoutes allowedRoles={[Role.ADMIN]}>
+        <PrivateGuard>
+          <RoleGuard allowedRoles={[Role.ADMIN]}>
             <ProfitLoss />
-          </RoleRoutes>
-        </PrivateRoutes>
+          </RoleGuard>
+        </PrivateGuard>
       ),
     },
     {
       path: "reports/inventory",
       element: (
-        <PrivateRoutes>
-          <RoleRoutes allowedRoles={[Role.ADMIN]}>
+        <PrivateGuard>
+          <RoleGuard allowedRoles={[Role.ADMIN]}>
             <InventoryReport />
-          </RoleRoutes>
-        </PrivateRoutes>
+          </RoleGuard>
+        </PrivateGuard>
       ),
     },
     {
       path: "reports/top-products",
       element: (
-        <PrivateRoutes>
-          <RoleRoutes allowedRoles={[Role.ADMIN]}>
+        <PrivateGuard>
+          <RoleGuard allowedRoles={[Role.ADMIN]}>
             <TopProductsReport />
-          </RoleRoutes>
-        </PrivateRoutes>
+          </RoleGuard>
+        </PrivateGuard>
       ),
     },
     {
       path: "reports/mechanics",
       element: (
-        <PrivateRoutes>
-          <RoleRoutes allowedRoles={[Role.ADMIN]}>
+        <PrivateGuard>
+          <RoleGuard allowedRoles={[Role.ADMIN]}>
             <MechanicReport />
-          </RoleRoutes>
-        </PrivateRoutes>
+          </RoleGuard>
+        </PrivateGuard>
       ),
     },
     {
       path: "reports/expenses",
       element: (
-        <PrivateRoutes>
-          <RoleRoutes allowedRoles={[Role.ADMIN]}>
+        <PrivateGuard>
+          <RoleGuard allowedRoles={[Role.ADMIN]}>
             <ExpenseReport />
-          </RoleRoutes>
-        </PrivateRoutes>
+          </RoleGuard>
+        </PrivateGuard>
       ),
     },
     {
       path: "reports/payments",
       element: (
-        <PrivateRoutes>
-          <RoleRoutes allowedRoles={[Role.ADMIN]}>
+        <PrivateGuard>
+          <RoleGuard allowedRoles={[Role.ADMIN]}>
             <PaymentReport />
-          </RoleRoutes>
-        </PrivateRoutes>
+          </RoleGuard>
+        </PrivateGuard>
       ),
     },
     {
       path: "reports/customers",
       element: (
-        <PrivateRoutes>
-          <RoleRoutes allowedRoles={[Role.ADMIN]}>
+        <PrivateGuard>
+          <RoleGuard allowedRoles={[Role.ADMIN]}>
             <CustomerReport />
-          </RoleRoutes>
-        </PrivateRoutes>
+          </RoleGuard>
+        </PrivateGuard>
       ),
     },
     {
       path: "reports/vehicles",
       element: (
-        <PrivateRoutes>
-          <RoleRoutes allowedRoles={[Role.ADMIN]}>
+        <PrivateGuard>
+          <RoleGuard allowedRoles={[Role.ADMIN]}>
             <VehicleReport />
-          </RoleRoutes>
-        </PrivateRoutes>
+          </RoleGuard>
+        </PrivateGuard>
       ),
     },
     {
       path: "users",
       element: (
-        <PrivateRoutes>
-          <RoleRoutes allowedRoles={[Role.ADMIN]}>
+        <PrivateGuard>
+          <RoleGuard allowedRoles={[Role.ADMIN]}>
             <Users />
-          </RoleRoutes>
-        </PrivateRoutes>
+          </RoleGuard>
+        </PrivateGuard>
       ),
     },
     {
       path: "settings",
       element: (
-        <PrivateRoutes>
-          <RoleRoutes allowedRoles={[Role.ADMIN]}>
+        <PrivateGuard>
+          <RoleGuard allowedRoles={[Role.ADMIN]}>
             <Settings />
-          </RoleRoutes>
-        </PrivateRoutes>
+          </RoleGuard>
+        </PrivateGuard>
       ),
     },
     {

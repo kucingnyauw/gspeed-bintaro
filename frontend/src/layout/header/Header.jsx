@@ -246,7 +246,7 @@ const Header = () => {
           <Toolbar
             sx={{
               minHeight: `${HEADER.MOBILE_HEIGHT}px !important`,
-              px: { xs: 2, sm: 3 },
+              px: { xs: 8, sm: 4 },
               display: "flex",
               alignItems: "center",
               bgcolor: "background.paper",
@@ -327,9 +327,9 @@ const Header = () => {
               isSmallDevice ? HEADER.MOBILE_HEIGHT : HEADER.DESKTOP_HEIGHT
             }px !important`,
             pl: { xs: 2, sm: 2, md: 0 },
-            pr: { xs: 2, sm: 4, md: 6 },
+            pr: { xs: 4, sm: 6, md: 6 },
             display: isSmallDevice && showMobileSearch ? "none" : "flex",
-            gap: { xs: 1, sm: 2 },
+            gap: { xs: 2, sm: 2 },
           }}
         >
           {/* LEFT */}

@@ -3,29 +3,26 @@ import { useSelector } from "react-redux";
 import { selectAuthStatus } from "@store/auth/authSelector.js";
 
 /**
- * Guard component untuk route yang membutuhkan autentikasi
- * Hanya handle redirect ke login jika guest
- * Loading & error di-handle oleh MainLayout
+ * Guard component untuk route yang membutuhkan autentikasi.
+ * Redirect ke login jika status bukan "auth".
+ *
  * @param {Object} props
  * @param {React.ReactNode} props.children - Children components
  * @returns {JSX.Element} Protected route atau redirect ke login
  */
-const PrivateRoutes = ({ children }) => {
+const PrivateGuard = ({ children }) => {
   const location = useLocation();
   const status = useSelector(selectAuthStatus);
 
   /**
-   * Tidak ada session valid - redirect ke login
+   * Hanya izinkan akses jika status adalah "auth".
+   * Semua status lain (guest, degraded, unknown) akan di-redirect ke login.
    */
-  if (status === "guest") {
+  if (status !== "auth") {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  /**
-   * Auth valid, degraded, atau unknown
-   * Semua di-handle oleh MainLayout
-   */
   return children;
 };
 
-export default PrivateRoutes;
+export default PrivateGuard;

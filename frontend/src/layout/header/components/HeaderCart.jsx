@@ -48,14 +48,6 @@ import { useDevice } from "@hooks";
 import { AsyncAutocomplete } from "@components";
 import { useHeaderCart } from "../hooks/useHeaderCart";
 
-/**
- * SVG ilustrasi untuk keranjang kosong.
- *
- * @component
- * @param {Object} props - Props komponen
- * @param {number} [props.opacity=0.15] - Tingkat opacity ilustrasi
- * @returns {JSX.Element} Ilustrasi SVG
- */
 const EmptyCartSvg = ({ opacity = 0.15 }) => (
   <Box
     component="svg"
@@ -85,17 +77,6 @@ const EmptyCartSvg = ({ opacity = 0.15 }) => (
   </Box>
 );
 
-/**
- * QuantityControl - Komponen kontrol increment/decrement quantity item.
- *
- * @component
- * @param {Object} props - Props komponen
- * @param {number} props.quantity - Quantity saat ini
- * @param {number} props.maxLimit - Batas maksimal quantity
- * @param {Function} props.onChange - Handler perubahan quantity (+1 atau -1)
- * @param {boolean} [props.disabled=false] - Status disabled
- * @returns {JSX.Element} Komponen kontrol quantity
- */
 const QuantityControl = ({ quantity, maxLimit, onChange, disabled }) => {
   const theme = useTheme();
   const br = `${theme.shape.borderRadius}px`;
@@ -116,11 +97,7 @@ const QuantityControl = ({ quantity, maxLimit, onChange, disabled }) => {
         onClick={() => onChange(-1)}
         disabled={disabled || quantity <= 1}
         aria-label="Kurangi quantity"
-        sx={{
-          borderRadius: 0,
-          minWidth: 32,
-          minHeight: 32,
-        }}
+        sx={{ borderRadius: 0, minWidth: 32, minHeight: 32 }}
       >
         <Minus size={14} strokeWidth={1.5} />
       </IconButton>
@@ -142,11 +119,7 @@ const QuantityControl = ({ quantity, maxLimit, onChange, disabled }) => {
         onClick={() => onChange(1)}
         disabled={disabled || quantity >= maxLimit}
         aria-label="Tambah quantity"
-        sx={{
-          borderRadius: 0,
-          minWidth: 32,
-          minHeight: 32,
-        }}
+        sx={{ borderRadius: 0, minWidth: 32, minHeight: 32 }}
       >
         <Plus size={14} strokeWidth={1.5} />
       </IconButton>
@@ -154,17 +127,6 @@ const QuantityControl = ({ quantity, maxLimit, onChange, disabled }) => {
   );
 };
 
-/**
- * CartItemCard - Kartu item dalam keranjang belanja.
- *
- * @component
- * @param {Object} props - Props komponen
- * @param {Object} props.item - Data item keranjang
- * @param {Function} props.onRemove - Handler hapus item
- * @param {Function} props.onQuantityChange - Handler perubahan quantity
- * @param {boolean} [props.disabled=false] - Status disabled
- * @returns {JSX.Element} Kartu item keranjang
- */
 const CartItemCard = ({ item, onRemove, onQuantityChange, disabled }) => {
   const theme = useTheme();
   const br = `${theme.shape.borderRadius}px`;
@@ -193,13 +155,13 @@ const CartItemCard = ({ item, onRemove, onQuantityChange, disabled }) => {
             src={item.image?.url || ""}
             variant="rounded"
             sx={{
-              width: 52,
-              height: 52,
+              width: 56,
+              height: 56,
               flexShrink: 0,
               borderRadius: br,
               bgcolor: !item.image?.url ? alpha(theme.palette.secondary.main, 0.08) : "transparent",
               color: !item.image?.url ? theme.palette.secondary.main : "transparent",
-              fontSize: "1.125rem",
+              fontSize: "1.25rem",
               fontWeight: 700,
             }}
           >
@@ -212,16 +174,16 @@ const CartItemCard = ({ item, onRemove, onQuantityChange, disabled }) => {
             <Stack direction="row" sx={{ alignItems: "flex-start", justifyContent: "space-between", gap: 1.5 }}>
               <Stack sx={{ minWidth: 0, gap: 1 }}>
                 <Stack direction="row" sx={{ alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+                  <Typography variant="body2" sx={{ fontWeight: 600, fontSize: { xs: "0.8125rem", sm: "0.875rem" } }} noWrap>
+                    {item.productName}
+                  </Typography>
                   <Chip
                     label={isSparepart ? "Sparepart" : "Servis"}
                     size="small"
                     variant="outlined"
                     color={isSparepart ? "warning" : "secondary"}
-                    sx={{ height: 22, fontWeight: 500, borderRadius: br }}
+                    sx={{ height: 22, fontWeight: 500, fontSize: "0.6875rem", borderRadius: br }}
                   />
-                  <Typography variant="body2" sx={{ fontWeight: 600 }} noWrap>
-                    {item.productName}
-                  </Typography>
                 </Stack>
                 <Typography variant="caption" color="text.secondary">
                   {formatToIdr(item.unitPrice || 0)} × {item.quantity}
@@ -253,7 +215,7 @@ const CartItemCard = ({ item, onRemove, onQuantityChange, disabled }) => {
                 >
                   <Trash2 size={14} strokeWidth={1.5} />
                 </IconButton>
-                <Typography variant="body2" sx={{ fontWeight: 700 }}>
+                <Typography variant="body2" sx={{ fontWeight: 700, fontSize: { xs: "0.875rem", sm: "0.9375rem" } }}>
                   {formatToIdr(itemTotal)}
                 </Typography>
               </Stack>
@@ -280,19 +242,6 @@ const CartItemCard = ({ item, onRemove, onQuantityChange, disabled }) => {
   );
 };
 
-/**
- * PriceRow - Komponen baris harga untuk summary pembayaran.
- *
- * @component
- * @param {Object} props - Props komponen
- * @param {string} props.label - Label harga
- * @param {number} props.value - Nilai harga
- * @param {boolean} [props.isPending=false] - Status loading
- * @param {number} [props.skeletonWidth=80] - Lebar skeleton saat loading
- * @param {boolean} [props.bold=false] - Apakah teks bold
- * @param {string} [props.color] - Warna teks
- * @returns {JSX.Element} Baris harga
- */
 const PriceRow = ({ label, value, isPending, skeletonWidth = 80, bold, color }) => (
   <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center" }}>
     <Typography variant="body2" color="text.secondary">
@@ -312,15 +261,6 @@ const PriceRow = ({ label, value, isPending, skeletonWidth = 80, bold, color }) 
   </Stack>
 );
 
-/**
- * HeaderCart - Dialog keranjang belanja fullscreen di mobile.
- *
- * @component
- * @param {Object} props - Props komponen
- * @param {boolean} props.open - Status dialog
- * @param {Function} props.onClose - Handler tutup dialog
- * @returns {JSX.Element} Dialog keranjang belanja
- */
 const HeaderCart = ({ open, onClose }) => {
   const theme = useTheme();
   const { isMobile } = useDevice();
@@ -342,16 +282,8 @@ const HeaderCart = ({ open, onClose }) => {
     onSubmit,
   } = useHeaderCart(open, onClose);
 
-  /** @type {boolean} Status processing (submit atau kalkulasi) */
   const isProcessing = isSubmitting || isCalculatePending;
 
-  /**
-   * Handler perubahan quantity item.
-   *
-   * @param {string} productId - ID produk
-   * @param {number} currentQty - Quantity saat ini
-   * @param {number} inc - Increment (+1 atau -1)
-   */
   const handleQuantityChange = (productId, currentQty, inc) => {
     if (inc > 0) {
       handleIncrement(productId);
@@ -394,7 +326,6 @@ const HeaderCart = ({ open, onClose }) => {
             alignItems: "center",
             px: { xs: 2.5, sm: 3 },
             py: { xs: 2, sm: 2.5 },
-            borderBottom: `1px solid ${theme.palette.divider}`,
             flexShrink: 0,
             bgcolor: "background.paper",
           }}
@@ -415,10 +346,7 @@ const HeaderCart = ({ open, onClose }) => {
             sx={{
               color: "text.secondary",
               borderRadius: br,
-              "&:hover": {
-                color: "error.main",
-                bgcolor: alpha(theme.palette.error.main, 0.08),
-              },
+              "&:hover": { color: "error.main", bgcolor: alpha(theme.palette.error.main, 0.08) },
             }}
           >
             <X size={20} strokeWidth={1.5} />
@@ -442,13 +370,7 @@ const HeaderCart = ({ open, onClose }) => {
           ) : (
             <Stack sx={{ gap: { xs: 3, sm: 4 } }}>
               {/* Customer Section */}
-              <Card
-                sx={{
-                  border: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
-                  boxShadow: "none",
-                  borderRadius: br,
-                }}
-              >
+              <Card sx={{ border: `1px solid ${alpha(theme.palette.divider, 0.6)}`, boxShadow: "none", borderRadius: br }}>
                 <CardContent sx={{ p: { xs: 2.5, sm: 3 }, "&:last-child": { pb: { xs: 2.5, sm: 3 } } }}>
                   <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2.5 }}>
                     Informasi Pelanggan
@@ -509,12 +431,7 @@ const HeaderCart = ({ open, onClose }) => {
                             isOptionEqualToValue={(a, b) => a.id === b.id}
                             noOptionsText="Tidak ada kendaraan"
                             renderInput={(params) => (
-                              <TextField
-                                {...params}
-                                placeholder="Pilih kendaraan"
-                                error={!!fieldState.error}
-                                helperText={fieldState.error?.message}
-                              />
+                              <TextField {...params} placeholder="Pilih kendaraan" error={!!fieldState.error} helperText={fieldState.error?.message} />
                             )}
                             renderOption={(props, option) => (
                               <li {...props}>
@@ -559,7 +476,7 @@ const HeaderCart = ({ open, onClose }) => {
           )}
         </Box>
 
-        {/* Footer - Summary & Checkout */}
+        {/* Footer */}
         {items.length > 0 && (
           <Stack
             sx={{
@@ -584,12 +501,13 @@ const HeaderCart = ({ open, onClose }) => {
               size="large"
               disabled={!items.length || isProcessing}
               sx={{
-                py: 1.5,
+                py: 1.75,
                 fontWeight: 600,
                 textTransform: "none",
                 fontSize: "0.9375rem",
                 borderRadius: br,
                 boxShadow: "none",
+                minHeight: 48,
                 "&:hover": {
                   boxShadow: `0 4px 12px ${alpha(theme.palette.primary.main, 0.3)}`,
                 },
@@ -597,7 +515,7 @@ const HeaderCart = ({ open, onClose }) => {
             >
               {isSubmitting ? (
                 <Stack direction="row" sx={{ alignItems: "center", gap: 1 }}>
-                  <CircularProgress size={16} color="inherit" />
+                  <CircularProgress size={18} color="inherit" />
                   Memproses...
                 </Stack>
               ) : (

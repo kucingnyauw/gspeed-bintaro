@@ -4,10 +4,9 @@
  * Fitur:
  * - Fullscreen di mobile untuk UX yang lebih baik
  * - Typewriter effect untuk pesan terakhir dari agent
- * - Markdown rendering dengan GitHub Flavored Markdown
+ * - Markdown rendering dengan GitHub Flavored Markdown (termasuk tabel)
  * - Empty state dengan sapaan personal (nama user)
  * - Loading dots animation saat menunggu response
- * - Auto-focus input saat dialog dibuka
  * - Riwayat chat persisten selama sesi (tidak reset saat tutup)
  * - Scroll otomatis ke bawah saat ada pesan baru
  * - Send button dengan animasi hover
@@ -36,7 +35,7 @@ import { X, Send, Sparkles } from "lucide-react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
-import { useChat } from "@layout/customization/hooks";
+import { useChat } from "@layout/tools/hooks";
 import { selectUser } from "@store/auth/authSelector.js";
 import { useDevice } from "@hooks";
 
@@ -89,7 +88,7 @@ const TypewriterMessage = ({ content }) => {
 };
 
 /**
- * MarkdownContent - Render markdown dengan styling minimalis.
+ * MarkdownContent - Render markdown dengan styling minimalis termasuk tabel.
  *
  * @component
  * @param {Object} props
@@ -103,19 +102,19 @@ const MarkdownContent = ({ content }) => {
   const markdownStyles = {
     "& p": {
       m: 0,
-      lineHeight: 1.65,
+      lineHeight: 1.6,
       color: "inherit",
       fontSize: isMobile ? "0.875rem" : "0.9375rem",
     },
-    "& p:not(:last-child)": { mb: 1.25 },
-    "& ul, & ol": { m: 0, pl: 2.5, lineHeight: 1.65, color: "inherit" },
-    "& li:not(:last-child)": { mb: 0.25 },
-    "& strong": { fontWeight: 600, color: "inherit" },
+    "& p:not(:last-child)": { mb: 1 },
+    "& ul, & ol": { m: 0, pl: 2, lineHeight: 1.6, color: "inherit" },
+    "& li:not(:last-child)": { mb: 0.125 },
+    "& strong": { fontWeight: 500, color: "inherit" },
     "& em": { fontStyle: "italic" },
     "& code": {
-      px: 0.75,
-      py: 0.25,
-      borderRadius: 1,
+      px: 0.5,
+      py: 0.125,
+      borderRadius: 0.75,
       fontSize: "0.8125rem",
       fontFamily: "monospace",
       bgcolor: alpha(theme.palette.common.black, 0.06),
@@ -123,8 +122,8 @@ const MarkdownContent = ({ content }) => {
     },
     "& pre": {
       m: 0,
-      p: 1.5,
-      borderRadius: 1.5,
+      p: 1.25,
+      borderRadius: 1,
       fontSize: "0.8125rem",
       fontFamily: "monospace",
       bgcolor: alpha(theme.palette.common.black, 0.06),
@@ -132,25 +131,60 @@ const MarkdownContent = ({ content }) => {
     },
     "& blockquote": {
       m: 0,
-      pl: 2,
-      py: 0.25,
+      pl: 1.5,
+      py: 0.125,
       borderLeft: `2px solid ${alpha(theme.palette.secondary.main, 0.5)}`,
       opacity: 0.85,
       fontStyle: "italic",
     },
     "& hr": {
-      my: 1.5,
+      my: 1,
       border: "none",
       borderTop: `1px solid ${theme.palette.divider}`,
     },
     "& h1, & h2, & h3, & h4, & h5, & h6": {
       m: 0,
-      mt: 1.25,
-      mb: 0.5,
-      fontWeight: 600,
-      lineHeight: 1.3,
+      mt: 0.75,
+      mb: 0.25,
+      fontWeight: 500,
+      lineHeight: 1.4,
       color: "inherit",
       "&:first-of-type": { mt: 0 },
+    },
+    "& h1": { fontSize: isMobile ? "0.9375rem" : "1rem" },
+    "& h2": { fontSize: isMobile ? "0.875rem" : "0.9375rem" },
+    "& h3": { fontSize: isMobile ? "0.8125rem" : "0.875rem" },
+    "& h4, & h5, & h6": { fontSize: isMobile ? "0.75rem" : "0.8125rem" },
+    "& table": {
+      width: "100%",
+      borderCollapse: "collapse",
+      fontSize: isMobile ? "0.6875rem" : "0.75rem",
+      my: 1,
+    },
+    "& thead": {
+      borderBottom: `1px solid ${theme.palette.divider}`,
+    },
+    "& th": {
+      textAlign: "left",
+      px: 1,
+      py: 0.75,
+      fontWeight: 500,
+      color: "text.secondary",
+      fontSize: "0.6875rem",
+      textTransform: "uppercase",
+      letterSpacing: "0.05em",
+      whiteSpace: "nowrap",
+    },
+    "& td": {
+      px: 1,
+      py: 0.75,
+      borderBottom: `1px solid ${alpha(theme.palette.divider, 0.4)}`,
+    },
+    "& tr:last-child td": {
+      borderBottom: "none",
+    },
+    "& tbody tr:hover": {
+      bgcolor: alpha(theme.palette.secondary.main, 0.02),
     },
   };
 
@@ -196,9 +230,6 @@ const Chat = ({ open, onClose }) => {
     if (open && !hasInitialized.current) {
       initChat();
       hasInitialized.current = true;
-    }
-    if (open) {
-      setTimeout(() => inputRef.current?.focus(), 150);
     }
   }, [open, initChat]);
 
@@ -264,16 +295,15 @@ const Chat = ({ open, onClose }) => {
             alignItems: "center",
             justifyContent: "space-between",
             px: { xs: 2.5, sm: 3 },
-            py: { xs: 1.5, sm: 2 },
-            borderBottom: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
+            py: { xs: 2, sm: 2.5 },
             flexShrink: 0,
           }}
         >
-          <Stack direction="row" sx={{ gap: { xs: 1, sm: 1.5 }, alignItems: "center" }}>
+          <Stack direction="row" sx={{ gap: { xs: 1.5, sm: 2 }, alignItems: "center" }}>
             <Box
               sx={{
-                width: { xs: 32, sm: 36 },
-                height: { xs: 32, sm: 36 },
+                width: { xs: 36, sm: 40 },
+                height: { xs: 36, sm: 40 },
                 borderRadius: borderRadius,
                 bgcolor: alpha(theme.palette.secondary.main, 0.08),
                 color: "secondary.main",
@@ -282,7 +312,7 @@ const Chat = ({ open, onClose }) => {
                 justifyContent: "center",
               }}
             >
-              <Sparkles size={isMobile ? 16 : 18} strokeWidth={1.5} />
+              <Sparkles size={isMobile ? 18 : 20} strokeWidth={1.5} />
             </Box>
             <Box>
               <Typography
@@ -290,7 +320,7 @@ const Chat = ({ open, onClose }) => {
                 sx={{
                   fontWeight: 600,
                   lineHeight: 1.3,
-                  fontSize: isMobile ? "0.875rem" : "0.9375rem",
+                  fontSize: isMobile ? "0.9375rem" : "1rem",
                 }}
               >
                 G-Speed Copilot
@@ -311,6 +341,10 @@ const Chat = ({ open, onClose }) => {
             sx={{
               color: "text.secondary",
               borderRadius: borderRadius,
+              border: "1px solid",
+              borderColor: alpha(theme.palette.divider, 0.8),
+              width: 36,
+              height: 36,
               "&:hover": { color: "text.primary", bgcolor: "action.hover" },
             }}
           >
@@ -324,11 +358,11 @@ const Chat = ({ open, onClose }) => {
           sx={{
             flex: 1,
             overflowY: "auto",
-            px: { xs: 2, sm: 3 },
-            py: { xs: 2.5, sm: 3 },
+            px: { xs: 2.5, sm: 3 },
+            py: { xs: 3, sm: 4 },
             display: "flex",
             flexDirection: "column",
-            gap: { xs: 2, sm: 2.5 },
+            gap: { xs: 3, sm: 3.5 },
             "&::-webkit-scrollbar": { width: 4 },
             "&::-webkit-scrollbar-track": { bgcolor: "transparent" },
             "&::-webkit-scrollbar-thumb": {
@@ -344,15 +378,15 @@ const Chat = ({ open, onClose }) => {
                 flex: 1,
                 alignItems: "center",
                 justifyContent: "center",
-                gap: { xs: 3, sm: 4 },
-                py: { xs: 4, sm: 6 },
+                gap: { xs: 4, sm: 5 },
+                py: { xs: 6, sm: 8 },
                 textAlign: "center",
               }}
             >
               <Box
                 sx={{
-                  width: { xs: 56, sm: 64 },
-                  height: { xs: 56, sm: 64 },
+                  width: { xs: 64, sm: 72 },
+                  height: { xs: 64, sm: 72 },
                   borderRadius: "50%",
                   bgcolor: alpha(theme.palette.secondary.main, 0.06),
                   color: "secondary.main",
@@ -361,12 +395,12 @@ const Chat = ({ open, onClose }) => {
                   justifyContent: "center",
                 }}
               >
-                <Sparkles size={isMobile ? 24 : 28} strokeWidth={1.5} />
+                <Sparkles size={isMobile ? 28 : 32} strokeWidth={1.5} />
               </Box>
-              <Box sx={{ maxWidth: 300, px: { xs: 2, sm: 0 } }}>
+              <Box sx={{ maxWidth: 320, px: { xs: 2, sm: 0 } }}>
                 <Typography
                   variant={isMobile ? "subtitle1" : "h6"}
-                  sx={{ fontWeight: 600, mb: 1, fontSize: isMobile ? "1rem" : "1.125rem" }}
+                  sx={{ fontWeight: 600, mb: 1.5, fontSize: isMobile ? "1rem" : "1.125rem" }}
                 >
                   Hai, {firstName}!
                 </Typography>
@@ -393,15 +427,15 @@ const Chat = ({ open, onClose }) => {
                 sx={{
                   justifyContent: isAgent ? "flex-start" : "flex-end",
                   alignItems: "flex-end",
-                  gap: { xs: 0.75, sm: 1 },
-                  animation: `${fadeInUp} 0.25s ${theme.transitions.easing.easeOut}`,
+                  gap: { xs: 1, sm: 1.5 },
+                  animation: `${fadeInUp} 0.3s ${theme.transitions.easing.easeOut}`,
                 }}
               >
                 {isAgent && (
                   <Box
                     sx={{
-                      width: { xs: 24, sm: 28 },
-                      height: { xs: 24, sm: 28 },
+                      width: { xs: 28, sm: 32 },
+                      height: { xs: 28, sm: 32 },
                       borderRadius: borderRadius,
                       bgcolor: alpha(theme.palette.secondary.main, 0.08),
                       color: "secondary.main",
@@ -409,18 +443,18 @@ const Chat = ({ open, onClose }) => {
                       alignItems: "center",
                       justifyContent: "center",
                       flexShrink: 0,
-                      mb: 0.25,
+                      mb: 0.5,
                     }}
                   >
-                    <Sparkles size={isMobile ? 12 : 14} strokeWidth={1.5} />
+                    <Sparkles size={isMobile ? 14 : 16} strokeWidth={1.5} />
                   </Box>
                 )}
 
                 <Box
                   sx={{
                     maxWidth: isAgent ? { xs: "85%", sm: "80%" } : { xs: "75%", sm: "70%" },
-                    px: { xs: 1.5, sm: 2 },
-                    py: { xs: 1.25, sm: 1.5 },
+                    px: { xs: 2, sm: 2.5 },
+                    py: { xs: 1.5, sm: 2 },
                     borderRadius: isAgent
                       ? `${borderRadius} ${borderRadius} ${borderRadius} 4px`
                       : `${borderRadius} ${borderRadius} 4px ${borderRadius}`,
@@ -429,7 +463,7 @@ const Chat = ({ open, onClose }) => {
                       : alpha(theme.palette.secondary.main, 0.1),
                     color: "text.primary",
                     border: isAgent
-                      ? `1px solid ${alpha(theme.palette.divider, 0.4)}`
+                      ? `1px solid ${alpha(theme.palette.divider, 0.5)}`
                       : "1px solid transparent",
                     ...(msg.isError && {
                       bgcolor: alpha(theme.palette.error.main, 0.08),
@@ -458,14 +492,14 @@ const Chat = ({ open, onClose }) => {
               direction="row"
               sx={{
                 alignItems: "flex-end",
-                gap: { xs: 0.75, sm: 1 },
-                animation: `${fadeInUp} 0.25s ${theme.transitions.easing.easeOut}`,
+                gap: { xs: 1, sm: 1.5 },
+                animation: `${fadeInUp} 0.3s ${theme.transitions.easing.easeOut}`,
               }}
             >
               <Box
                 sx={{
-                  width: { xs: 24, sm: 28 },
-                  height: { xs: 24, sm: 28 },
+                  width: { xs: 28, sm: 32 },
+                  height: { xs: 28, sm: 32 },
                   borderRadius: borderRadius,
                   bgcolor: alpha(theme.palette.secondary.main, 0.08),
                   color: "secondary.main",
@@ -473,32 +507,32 @@ const Chat = ({ open, onClose }) => {
                   alignItems: "center",
                   justifyContent: "center",
                   flexShrink: 0,
-                  mb: 0.25,
+                  mb: 0.5,
                 }}
               >
-                <Sparkles size={isMobile ? 12 : 14} strokeWidth={1.5} />
+                <Sparkles size={isMobile ? 14 : 16} strokeWidth={1.5} />
               </Box>
               <Box
                 sx={{
-                  px: { xs: 2, sm: 2.5 },
-                  py: { xs: 1.75, sm: 2 },
+                  px: { xs: 2.5, sm: 3 },
+                  py: { xs: 2, sm: 2.5 },
                   borderRadius: `${borderRadius} ${borderRadius} ${borderRadius} 4px`,
                   bgcolor: alpha(theme.palette.secondary.main, 0.04),
-                  border: `1px solid ${alpha(theme.palette.divider, 0.4)}`,
+                  border: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
                   display: "flex",
                   alignItems: "center",
-                  gap: 0.75,
+                  gap: 1,
                 }}
               >
                 {[0, 1, 2].map((i) => (
                   <Box
                     key={`dot-${i}`}
                     sx={{
-                      width: 6,
-                      height: 6,
+                      width: 7,
+                      height: 7,
                       borderRadius: "50%",
                       bgcolor: "text.secondary",
-                      opacity: 0.4,
+                      opacity: 0.5,
                       animation: `${jumpDots} 1.4s ease-in-out infinite`,
                       animationDelay: `${i * 0.16}s`,
                     }}
@@ -508,7 +542,7 @@ const Chat = ({ open, onClose }) => {
             </Stack>
           )}
 
-          <Box sx={{ height: 4, flexShrink: 0 }} />
+          <Box sx={{ height: 8, flexShrink: 0 }} />
         </Box>
 
         {/* INPUT AREA */}
@@ -516,10 +550,9 @@ const Chat = ({ open, onClose }) => {
           direction="row"
           sx={{
             alignItems: "flex-end",
-            gap: { xs: 1, sm: 1.5 },
-            px: { xs: 2, sm: 3 },
-            py: { xs: 1.5, sm: 2.5 },
-            borderTop: `1px solid ${alpha(theme.palette.divider, 0.5)}`,
+            gap: { xs: 1.5, sm: 2 },
+            px: { xs: 2.5, sm: 3 },
+            py: { xs: 2, sm: 3 },
             flexShrink: 0,
           }}
         >
@@ -549,7 +582,7 @@ const Chat = ({ open, onClose }) => {
                 },
               },
               "& .MuiOutlinedInput-input": {
-                py: { xs: 1, sm: 1.25 },
+                py: { xs: 1.25, sm: 1.5 },
                 "&::placeholder": {
                   color: "text.disabled",
                   opacity: 0.7,
@@ -567,8 +600,8 @@ const Chat = ({ open, onClose }) => {
                       size="small"
                       aria-label="Kirim pesan"
                       sx={{
-                        width: { xs: 32, sm: 36 },
-                        height: { xs: 32, sm: 36 },
+                        width: { xs: 34, sm: 38 },
+                        height: { xs: 34, sm: 38 },
                         bgcolor: input.trim() ? "secondary.main" : "transparent",
                         color: input.trim()
                           ? "secondary.contrastText"
@@ -591,7 +624,7 @@ const Chat = ({ open, onClose }) => {
                         },
                       }}
                     >
-                      <Send size={isMobile ? 14 : 16} strokeWidth={2} />
+                      <Send size={isMobile ? 15 : 17} strokeWidth={2} />
                     </IconButton>
                   </InputAdornment>
                 ),

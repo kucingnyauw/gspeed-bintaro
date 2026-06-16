@@ -5,7 +5,6 @@ export { default as AppLoadable } from "./loader/Loadable";
 export { default as NotificationHandler } from "./dialog/Notifications";
 export { default as CopyButton } from "./button/CopyButton";
 
-
 export {
   BarChart,
   LineChart,
@@ -16,6 +15,8 @@ export {
   PolarAreaChart,
   BubbleChart,
 } from "./charts";
+
+export { DotGridDeco, HashDashDeco, GridPlusDeco } from "./decoration";
 
 export { default as Invoice } from "./documents/Invoice";
 export { default as SummaryCard } from "./card/SummaryCard";

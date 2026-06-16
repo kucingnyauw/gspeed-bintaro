@@ -19,7 +19,7 @@
 import { Box, Button, IconButton, Stack, Tooltip, Typography, useTheme } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { X, Sigma } from "lucide-react";
-import { useCalculator } from "../hooks";
+import { useCalculator } from "@layout/tools/hooks";
 
 /**
  * Konfigurasi tombol fungsi ilmiah per baris.

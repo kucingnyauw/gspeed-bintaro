@@ -1,3 +1,3 @@
-export { default as PrivateRoutes } from "./PrivateRoutes";
-export { default as PublicRoutes } from "./PublicRoutes";
-export { default as RoleRoutes } from "./RoleRoutes";
+export { default as PrivateGuard } from "./PrivateGuard";
+export { default as PublicGuard } from "./PublicGuard";
+export { default as RoleGuard } from "./RoleGuard";

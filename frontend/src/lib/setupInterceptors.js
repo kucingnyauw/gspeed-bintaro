@@ -1,11 +1,12 @@
 import Client from "@lib/client.js";
 import supabase from "@lib/supabase.js";
 import { showNotification } from "@store/notifications/notificationsSlice.js";
+import { setAuthStatus } from "@store/auth/authSlices.js";
 import { logger } from "@lib/logger.js";
 
 /**
- * Setup Axios Interceptors untuk request dan response.
- * Menangani auth token, error handling, retry untuk cold start, dan notifikasi.
+ * Setup Axios Interceptors untuk request dan response
+ * Menangani auth token, error handling, dan notifikasi
  *
  * @param {Object} params
  * @param {import("@reduxjs/toolkit").EnhancedStore} params.store - Redux store
@@ -131,23 +132,6 @@ export function setupInterceptors({ store }) {
           code: error.code,
           message: error.message,
         });
-
-        /**
-         * RETRY LOGIC untuk Render cold start.
-         * Jika server unreachable (cold start), retry dengan exponential backoff.
-         */
-        if (!config._retryCount || config._retryCount < 2) {
-          config._retryCount = (config._retryCount || 0) + 1;
-          const delay = Math.min(3000 * 2 ** (config._retryCount - 1), 12000);
-
-          logger.info(
-            `🔄 Retry ${config._retryCount}/2 dalam ${delay}ms untuk:`,
-            config.url
-          );
-
-          await new Promise((resolve) => setTimeout(resolve, delay));
-          return Client(config);
-        }
       } else if (error.code === "ECONNREFUSED") {
         errorCode = "CONNECTION_REFUSED";
         message =
@@ -162,6 +146,10 @@ export function setupInterceptors({ store }) {
         logger.debug("🛑 Request canceled:", config?.url);
       }
 
+      /**
+       * Handling untuk status 401 (Unauthorized)
+       * Hanya update Redux state, navigasi ditangani oleh PrivateGuard
+       */
       if (statusCode === 401 && !isRedirecting) {
         const currentPath = window.location.pathname;
 
@@ -169,9 +157,12 @@ export function setupInterceptors({ store }) {
           logger.debug("🔒 Already on login page, skipping redirect");
         } else {
           isRedirecting = true;
-          logger.warn("🔒 Unauthorized - Redirecting to login");
+          logger.warn("🔒 Unauthorized - Updating auth state to guest");
 
           try {
+            /**
+             * Clear Supabase session
+             */
             await supabase.auth.signOut();
 
             const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
@@ -179,15 +170,31 @@ export function setupInterceptors({ store }) {
               localStorage.removeItem(`sb-${projectId}-auth-token`);
             }
 
+            /**
+             * Save current path for redirect after login
+             */
             sessionStorage.setItem("redirectAfterLogin", currentPath);
 
-            setTimeout(() => {
-              window.location.href = "/login";
-            }, 100);
+            /**
+             * Update Redux state to guest
+             * PrivateGuard akan mendeteksi perubahan ini dan redirect ke login
+             */
+            store.dispatch(setAuthStatus("guest"));
+            store.dispatch({ type: "auth/resetAuthState" });
           } catch (err) {
             logger.error("❌ Error handling 401:", err.message);
-            isRedirecting = false;
-            window.location.href = "/login";
+            /**
+             * Tetap update state meskipun ada error
+             */
+            store.dispatch(setAuthStatus("guest"));
+store.dispatch({ type: "auth/resetAuthState" });
+          } finally {
+            /**
+             * Reset redirecting flag after delay
+             */
+            setTimeout(() => {
+              isRedirecting = false;
+            }, 1000);
           }
         }
 
@@ -202,7 +209,7 @@ export function setupInterceptors({ store }) {
       }
 
       /**
-       * Tampilkan notifikasi hanya untuk error yang bukan dari retry.
+       * Tampilkan notifikasi untuk error koneksi yang critical
        */
       const connectionErrors = [
         "NO_INTERNET_CONNECTION",
@@ -214,8 +221,7 @@ export function setupInterceptors({ store }) {
 
       if (
         connectionErrors.includes(errorCode) &&
-        !config?.skipErrorNotification &&
-        (!config._retryCount || config._retryCount >= 2)
+        !config?.skipErrorNotification
       ) {
         store.dispatch(
           showNotification({
@@ -243,7 +249,7 @@ export function setupInterceptors({ store }) {
 }
 
 /**
- * Mendapatkan judul error yang mudah dibaca berdasarkan error code.
+ * Mendapatkan judul error yang mudah dibaca berdasarkan error code
  *
  * @param {string} code - Error code dari response
  * @returns {string} Judul error dalam Bahasa Indonesia

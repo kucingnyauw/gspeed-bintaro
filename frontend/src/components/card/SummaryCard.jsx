@@ -77,15 +77,12 @@ const SummaryCard = memo(
           position: "relative",
           overflow: "hidden",
           boxShadow: theme.shadows[1],
-    
-          transition: theme.transitions.create(
-            ["transform", "box-shadow"],
-            { duration: theme.transitions.duration.short }
-          ),
+          transition: theme.transitions.create(["transform", "box-shadow"], {
+            duration: theme.transitions.duration.short,
+          }),
           "&:hover": {
             transform: "translateY(-4px)",
             boxShadow: theme.shadows[4],
-
           },
         }}
       >
@@ -97,6 +94,8 @@ const SummaryCard = memo(
             justifyContent: "center",
             position: "relative",
             zIndex: 1,
+            p: { xs: 2, sm: 2.5, md: 3 },
+            "&:last-child": { pb: { xs: 2, sm: 2.5, md: 3 } },
           }}
         >
           <Stack
@@ -104,7 +103,7 @@ const SummaryCard = memo(
             sx={{
               justifyContent: "space-between",
               alignItems: "flex-start",
-              gap: 2.5,
+              gap: { xs: 2, sm: 2.5 },
               width: "100%",
             }}
           >
@@ -112,7 +111,7 @@ const SummaryCard = memo(
               sx={{
                 flex: 1,
                 minWidth: 0,
-                gap: 1.5,
+                gap: { xs: 1, sm: 1.5 },
               }}
             >
               <Typography
@@ -215,8 +214,8 @@ const SummaryCard = memo(
                 alignItems: "center",
                 justifyContent: "center",
                 flexShrink: 0,
-                width: 48,
-                height: 48,
+                width: { xs: 40, sm: 44, md: 48 },
+                height: { xs: 40, sm: 44, md: 48 },
                 borderRadius: `${theme.shape.borderRadius}px`,
                 backgroundColor: alpha(mainColor, 0.1),
                 color: mainColor,
@@ -226,7 +225,7 @@ const SummaryCard = memo(
                 )}`,
               }}
             >
-              <Icon size={22} strokeWidth={2} />
+              <Icon size={20} strokeWidth={2} />
             </Box>
           </Stack>
         </CardContent>

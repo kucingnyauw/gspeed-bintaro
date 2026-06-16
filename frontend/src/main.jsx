@@ -37,6 +37,8 @@ import { setupInterceptors } from "@lib/setupInterceptors.js";
 import { register as registerServiceWorker } from "./serviceWorkerRegistration.js";
 import reportWebVitals from "./reportWebVitals.js";
 
+import "swiper/css"
+
 /**
  * Fonts — Open Sans
  */

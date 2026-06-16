@@ -1,11 +1,12 @@
 import { useState, useRef } from "react";
 import { Fab, Tooltip, Box, useTheme } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Calculator as CalcIcon,
   ListTodo,
   Bot,
-  Receipt ,
+  Receipt,
   Plus,
 } from "lucide-react";
 import { Calculator, Chat, Todo, TaxCalculator } from "./components";
@@ -38,10 +39,7 @@ const menuVariants = {
   },
 };
 
-/**
- * Komponen Customization untuk menampilkan akses cepat ke berbagai tools.
- */
-const Customization = () => {
+const Tools = () => {
   const theme = useTheme();
   const [open, setOpen] = useState(false);
   const [portalContent, setPortalContent] = useState(null);
@@ -53,6 +51,8 @@ const Customization = () => {
   };
 
   const handleClosePortal = () => setPortalContent(null);
+
+  const gradientBg = `linear-gradient(135deg, ${theme.palette.secondary.main} 0%, ${alpha(theme.palette.secondary.dark, 0.9)} 100%)`;
 
   return (
     <>
@@ -86,12 +86,7 @@ const Customization = () => {
               }}
             >
               {menuItems.map((item, i) => (
-                <Tooltip
-                  key={item.id}
-                  title={item.label}
-                  placement="left"
-                  arrow
-                >
+                <Tooltip key={item.id} title={item.label} placement="left" arrow>
                   <Box
                     component={motion.div}
                     custom={menuItems.length - 1 - i}
@@ -102,19 +97,20 @@ const Customization = () => {
                   >
                     <Fab
                       size="small"
-                      color="secondary"
                       onClick={() => handleMenuClick(item.id)}
                       sx={{
                         width: 44,
                         height: 44,
-                        boxShadow: theme.shadows[3],
+                        background: gradientBg,
+                        color: theme.palette.secondary.contrastText,
+                        boxShadow: `0 4px 16px ${alpha(theme.palette.secondary.main, 0.4)}`,
                         transition: theme.transitions.create(
                           ["transform", "box-shadow"],
                           { duration: theme.transitions.duration.shorter }
                         ),
                         "&:hover": {
                           transform: "scale(1.08)",
-                          boxShadow: theme.shadows[6],
+                          boxShadow: `0 8px 24px ${alpha(theme.palette.secondary.main, 0.5)}`,
                         },
                         "&:active": {
                           transform: "scale(0.95)",
@@ -131,25 +127,22 @@ const Customization = () => {
         </AnimatePresence>
 
         {/* Main FAB */}
-        <Tooltip
-          title={open ? "Tutup menu" : "Tools"}
-          placement="left"
-          arrow
-        >
+        <Tooltip title={open ? "Tutup menu" : "Tools"} placement="left" arrow>
           <Fab
-            color="secondary"
             onClick={() => setOpen(!open)}
             sx={{
               width: 48,
               height: 48,
-              boxShadow: theme.shadows[4],
+              background: gradientBg,
+              color: theme.palette.secondary.contrastText,
+              boxShadow: `0 4px 20px ${alpha(theme.palette.secondary.main, 0.5)}`,
               transition: theme.transitions.create(
                 ["transform", "box-shadow"],
                 { duration: theme.transitions.duration.standard }
               ),
               "&:hover": {
                 transform: "scale(1.08)",
-                boxShadow: theme.shadows[8],
+                boxShadow: `0 8px 28px ${alpha(theme.palette.secondary.main, 0.6)}`,
               },
               "&:active": {
                 transform: "scale(0.95)",
@@ -172,18 +165,12 @@ const Customization = () => {
       </Box>
 
       {/* Portals */}
-      <Calculator
-        open={portalContent === "calculator"}
-        onClose={handleClosePortal}
-      />
-      <TaxCalculator
-        open={portalContent === "tax"}
-        onClose={handleClosePortal}
-      />
+      <Calculator open={portalContent === "calculator"} onClose={handleClosePortal} />
+      <TaxCalculator open={portalContent === "tax"} onClose={handleClosePortal} />
       <Todo open={portalContent === "todos"} onClose={handleClosePortal} />
       <Chat open={portalContent === "chat"} onClose={handleClosePortal} />
     </>
   );
 };
 
-export default Customization;
+export default Tools;
