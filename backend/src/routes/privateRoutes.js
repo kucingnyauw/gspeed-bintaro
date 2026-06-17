@@ -227,14 +227,12 @@ privateRouter.get(
 privateRouter.get(
   `${prefix}/notifications/unread-count`,
   allRoles,
-  generalLimiter,
   NotificationController.getUnreadCount
 );
 
 privateRouter.get(
   `${prefix}/notifications/total-count`,
   allRoles,
-  generalLimiter,
   NotificationController.getTotalCount
 );
 

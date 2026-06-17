@@ -282,8 +282,7 @@ class UserService {
       `Halo **${fullName}**,`,
       ``,
       `Akun Anda telah berhasil dibuat sebagai **${roleLabel}**. Selamat bergabung di Bengkel POS.`,
-      ``,
-      `Silakan cek email Anda untuk verifikasi akun.`,
+      ``
     ].join("\n");
 
     await this.#sendNotification(userId, "Selamat Datang", welcomeMessage, "SUCCESS");
