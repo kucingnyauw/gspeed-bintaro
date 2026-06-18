@@ -15,6 +15,9 @@ class ExpenseRepository {
 
   #fullSelect = {
     ...this.#defaultSelect,
+    shiftId: true,
+    recordedById: true,
+    receiptId: true,
     shift: {
       select: {
         id: true,
@@ -52,6 +55,9 @@ class ExpenseRepository {
     category: true,
     date: true,
     createdAt: true,
+    shiftId: true,
+    recordedById: true,
+    receiptId: true,
     shift: {
       select: {
         id: true,
@@ -323,44 +329,44 @@ class ExpenseRepository {
   }
 
   /**
- * Menghapus banyak pengeluaran sekaligus
- * @param {string[]} ids - Array ID pengeluaran
- * @returns {Promise<{success: Array, failed: Array}>} Hasil penghapusan
- * @complexity O(n) - Batch delete dengan cascade handling dan partial success tracking
- */
-async deleteMany(ids) {
-  const results = { success: [], failed: [] };
+   * Menghapus banyak pengeluaran sekaligus
+   * @param {string[]} ids - Array ID pengeluaran
+   * @returns {Promise<{success: Array, failed: Array}>} Hasil penghapusan
+   * @complexity O(n) - Batch delete dengan cascade handling dan partial success tracking
+   */
+  async deleteMany(ids) {
+    const results = { success: [], failed: [] };
 
-  const batchSize = 10;
-  
-  for (let i = 0; i < ids.length; i += batchSize) {
-    const batch = ids.slice(i, i + batchSize);
+    const batchSize = 10;
     
-    try {
-      await prisma.$transaction(async (tx) => {
-        await tx.expense.deleteMany({
-          where: { id: { in: batch } }
-        });
-        
-        results.success.push(...batch);
-      });
-    } catch (error) {
-      for (const id of batch) {
-        try {
-          await tx.expense.delete({ where: { id } });
-          results.success.push(id);
-        } catch (individualError) {
-          results.failed.push({ 
-            id, 
-            error: individualError.message 
+    for (let i = 0; i < ids.length; i += batchSize) {
+      const batch = ids.slice(i, i + batchSize);
+      
+      try {
+        await prisma.$transaction(async (tx) => {
+          await tx.expense.deleteMany({
+            where: { id: { in: batch } }
           });
+          
+          results.success.push(...batch);
+        });
+      } catch (error) {
+        for (const id of batch) {
+          try {
+            await prisma.expense.delete({ where: { id } });
+            results.success.push(id);
+          } catch (individualError) {
+            results.failed.push({ 
+              id, 
+              error: individualError.message 
+            });
+          }
         }
       }
     }
-  }
 
-  return results;
-}
+    return results;
+  }
 }
 
 export default ExpenseRepository;

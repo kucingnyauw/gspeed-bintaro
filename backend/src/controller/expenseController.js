@@ -35,10 +35,10 @@ class ExpenseController {
   createExpense = CatchAsync.run(async (req, res) => {
     const payload = validate(createExpenseSchema, req.body);
     const file = req.asset;
-    const cashierId = req.user.id;
+    const userId = req.user.id;
 
     const expense = await this.expenseService.createExpense(
-      cashierId,
+      userId,
       payload,
       file
     );
@@ -111,22 +111,22 @@ class ExpenseController {
   });
 
   /**
-   * Mendapatkan pengeluaran berdasarkan kasir yang sedang login
+   * Mendapatkan pengeluaran berdasarkan user yang sedang login
    * @param {import('express').Request} req
    * @param {import('express').Response} res
    */
-  getExpensesByCashier = CatchAsync.run(async (req, res) => {
-    const cashierId = req.user.id;
+  getExpensesByUser = CatchAsync.run(async (req, res) => {
+    const userId = req.user.id;
     const query = validate(getExpensesQuerySchema, req.query);
 
-    const result = await this.expenseService.getExpensesByCashier(
-      cashierId,
+    const result = await this.expenseService.getExpensesByUser(
+      userId,
       query
     );
 
     res.status(200).json({
       success: true,
-      message: "Daftar pengeluaran kasir berhasil diambil",
+      message: "Daftar pengeluaran pengguna berhasil diambil",
       data: result.data.map((expense) => new ExpenseListDto(expense)),
       metadata: result.metadata,
     });

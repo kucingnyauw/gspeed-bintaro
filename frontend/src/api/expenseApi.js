@@ -23,12 +23,12 @@ export const getExpenses = async (params) => {
 };
 
 /**
- * Mendapatkan pengeluaran berdasarkan kasir yang login
+ * Mendapatkan pengeluaran berdasarkan user yang sedang login
  * @param {Object} [params]
  * @returns {Promise<Object>} Object berisi data dan metadata
  */
-export const getCashierExpenses = async (params) => {
-  const response = await Client.get("/expenses/cashier", { params });
+export const getUserExpenses = async (params) => {
+  const response = await Client.get("/expenses/user", { params });
   return { data: response.data, metadata: response.metadata };
 };
 

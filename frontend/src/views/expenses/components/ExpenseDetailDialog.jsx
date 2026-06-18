@@ -1,17 +1,33 @@
 /**
  * ExpenseDetailDialog - Dialog untuk menampilkan detail pengeluaran.
  *
+ * Menampilkan:
+ * - Bukti pembayaran (gambar besar di atas, atau empty state)
+ * - Informasi pengeluaran (judul, jumlah, kategori, tanggal, deskripsi)
+ *
  * @component
  * @param {Object} props
  * @param {Object} props.expense - Data expense
  * @param {boolean} props.open - Status dialog
  * @param {Function} props.onClose - Handler tutup dialog
- * @returns {JSX.Element}
+ * @returns {JSX.Element} Dialog detail pengeluaran
  */
 import { Receipt, X } from "lucide-react";
 import {
-  Box, Button, Card, Chip, Dialog, DialogActions, DialogContent,
-  DialogTitle, Divider, IconButton, Skeleton, Stack, Typography, useTheme,
+  Box,
+  Button,
+  Card,
+  Chip,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Divider,
+  IconButton,
+  Skeleton,
+  Stack,
+  Typography,
+  useTheme,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 
@@ -20,22 +36,46 @@ import { formatDateTime, formatToIdr, normalizeEnumText } from "@shared/utils";
 import { useExpenseDetailQuery } from "@views/expenses/hooks";
 import { useDevice } from "@hooks";
 
+/**
+ * DetailSkeleton - Skeleton loading untuk konten detail.
+ *
+ * @returns {JSX.Element} Skeleton placeholder
+ */
 const DetailSkeleton = () => (
   <Stack sx={{ gap: 3 }}>
-    <Skeleton variant="rounded" height={140} sx={{ minHeight: 120 }} />
-    <Skeleton variant="rounded" height={280} sx={{ minHeight: 240 }} />
+    <Skeleton variant="rounded" height={360} />
+    <Skeleton variant="rounded" height={140} />
   </Stack>
 );
 
 const ExpenseDetailDialog = ({ expense, onClose, open }) => {
   const theme = useTheme();
   const { isMobile } = useDevice();
+
+  /**
+   * Fetch detail pengeluaran. Hanya fetch jika dialog terbuka & ada ID.
+   */
   const { data: detailData, isLoading } = useExpenseDetailQuery(expense?.id, open);
+
+  /** @type {string} */
   const br = `${theme.shape.borderRadius}px`;
 
   return (
-    <Dialog fullWidth maxWidth="sm" onClose={onClose} open={open}
-      slotProps={{ paper: { sx: { borderRadius: br, overflow: "hidden" } } }}>
+    <Dialog
+      fullWidth
+      maxWidth="sm"
+      onClose={onClose}
+      open={open}
+      fullScreen={isMobile}
+      slotProps={{
+        paper: {
+          sx: {
+            borderRadius: isMobile ? 0 : br,
+            overflow: "hidden",
+          },
+        },
+      }}
+    >
       {/* Header */}
       <DialogTitle sx={{ pb: 1.5, px: { xs: 2.5, sm: 3 } }}>
         <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center" }}>
@@ -50,76 +90,60 @@ const ExpenseDetailDialog = ({ expense, onClose, open }) => {
 
       <Divider />
 
-      <DialogContent sx={{ pt: 2.5, px: { xs: 2, sm: 3 }, pb: { xs: 2, sm: 3 } }}>
+      <DialogContent sx={{ pt: 3, px: { xs: 2.5, sm: 3 }, pb: 3 }}>
         {isLoading ? (
           <DetailSkeleton />
         ) : detailData ? (
-          <Stack sx={{ gap: { xs: 2.5, sm: 3 } }}>
-            {/* Informasi Pengeluaran */}
-            <Card sx={{ border: `1px solid ${alpha(theme.palette.divider, 0.6)}`, boxShadow: "none", borderRadius: br }}>
-              <Box sx={{ p: { xs: 2.5, sm: 3 } }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2.5, fontSize: { xs: "0.8125rem", sm: "0.875rem" } }}>
-                  Informasi Pengeluaran
-                </Typography>
-                <Stack sx={{ gap: { xs: 1.5, sm: 2 } }}>
-                  {[
-                    { label: "Judul", value: detailData.title },
-                    { label: "Jumlah", value: `-${formatToIdr(detailData.amount)}`, bold: true, color: "error.main" },
-                    { label: "Kategori", value: <Chip color={expenseCategoryColorMap[detailData.category] || "default"} label={normalizeEnumText(ExpenseCategory[detailData.category] || detailData.category)} size="small" variant="outlined" sx={{ fontWeight: 500, fontSize: "0.75rem", height: 24 }} /> },
-                    { label: "Tanggal", value: formatDateTime(detailData.date) },
-                    ...(detailData.description ? [{ label: "Deskripsi", value: detailData.description, wrap: true }] : []),
-                  ].map((item, i) => (
-                    <Stack key={i} direction="row" sx={{ justifyContent: "space-between", alignItems: item.wrap ? "flex-start" : "center" }}>
-                      <Typography variant="body2" color="text.secondary" sx={{ flexShrink: 0, mr: 2, minWidth: 70 }}>{item.label}</Typography>
-                      {typeof item.value === "string" ? (
-                        <Typography variant="body2" sx={{ fontWeight: item.bold ? 600 : 500, color: item.color || "text.primary", textAlign: item.wrap ? "right" : "left", maxWidth: item.wrap ? "65%" : "auto", lineHeight: 1.5 }}>
-                          {item.value}
-                        </Typography>
-                      ) : item.value}
-                    </Stack>
-                  ))}
-                </Stack>
-              </Box>
-            </Card>
-
-            {/* Bukti Pembayaran */}
-            <Card sx={{ border: `1px solid ${alpha(theme.palette.divider, 0.6)}`, boxShadow: "none", borderRadius: br, overflow: "hidden" }}>
-              <Box sx={{ p: { xs: 2.5, sm: 3 }, pb: detailData.receipt?.url ? 2 : 0 }}>
-                <Typography variant="subtitle2" sx={{ fontWeight: 600, fontSize: { xs: "0.8125rem", sm: "0.875rem" } }}>
-                  Bukti Pembayaran
-                </Typography>
-              </Box>
+          <Stack sx={{ gap: 3 }}>
+            {/* Bukti Pembayaran - Posisi pertama, tinggi besar */}
+            <Card
+              sx={{
+                border: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
+                boxShadow: "none",
+                borderRadius: br,
+                overflow: "hidden",
+              }}
+            >
               {detailData.receipt?.url ? (
-                <Box sx={{ px: { xs: 2.5, sm: 3 }, pb: { xs: 2.5, sm: 3 } }}>
-                  <Box
-                    component="img"
-                    alt="Bukti Pembayaran"
-                    src={detailData.receipt.url}
-                    sx={{
-                      display: "block", width: "100%",
-                      height: { xs: 300, sm: 400, md: 480 },
-                      objectFit: "cover", borderRadius: br,
-                      bgcolor: alpha(theme.palette.divider, 0.1),
-                    }}
-                  />
-                </Box>
+                <Box
+                  component="img"
+                  alt="Bukti Pembayaran"
+                  src={detailData.receipt.url}
+                  sx={{
+                    display: "block",
+                    width: "100%",
+                    height: { xs: 320, sm: 420, md: 500 },
+                    objectFit: "cover",
+                  }}
+                />
               ) : (
-                <Box sx={{
-                  display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-                  py: { xs: 6, sm: 8 }, gap: 2,
-                  bgcolor: alpha(theme.palette.secondary.main, 0.02),
-                  mx: { xs: 2.5, sm: 3 }, mb: { xs: 2.5, sm: 3 }, borderRadius: br,
-                  minHeight: { xs: 200, sm: 260 },
-                }}>
-                  <Box sx={{
-                    width: { xs: 56, sm: 64 }, height: { xs: 56, sm: 64 },
-                    borderRadius: "50%", bgcolor: alpha(theme.palette.secondary.main, 0.06),
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                  }}>
-                    <Receipt size={isMobile ? 24 : 28} strokeWidth={1.5} style={{ opacity: 0.25 }} />
+                <Box
+                  sx={{
+                    display: "flex",
+                    flexDirection: "column",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    py: { xs: 8, sm: 10 },
+                    gap: 2.5,
+                    bgcolor: alpha(theme.palette.secondary.main, 0.02),
+                    minHeight: { xs: 280, sm: 360 },
+                  }}
+                >
+                  <Box
+                    sx={{
+                      width: { xs: 64, sm: 72 },
+                      height: { xs: 64, sm: 72 },
+                      borderRadius: "50%",
+                      bgcolor: alpha(theme.palette.secondary.main, 0.06),
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Receipt size={isMobile ? 28 : 32} strokeWidth={1.5} style={{ opacity: 0.2 }} />
                   </Box>
-                  <Stack sx={{ gap: 0.5, alignItems: "center" }}>
-                    <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500, fontSize: { xs: "0.8125rem", sm: "0.875rem" } }}>
+                  <Stack sx={{ gap: 0.5, alignItems: "center", textAlign: "center" }}>
+                    <Typography variant="body2" color="text.secondary" sx={{ fontWeight: 500 }}>
                       Tidak ada bukti pembayaran
                     </Typography>
                     <Typography variant="caption" color="text.disabled">
@@ -129,6 +153,60 @@ const ExpenseDetailDialog = ({ expense, onClose, open }) => {
                 </Box>
               )}
             </Card>
+
+            {/* Informasi Pengeluaran */}
+            <Card
+              sx={{
+                border: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
+                boxShadow: "none",
+                borderRadius: br,
+              }}
+            >
+              <Box sx={{ p: { xs: 2.5, sm: 3 } }}>
+                <Typography variant="subtitle2" sx={{ fontWeight: 600, mb: 2.5, fontSize: "0.875rem" }}>
+                  Informasi Pengeluaran
+                </Typography>
+
+                <Stack sx={{ gap: 2 }}>
+                  <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center" }}>
+                    <Typography variant="body2" color="text.secondary">Judul</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 500 }}>{detailData.title}</Typography>
+                  </Stack>
+
+                  <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center" }}>
+                    <Typography variant="body2" color="text.secondary">Jumlah</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 600, color: "error.main" }}>
+                      -{formatToIdr(detailData.amount)}
+                    </Typography>
+                  </Stack>
+
+                  <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center" }}>
+                    <Typography variant="body2" color="text.secondary">Kategori</Typography>
+                    <Chip
+                      color={expenseCategoryColorMap[detailData.category] || "default"}
+                      label={normalizeEnumText(ExpenseCategory[detailData.category] || detailData.category)}
+                      size="small"
+                      variant="outlined"
+                      sx={{ fontWeight: 500, fontSize: "0.75rem", height: 24 }}
+                    />
+                  </Stack>
+
+                  <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center" }}>
+                    <Typography variant="body2" color="text.secondary">Tanggal</Typography>
+                    <Typography variant="body2" sx={{ fontWeight: 500 }}>{formatDateTime(detailData.date)}</Typography>
+                  </Stack>
+
+                  {detailData.description && (
+                    <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "flex-start" }}>
+                      <Typography variant="body2" color="text.secondary" sx={{ flexShrink: 0, mr: 2 }}>Deskripsi</Typography>
+                      <Typography variant="body2" sx={{ fontWeight: 500, textAlign: "right", lineHeight: 1.5 }}>
+                        {detailData.description}
+                      </Typography>
+                    </Stack>
+                  )}
+                </Stack>
+              </Box>
+            </Card>
           </Stack>
         ) : null}
       </DialogContent>
@@ -136,7 +214,11 @@ const ExpenseDetailDialog = ({ expense, onClose, open }) => {
       <Divider />
 
       <DialogActions sx={{ px: { xs: 2.5, sm: 3 }, py: 2.5 }}>
-        <Button variant="outlined" onClick={onClose} sx={{ fontWeight: 500, textTransform: "none", borderRadius: br, px: 3 }}>
+        <Button
+          variant="outlined"
+          onClick={onClose}
+          sx={{ fontWeight: 500, textTransform: "none", borderRadius: br, px: 3 }}
+        >
           Tutup
         </Button>
       </DialogActions>

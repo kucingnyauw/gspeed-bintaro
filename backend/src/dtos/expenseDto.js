@@ -13,10 +13,12 @@ class ExpenseShiftDto {
     this.status = data.status;
     this.openedAt = data.openedAt;
     this.closedAt = data.closedAt;
-    this.cashier = {
-      id: data.cashier.id,
-      fullName: data.cashier.fullName,
-    };
+    this.cashier = data.cashier
+      ? {
+          id: data.cashier.id,
+          fullName: data.cashier.fullName,
+        }
+      : null;
   }
 }
 
@@ -57,6 +59,42 @@ class ExpenseReceiptDto {
 }
 
 /**
+ * Menentukan apakah expense bisa diedit berdasarkan role dan status shift
+ * @param {Object} data - Data expense
+ * @returns {boolean}
+ * @private
+ */
+function canEditExpense(data) {
+  if (!data.recordedBy) return false;
+
+  if (data.recordedBy.role === "ADMIN") return true;
+
+  if (data.recordedBy.role === "CASHIER") {
+    return data.shift && data.shift.status === "OPEN";
+  }
+
+  return false;
+}
+
+/**
+ * Menentukan apakah expense bisa dihapus berdasarkan role dan status shift
+ * @param {Object} data - Data expense
+ * @returns {boolean}
+ * @private
+ */
+function canDeleteExpense(data) {
+  if (!data.recordedBy) return false;
+
+  if (data.recordedBy.role === "ADMIN") return true;
+
+  if (data.recordedBy.role === "CASHIER") {
+    return data.shift && data.shift.status === "OPEN";
+  }
+
+  return false;
+}
+
+/**
  * DTO untuk response detail expense
  * @class ExpenseDetailDto
  */
@@ -71,8 +109,12 @@ class ExpenseDetailDto {
     this.createdAt = data.createdAt;
     this.updatedAt = data.updatedAt;
     this.shift = data.shift ? new ExpenseShiftDto(data.shift) : null;
-    this.recordedBy = new ExpenseRecordedByDto(data.recordedBy);
+    this.recordedBy = data.recordedBy
+      ? new ExpenseRecordedByDto(data.recordedBy)
+      : null;
     this.receipt = data.receipt ? new ExpenseReceiptDto(data.receipt) : null;
+    this.canEdit = canEditExpense(data);
+    this.canDelete = canDeleteExpense(data);
   }
 }
 
@@ -89,13 +131,17 @@ class ExpenseListDto {
     this.date = data.date;
     this.createdAt = data.createdAt;
     this.shift = data.shift ? new ExpenseShiftSummaryDto(data.shift) : null;
-    this.recordedBy = {
-      id: data.recordedBy.id,
-      fullName: data.recordedBy.fullName,
-    };
+    this.recordedBy = data.recordedBy
+      ? {
+          id: data.recordedBy.id,
+          fullName: data.recordedBy.fullName,
+        }
+      : null;
     this.receipt = data.receipt
       ? { id: data.receipt.id, url: data.receipt.url || null }
       : null;
+    this.canEdit = canEditExpense(data);
+    this.canDelete = canDeleteExpense(data);
   }
 }
 
@@ -113,6 +159,8 @@ class ExpenseUpdatedDto {
     this.date = data.date;
     this.createdAt = data.createdAt;
     this.updatedAt = data.updatedAt;
+    this.canEdit = canEditExpense(data);
+    this.canDelete = canDeleteExpense(data);
   }
 }
 

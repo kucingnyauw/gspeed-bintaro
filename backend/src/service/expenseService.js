@@ -10,10 +10,6 @@ import Storage from "#shared/utils/storage.js";
 import prisma from "#app/database.js";
 import logger from "#app/logger.js";
 
-/**
- * Service untuk mengelola logika bisnis pengeluaran
- * @class ExpenseService
- */
 class ExpenseService {
   constructor() {
     this.expenseRepo = new ExpenseRepository();
@@ -24,9 +20,41 @@ class ExpenseService {
   }
 
   /**
-   * Upload file bukti pengeluaran
+   * Validasi bahwa shift terkait masih terbuka khusus untuk kasir.
+   * Admin tidak terikat shift sehingga tidak divalidasi.
+   * @param {string} expenseId - ID pengeluaran
+   * @returns {Promise<Object>} Data pengeluaran
+   * @throws {ApiError} 404 - Pengeluaran tidak ditemukan
+   * @throws {ApiError} 409 - Shift sudah ditutup
+   * @private
+   */
+  async #validateShiftOpen(expenseId) {
+    const expense = await this.expenseRepo.findById(expenseId);
+    if (!expense) {
+      throw ApiError.notFound({
+        message: `Pengeluaran dengan ID '${expenseId}' tidak ditemukan.`,
+      });
+    }
+
+    if (
+      expense.recordedBy &&
+      expense.recordedBy.role === "CASHIER" &&
+      expense.shift
+    ) {
+      if (expense.shift.status !== "OPEN") {
+        throw ApiError.conflict({
+          message: "Shift sudah ditutup, pengeluaran tidak dapat dihapus.",
+        });
+      }
+    }
+
+    return expense;
+  }
+
+  /**
+   * Upload file bukti pengeluaran ke storage
    * @param {Object} file - File dari middleware
-   * @param {string} userId - ID user
+   * @param {string} userId - ID user pengupload
    * @returns {Promise<Object>} File record
    * @private
    */
@@ -43,10 +71,11 @@ class ExpenseService {
   }
 
   /**
-   * Menghapus file bukti lama
+   * Menghapus file bukti lama dari storage dan database.
+   * Tidak throw error untuk mencegah transaction gagal.
    * @param {string} fileId - ID file
-   * @param {string} expenseId - ID pengeluaran
-   * @returns {Promise<void>}
+   * @param {string} expenseId - ID pengeluaran terkait
+   * @returns {Promise<boolean>} Status keberhasilan penghapusan
    * @private
    */
   async #deleteReceipt(fileId, expenseId) {
@@ -56,19 +85,21 @@ class ExpenseService {
         await Storage.deleteFile(oldFile.path);
         await this.fileRepo.delete(oldFile.id);
       }
+      return true;
     } catch (err) {
       logger.warn("Gagal membersihkan file bukti lama", {
         expenseId,
         fileId,
         error: err.message,
       });
+      return false;
     }
   }
 
   /**
    * Mendapatkan label kategori dalam Bahasa Indonesia
-   * @param {string} category
-   * @returns {string}
+   * @param {string} category - Kategori pengeluaran
+   * @returns {string} Label kategori
    * @private
    */
   #getCategoryLabel(category) {
@@ -85,12 +116,12 @@ class ExpenseService {
   /**
    * Build notifikasi pengeluaran dalam format Markdown
    * @param {Object} params
-   * @param {string} params.eventTitle
-   * @param {Object} params.expense
-   * @param {string} [params.cashierName]
-   * @param {string} [params.shiftInfo]
-   * @param {boolean} [params.hasReceipt]
-   * @returns {string}
+   * @param {string} params.eventTitle - Judul event notifikasi
+   * @param {Object} params.expense - Data pengeluaran
+   * @param {string} [params.cashierName] - Nama kasir
+   * @param {string} [params.shiftInfo] - Informasi shift
+   * @param {boolean} [params.hasReceipt] - Status keberadaan bukti
+   * @returns {string} Pesan notifikasi format Markdown
    * @private
    */
   #buildExpenseNotification({
@@ -123,11 +154,11 @@ class ExpenseService {
   }
 
   /**
-   * Mengirim notifikasi ke user
-   * @param {string} userId
-   * @param {string} title
-   * @param {string} message
-   * @param {string} [type="INFO"]
+   * Mengirim notifikasi ke user tertentu
+   * @param {string} userId - ID user penerima
+   * @param {string} title - Judul notifikasi
+   * @param {string} message - Pesan notifikasi
+   * @param {string} [type="INFO"] - Tipe notifikasi
    * @returns {Promise<void>}
    * @private
    */
@@ -144,10 +175,10 @@ class ExpenseService {
   }
 
   /**
-   * Mengirim notifikasi ke semua admin
-   * @param {string} title
-   * @param {string} message
-   * @param {string} [type="INFO"]
+   * Mengirim notifikasi ke semua admin aktif
+   * @param {string} title - Judul notifikasi
+   * @param {string} message - Pesan notifikasi
+   * @param {string} [type="INFO"] - Tipe notifikasi
    * @returns {Promise<void>}
    * @private
    */
@@ -168,8 +199,9 @@ class ExpenseService {
   }
 
   /**
-   * Membuat pengeluaran baru
-   * @param {string} cashierId - ID kasir (sekaligus sebagai pencatat)
+   * Membuat pengeluaran baru.
+   * Admin tidak memerlukan shift aktif, kasir harus memiliki shift aktif.
+   * @param {string} userId - ID user pencatat
    * @param {Object} payload - Data pengeluaran
    * @param {string} payload.title - Judul pengeluaran
    * @param {string} [payload.description] - Deskripsi
@@ -181,27 +213,33 @@ class ExpenseService {
    * @throws {ApiError} 404 - Shift tidak ditemukan
    * @throws {ApiError} 409 - Shift sudah ditutup
    */
-  async createExpense(cashierId, payload, receiptFile) {
+  async createExpense(userId, payload, receiptFile) {
     const { amount, category } = payload;
+    const user = await this.userRepo.findById(userId);
+    let shiftId = null;
 
-    const activeShift = await this.shiftRepo.findActiveByCashier(cashierId);
-    if (!activeShift) {
-      throw ApiError.notFound({
-        message: `Kasir dengan ID '${cashierId}' tidak memiliki shift aktif.`,
-      });
+    if (user.role === "CASHIER") {
+      const activeShift = await this.shiftRepo.findActiveByCashier(userId);
+      if (!activeShift) {
+        throw ApiError.notFound({
+          message: `Kasir dengan ID '${userId}' tidak memiliki shift aktif.`,
+        });
+      }
+
+      if (activeShift.status !== "OPEN") {
+        throw ApiError.conflict({
+          message:
+            "Shift sudah ditutup, tidak dapat mencatat pengeluaran baru.",
+        });
+      }
+
+      shiftId = activeShift.id;
     }
 
-    if (activeShift.status !== "OPEN") {
-      throw ApiError.conflict({
-        message: "Shift sudah ditutup, tidak dapat mencatat pengeluaran baru.",
-      });
-    }
-
-    const shiftId = activeShift.id;
     let receiptId = null;
 
     if (receiptFile) {
-      const fileRecord = await this.#uploadReceipt(receiptFile, cashierId);
+      const fileRecord = await this.#uploadReceipt(receiptFile, userId);
       receiptId = fileRecord.id;
     }
 
@@ -214,31 +252,31 @@ class ExpenseService {
           category: category || "OTHER",
           date: payload.date || new Date(),
           shiftId,
-          recordedById: cashierId,
+          recordedById: userId,
           receiptId,
         },
       });
 
-      await tx.shift.update({
-        where: { id: shiftId },
-        data: { cashOut: { increment: amount } },
-      });
+      if (shiftId) {
+        await tx.shift.update({
+          where: { id: shiftId },
+          data: { cashOut: { increment: amount } },
+        });
+      }
 
       return newExpense;
     });
 
-    const cashier = await this.userRepo.findById(cashierId);
-
     const notificationMessage = this.#buildExpenseNotification({
       eventTitle: "Pengeluaran Baru Dicatat",
       expense,
-      cashierName: cashier?.fullName || "-",
-      shiftInfo: activeShift.id,
+      cashierName: user?.fullName || "-",
+      shiftInfo: shiftId || "Non-Shift",
       hasReceipt: !!receiptId,
     });
 
     await this.#sendNotification(
-      cashierId,
+      userId,
       `Pengeluaran - ${Currency.toIDR(amount)}`,
       notificationMessage,
       "INFO"
@@ -248,8 +286,8 @@ class ExpenseService {
       const adminMessage = this.#buildExpenseNotification({
         eventTitle: "Pengeluaran Signifikan",
         expense,
-        cashierName: cashier?.fullName || "-",
-        shiftInfo: activeShift.id,
+        cashierName: user?.fullName || "-",
+        shiftInfo: shiftId || "Non-Shift",
         hasReceipt: !!receiptId,
       });
 
@@ -265,7 +303,7 @@ class ExpenseService {
       title: expense.title,
       amount,
       shiftId,
-      recordedById: cashierId,
+      recordedById: userId,
       hasReceipt: !!receiptId,
     });
 
@@ -294,7 +332,8 @@ class ExpenseService {
   }
 
   /**
-   * Memperbarui pengeluaran
+   * Memperbarui pengeluaran.
+   * Hanya kasir yang divalidasi shiftnya, admin bebas mengupdate.
    * @param {string} expenseId - ID pengeluaran
    * @param {Object} payload - Data yang akan diupdate
    * @param {string} [payload.title] - Judul baru
@@ -306,6 +345,7 @@ class ExpenseService {
    * @param {string} userId - ID user yang melakukan update
    * @returns {Promise<Object>} Pengeluaran yang sudah diperbarui
    * @throws {ApiError} 404 - Pengeluaran tidak ditemukan
+   * @throws {ApiError} 409 - Shift sudah ditutup
    */
   async updateExpense(expenseId, payload, receiptFile, userId) {
     const existingExpense = await this.expenseRepo.findById(expenseId);
@@ -314,13 +354,26 @@ class ExpenseService {
         message: `Pengeluaran dengan ID '${expenseId}' tidak ditemukan.`,
       });
 
+    if (
+      existingExpense.recordedBy &&
+      existingExpense.recordedBy.role === "CASHIER" &&
+      existingExpense.shift
+    ) {
+      if (existingExpense.shift.status !== "OPEN") {
+        throw ApiError.conflict({
+          message: "Shift sudah ditutup, pengeluaran tidak dapat diperbarui.",
+        });
+      }
+    }
+
     let receiptId = existingExpense.receiptId;
 
     if (receiptFile) {
       const newFileRecord = await this.#uploadReceipt(receiptFile, userId);
       receiptId = newFileRecord.id;
-      if (existingExpense.receiptId)
+      if (existingExpense.receiptId) {
         await this.#deleteReceipt(existingExpense.receiptId, expenseId);
+      }
     }
 
     const updatedExpense = await prisma.$transaction(async (tx) => {
@@ -359,7 +412,7 @@ class ExpenseService {
     });
 
     await this.#sendNotification(
-      existingExpense.recordedById,
+      existingExpense.recordedBy?.id,
       `Pengeluaran Diperbarui - ${Currency.toIDR(updatedExpense.amount)}`,
       notificationMessage,
       "INFO"
@@ -376,7 +429,7 @@ class ExpenseService {
   }
 
   /**
-   * Mendapatkan daftar pengeluaran
+   * Mendapatkan daftar pengeluaran dengan filter dan paginasi
    * @param {Object} [query={}] - Parameter query
    * @param {number} [query.page] - Nomor halaman
    * @param {number} [query.limit] - Jumlah item per halaman
@@ -437,15 +490,15 @@ class ExpenseService {
   }
 
   /**
-   * Mendapatkan pengeluaran berdasarkan kasir
-   * @param {string} cashierId - ID kasir
+   * Mendapatkan pengeluaran berdasarkan user (admin atau kasir)
+   * @param {string} userId - ID user
    * @param {Object} [query={}] - Parameter query tambahan
-   * @returns {Promise<{data: Array, metadata: Object}>} Daftar pengeluaran kasir
+   * @returns {Promise<{data: Array, metadata: Object}>} Daftar pengeluaran user
    */
-  async getExpensesByCashier(cashierId, query = {}) {
+  async getExpensesByUser(userId, query = {}) {
     const result = await this.expenseRepo.findMany({
       ...query,
-      recordedById: cashierId,
+      recordedById: userId,
     });
 
     for (const expense of result.data) {
@@ -459,22 +512,32 @@ class ExpenseService {
   }
 
   /**
-   * Menghapus pengeluaran
+   * Menghapus pengeluaran.
+   * Admin bebas menghapus, kasir hanya bisa jika shift masih terbuka.
    * @param {string} expenseId - ID pengeluaran
    * @returns {Promise<void>}
    * @throws {ApiError} 404 - Pengeluaran tidak ditemukan
+   * @throws {ApiError} 409 - Shift sudah ditutup
    */
   async deleteExpense(expenseId) {
-    const expense = await this.expenseRepo.findById(expenseId);
-    if (!expense)
-      throw ApiError.notFound({
-        message: `Pengeluaran dengan ID '${expenseId}' tidak ditemukan.`,
-      });
+    const expense = await this.#validateShiftOpen(expenseId);
 
-    if (expense.receiptId)
+    if (expense.receiptId) {
       await this.#deleteReceipt(expense.receiptId, expenseId);
+    }
 
-    await this.expenseRepo.delete(expenseId);
+    await prisma.$transaction(async (tx) => {
+      if (expense.shiftId) {
+        await tx.shift.update({
+          where: { id: expense.shiftId },
+          data: { cashOut: { decrement: expense.amount } },
+        });
+      }
+
+      await tx.expense.delete({
+        where: { id: expenseId },
+      });
+    });
 
     const notificationMessage = this.#buildExpenseNotification({
       eventTitle: "Pengeluaran Dihapus",
@@ -482,7 +545,7 @@ class ExpenseService {
     });
 
     await this.#sendNotification(
-      expense.recordedById,
+      expense.recordedBy?.id,
       `Pengeluaran Dihapus - ${Currency.toIDR(expense.amount)}`,
       notificationMessage,
       "WARNING"
@@ -496,7 +559,8 @@ class ExpenseService {
   }
 
   /**
-   * Menghapus banyak pengeluaran sekaligus
+   * Menghapus banyak pengeluaran sekaligus.
+   * Admin bebas menghapus, kasir hanya bisa jika shift masih terbuka.
    * @param {string[]} expenseIds - Array ID pengeluaran
    * @returns {Promise<{summary: Object, details: Object}>} Ringkasan dan detail hasil penghapusan
    * @throws {ApiError} 400 - Tidak ada pengeluaran yang dipilih
@@ -512,20 +576,39 @@ class ExpenseService {
     const skippedExpenses = [];
 
     for (const id of expenseIds) {
-      const expense = await this.expenseRepo.findById(id);
-      if (!expense) {
-        skippedExpenses.push({ id, reason: "Pengeluaran tidak ditemukan" });
-        continue;
+      try {
+        const expense = await this.#validateShiftOpen(id);
+        validIds.push(expense);
+      } catch (err) {
+        skippedExpenses.push({
+          id,
+          reason: err.message || "Gagal memvalidasi pengeluaran",
+        });
       }
-
-      if (expense.receiptId) {
-        await this.#deleteReceipt(expense.receiptId, id);
-      }
-
-      validIds.push(id);
     }
 
-    if (validIds.length === 0) {
+    for (const expense of validIds) {
+      if (expense.receiptId) {
+        await this.#deleteReceipt(expense.receiptId, expense.id);
+      }
+
+      if (expense.shiftId) {
+        await prisma.$transaction(async (tx) => {
+          await tx.shift.update({
+            where: { id: expense.shiftId },
+            data: { cashOut: { decrement: expense.amount } },
+          });
+
+          await tx.expense.delete({
+            where: { id: expense.id },
+          });
+        });
+      }
+    }
+
+    const validExpenseIds = validIds.map((e) => e.id);
+
+    if (validExpenseIds.length === 0) {
       throw ApiError.badRequest({
         message:
           "Gagal menghapus. Tidak ada pengeluaran yang valid untuk dihapus.",
@@ -533,11 +616,11 @@ class ExpenseService {
       });
     }
 
-    const deleteResults = await this.expenseRepo.deleteMany(validIds);
+    const deleteResults = await this.expenseRepo.deleteMany(validExpenseIds);
 
     const summary = {
       total: expenseIds.length,
-      valid: validIds.length,
+      valid: validExpenseIds.length,
       skipped: skippedExpenses.length,
       deleted: deleteResults.success.length,
       failed: deleteResults.failed.length,

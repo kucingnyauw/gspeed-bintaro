@@ -29,7 +29,7 @@ import {
   ExpenseFormDialog,
 } from "@views/expenses/components";
 import {
-  useCashiersExpenseQuery,
+  useUserExpensesQuery,
   useExpenseDialog,
   useExpenseFilters,
 } from "@views/expenses/hooks";
@@ -90,7 +90,7 @@ const Expenses = () => {
     [page, limit, debouncedSearch, activeFilters]
   );
 
-  const { data, isLoading, refetch } = useCashiersExpenseQuery(params);
+  const { data, isLoading, refetch } = useUserExpensesQuery(params);
 
   const tableData = data?.data || [];
   const metadata = data?.metadata || {};
@@ -143,9 +143,16 @@ const Expenses = () => {
 
   const handleBulkDelete = useCallback(
     (ids) => {
-      openBulkDeleteDialog(ids, ids.length);
+      const deletableIds = ids.filter((id) => {
+        const row = tableData.find((item) => item.id === id);
+        return row?.canDelete !== false;
+      });
+
+      if (deletableIds.length === 0) return;
+
+      openBulkDeleteDialog(deletableIds, deletableIds.length);
     },
-    [openBulkDeleteDialog]
+    [openBulkDeleteDialog, tableData]
   );
 
   const handleCloseBulkDelete = useCallback(() => {
@@ -154,8 +161,12 @@ const Expenses = () => {
   }, [closeBulkDeleteDialog]);
 
   const handleSelectionChange = useCallback((newSelection) => {
-    setSelectedRows(newSelection);
-  }, []);
+    const validSelection = newSelection.filter((id) => {
+      const row = tableData.find((item) => item.id === id);
+      return row?.canDelete !== false;
+    });
+    setSelectedRows(validSelection);
+  }, [tableData]);
 
   const renderRow = useCallback(
     (row) => [
@@ -225,10 +236,11 @@ const Expenses = () => {
       </Box>,
 
       <Stack key={`action-${row.id}`} direction="row" sx={{ gap: 0.5 }}>
-        <Tooltip title="Edit">
+        <Tooltip title={row.canEdit ? "Edit" : "Shift sudah ditutup"}>
           <Box component="span" sx={{ display: "inline-flex" }}>
             <IconButton
               onClick={(e) => handleEditClick(e, row)}
+              disabled={!row.canEdit}
               size="small"
               aria-label="Edit Pengeluaran"
               sx={{
@@ -246,16 +258,22 @@ const Expenses = () => {
                   borderColor: alpha(theme.palette.secondary.main, 0.4),
                   color: theme.palette.secondary.main,
                 },
+                "&.Mui-disabled": {
+                  bgcolor: alpha(theme.palette.action.disabled, 0.08),
+                  borderColor: alpha(theme.palette.divider, 0.4),
+                  color: theme.palette.text.disabled,
+                },
               }}
             >
               <FilePenLine size={16} strokeWidth={1.5} />
             </IconButton>
           </Box>
         </Tooltip>
-        <Tooltip title="Hapus">
+        <Tooltip title={row.canDelete ? "Hapus" : "Shift sudah ditutup"}>
           <Box component="span" sx={{ display: "inline-flex" }}>
             <IconButton
               onClick={(e) => handleDeleteClick(e, row)}
+              disabled={!row.canDelete}
               size="small"
               aria-label="Hapus Pengeluaran"
               sx={{
@@ -272,6 +290,11 @@ const Expenses = () => {
                   bgcolor: alpha(theme.palette.error.main, 0.06),
                   borderColor: alpha(theme.palette.error.main, 0.4),
                   color: theme.palette.error.main,
+                },
+                "&.Mui-disabled": {
+                  bgcolor: alpha(theme.palette.action.disabled, 0.08),
+                  borderColor: alpha(theme.palette.divider, 0.4),
+                  color: theme.palette.text.disabled,
                 },
               }}
             >

@@ -1,4 +1,4 @@
-export { useExpensesHistoryQuery, useCashiersExpenseQuery } from "./useExpensesQuery";
+export { useExpensesHistoryQuery, useUserExpensesQuery } from "./useExpensesQuery";
 export { useExpenseDetailQuery } from "./useExpenseDetailQuery";
 export { useCreateExpenseMutation } from "./useCreateExpenseMutation";
 export { useUpdateExpenseMutation } from "./useUpdateExpenseMutation";

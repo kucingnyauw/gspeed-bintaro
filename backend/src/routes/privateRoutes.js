@@ -131,14 +131,24 @@ privateRouter.delete(
  * ============================================================================
  */
 
+/**
+ * @route POST /api/{version}/expenses
+ * @description Membuat pengeluaran baru
+ * @access Admin, Kasir
+ */
 privateRouter.post(
   `${prefix}/expenses`,
-  cashierOnly,
+  adminAndCashier,
   createLimiter,
   fileUploadOptional("receipt"),
   ExpenseController.createExpense
 );
 
+/**
+ * @route GET /api/{version}/expenses
+ * @description Mendapatkan daftar pengeluaran
+ * @access Admin, Kasir
+ */
 privateRouter.get(
   `${prefix}/expenses`,
   adminAndCashier,
@@ -147,14 +157,24 @@ privateRouter.get(
   ExpenseController.getExpenses
 );
 
+/**
+ * @route GET /api/{version}/expenses/user
+ * @description Mendapatkan pengeluaran berdasarkan user yang sedang login
+ * @access Admin, Kasir
+ */
 privateRouter.get(
-  `${prefix}/expenses/cashier`,
-  cashierOnly,
+  `${prefix}/expenses/user`,
+  adminAndCashier,
   generalLimiter,
   shortTimeout,
-  ExpenseController.getExpensesByCashier
+  ExpenseController.getExpensesByUser
 );
 
+/**
+ * @route GET /api/{version}/expenses/shift/:shiftId
+ * @description Mendapatkan pengeluaran berdasarkan shift
+ * @access Admin, Kasir
+ */
 privateRouter.get(
   `${prefix}/expenses/shift/:shiftId`,
   adminAndCashier,
@@ -162,6 +182,11 @@ privateRouter.get(
   ExpenseController.getExpensesByShift
 );
 
+/**
+ * @route GET /api/{version}/expenses/:id
+ * @description Mendapatkan detail pengeluaran
+ * @access Admin, Kasir
+ */
 privateRouter.get(
   `${prefix}/expenses/:id`,
   adminAndCashier,
@@ -169,17 +194,27 @@ privateRouter.get(
   ExpenseController.getExpenseById
 );
 
+/**
+ * @route PUT /api/{version}/expenses/:id
+ * @description Memperbarui pengeluaran
+ * @access Admin, Kasir
+ */
 privateRouter.put(
   `${prefix}/expenses/:id`,
-  cashierOnly,
+  adminAndCashier,
   createLimiter,
   fileUploadOptional("receipt"),
   ExpenseController.updateExpense
 );
 
+/**
+ * @route DELETE /api/{version}/expenses/:id
+ * @description Menghapus pengeluaran
+ * @access Admin, Kasir
+ */
 privateRouter.delete(
   `${prefix}/expenses/:id`,
-  cashierOnly,
+  adminAndCashier,
   createLimiter,
   ExpenseController.deleteExpense
 );
@@ -187,11 +222,11 @@ privateRouter.delete(
 /**
  * @route DELETE /api/{version}/expenses
  * @description Menghapus banyak pengeluaran sekaligus
- * @access Kasir
+ * @access Admin, Kasir
  */
 privateRouter.delete(
   `${prefix}/expenses`,
-  cashierOnly,
+  adminAndCashier,
   createLimiter,
   ExpenseController.deleteExpenses
 );

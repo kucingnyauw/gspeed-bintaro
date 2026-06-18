@@ -236,7 +236,7 @@ const menuItems = {
           type: "item",
           url: "/expenses",
           icon: Receipt,
-          roles: [Role.CASHIER],
+          roles: [Role.CASHIER , Role.ADMIN],
         },
         {
           id: "financeExpensesHistory",

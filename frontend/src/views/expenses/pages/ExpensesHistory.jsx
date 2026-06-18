@@ -1,5 +1,14 @@
 /**
- * ExpenseHistory - Komponen halaman untuk melihat riwayat pengeluaran dengan filter dan pencarian.
+ * ExpenseHistory - Halaman riwayat pengeluaran (read-only).
+ *
+ * Fitur:
+ * - Tabel riwayat pengeluaran dengan kolom: Judul, Jumlah, Kategori, Shift, Pencatat, Tanggal, Nota
+ * - Pencarian real-time dengan debounce
+ * - Filter berdasarkan kategori, rentang tanggal, dan sorting
+ * - Detail pengeluaran dengan double-click
+ * - Preview thumbnail nota
+ * - Server-side pagination
+ * - Read-only (tidak ada aksi edit/hapus)
  *
  * @component
  * @returns {JSX.Element} Halaman riwayat pengeluaran
@@ -25,13 +34,21 @@ import {
 
 const ExpenseHistory = () => {
   const theme = useTheme();
+
+  /** @type {[number, Function]} */
   const [page, setPage] = useState(1);
+
+  /** @type {[number, Function]} */
   const [limit, setLimit] = useState(10);
+
+  /** @type {[string, Function]} */
   const [search, setSearch] = useState("");
 
+  /** @type {string} */
   const debouncedSearch = useDebounce(search);
 
   const { detailDialog, openDetailDialog, closeDetailDialog } = useExpenseDialog();
+
   const {
     activeFilters,
     applyFilter,
@@ -43,18 +60,19 @@ const ExpenseHistory = () => {
     tempFilters,
   } = useExpenseFilters();
 
+  /**
+   * Query params untuk fetch data.
+   *
+   * @type {Object}
+   */
   const params = useMemo(
     () => ({
       page,
       limit,
       search: debouncedSearch,
       category: activeFilters.category || undefined,
-      startDate: activeFilters.startDate
-        ? activeFilters.startDate.toISOString()
-        : undefined,
-      endDate: activeFilters.endDate
-        ? activeFilters.endDate.toISOString()
-        : undefined,
+      startDate: activeFilters.startDate ? activeFilters.startDate.toISOString() : undefined,
+      endDate: activeFilters.endDate ? activeFilters.endDate.toISOString() : undefined,
       sortBy: activeFilters.sortBy || "date",
       sortOrder: activeFilters.sortOrder || "desc",
     }),
@@ -63,24 +81,53 @@ const ExpenseHistory = () => {
 
   const { data, isLoading, refetch } = useExpensesHistoryQuery(params);
 
+  /** @type {Array} */
   const tableData = data?.data || [];
+
+  /** @type {Object} */
   const metadata = data?.metadata || {};
 
+  /**
+   * Apply filter & reset ke halaman 1.
+   */
   const handleApplyFilter = useCallback(() => {
     applyFilter();
     setPage(1);
   }, [applyFilter]);
 
+  /**
+   * Reset filter & reset ke halaman 1.
+   */
   const handleResetFilter = useCallback(() => {
     resetFilter();
     setPage(1);
   }, [resetFilter]);
 
+  /**
+   * Handler double-click row untuk buka detail.
+   *
+   * @param {Object} row - Data pengeluaran
+   */
   const handleRowDoubleClick = useCallback(
     (row) => openDetailDialog(row),
     [openDetailDialog]
   );
 
+  /**
+   * Render satu baris tabel riwayat pengeluaran.
+   *
+   * @param {Object} row - Data pengeluaran
+   * @param {string} row.id - ID
+   * @param {string} row.title - Judul
+   * @param {string} [row.description] - Deskripsi
+   * @param {number} row.amount - Jumlah
+   * @param {string} row.category - Kategori
+   * @param {Object} [row.shift] - Data shift
+   * @param {Object} row.recordedBy - Pencatat
+   * @param {string} row.date - Tanggal
+   * @param {Object} [row.receipt] - Nota
+   * @returns {JSX.Element[]} Elemen sel tabel
+   */
   const renderRow = useCallback(
     (row) => [
       <Box key={`title-${row.id}`}>
@@ -92,12 +139,12 @@ const ExpenseHistory = () => {
             variant="caption"
             color="text.secondary"
             sx={{
-              fontWeight: 400,
               display: "block",
               maxWidth: 200,
               overflow: "hidden",
               textOverflow: "ellipsis",
               whiteSpace: "nowrap",
+              mt: 0.25,
             }}
           >
             {row.description}
@@ -105,7 +152,7 @@ const ExpenseHistory = () => {
         )}
       </Box>,
 
-      <Typography key={`amount-${row.id}`} variant="body2" color="error.main" sx={{ fontWeight: 400 }}>
+      <Typography key={`amount-${row.id}`} variant="body2" sx={{ fontWeight: 400, color: "error.main" }}>
         -{formatToIdr(row.amount)}
       </Typography>,
 
@@ -115,7 +162,7 @@ const ExpenseHistory = () => {
         label={normalizeEnumText(ExpenseCategory[row.category] || row.category)}
         size="small"
         variant="outlined"
-        sx={{ fontWeight: 400 }}
+        sx={{ fontWeight: 400, height: 24 }}
       />,
 
       <Box key={`shift-${row.id}`}>
@@ -123,17 +170,17 @@ const ExpenseHistory = () => {
           {row.shift?.id ? formatDateTime(row.shift.openedAt) : "—"}
         </Typography>
         {row.shift?.id && (
-          <Typography variant="caption" color="text.secondary" sx={{ fontWeight: 400 }}>
+          <Typography variant="caption" color="text.secondary">
             {row.shift.closedAt ? `s/d ${formatDateTime(row.shift.closedAt)}` : "Masih berjalan"}
           </Typography>
         )}
       </Box>,
 
-      <Typography key={`recordedBy-${row.id}`} variant="body2" sx={{ fontWeight: 400 }}>
+      <Typography key={`recordedBy-${row.id}`} variant="body2" color="text.secondary">
         {row.recordedBy?.fullName || "—"}
       </Typography>,
 
-      <Typography key={`date-${row.id}`} variant="body2" color="text.secondary" sx={{ fontWeight: 400 }}>
+      <Typography key={`date-${row.id}`} variant="body2" color="text.secondary">
         {formatDateTime(row.date)}
       </Typography>,
 
@@ -148,12 +195,11 @@ const ExpenseHistory = () => {
               height: 48,
               borderRadius: `${theme.shape.borderRadius}px`,
               objectFit: "cover",
-              border: "1px solid",
-              borderColor: alpha(theme.palette.divider, 0.8),
+              border: `1px solid ${alpha(theme.palette.divider, 0.6)}`,
             }}
           />
         ) : (
-          <Typography variant="body2" color="text.disabled" sx={{ fontWeight: 400 }}>
+          <Typography variant="body2" color="text.disabled">
             —
           </Typography>
         )}
@@ -162,6 +208,11 @@ const ExpenseHistory = () => {
     [theme]
   );
 
+  /**
+   * Action buttons di header tabel.
+   *
+   * @type {Array<{icon: React.ElementType, label: string, onClick: Function}>}
+   */
   const tableActions = useMemo(
     () => [
       { icon: ListFilter, label: "Filter", onClick: openFilter },
@@ -170,15 +221,31 @@ const ExpenseHistory = () => {
     [openFilter, refetch]
   );
 
+  /**
+   * Handler perubahan halaman.
+   *
+   * @param {Object} event - Event change
+   * @param {number} newPage - Nomor halaman baru
+   */
   const handlePageChange = useCallback((event, newPage) => {
     setPage(newPage);
   }, []);
 
+  /**
+   * Handler perubahan jumlah baris per halaman.
+   *
+   * @param {number} newLimit - Jumlah baris baru
+   */
   const handleRowsPerPageChange = useCallback((newLimit) => {
     setLimit(newLimit);
     setPage(1);
   }, []);
 
+  /**
+   * Handler perubahan input pencarian.
+   *
+   * @param {React.ChangeEvent} e - Event change
+   */
   const onSearchChange = useCallback((e) => {
     setSearch(e.target.value);
     setPage(1);
