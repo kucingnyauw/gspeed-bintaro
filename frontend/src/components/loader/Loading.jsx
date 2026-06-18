@@ -1,10 +1,18 @@
-import { Box, Backdrop } from "@mui/material";
-import { keyframes } from "@mui/system";
+/**
+ * AppLoading - Full-screen loading overlay yang menutupi seluruh halaman.
+ * Digunakan saat initial bootstrap atau auth check berlangsung.
+ * Background solid memastikan halaman di baliknya tidak terlihat.
+ *
+ * @component
+ * @returns {JSX.Element} Full-screen backdrop dengan animasi loading dots
+ */
+import { Box, Backdrop, useTheme } from "@mui/material";
+import { alpha, keyframes } from "@mui/material/styles";
 
 const pulse = keyframes`
   0%, 80%, 100% {
     transform: scale(0.6);
-    opacity: 0.4;
+    opacity: 0.3;
   }
   40% {
     transform: scale(1);
@@ -12,19 +20,15 @@ const pulse = keyframes`
   }
 `;
 
-/**
- * AppLoading - Simple loading indicator dengan animasi 3 dots
- * Digunakan saat initial bootstrap atau auth check berlangsung
- * @component
- * @returns {JSX.Element} Full-screen backdrop dengan animasi loading
- */
 const AppLoading = () => {
+  const theme = useTheme();
+
   const dotStyle = {
     display: "inline-block",
-    width: 10,
-    height: 10,
+    width: 12,
+    height: 12,
     borderRadius: "50%",
-    backgroundColor: "primary.main",
+    backgroundColor: "secondary.main",
     animation: `${pulse} 1.4s ease-in-out infinite`,
     mx: 0.5,
   };
@@ -33,7 +37,10 @@ const AppLoading = () => {
     <Backdrop
       open={true}
       sx={{
-        zIndex: 9999,
+        zIndex: theme.zIndex.modal + 10,
+        bgcolor: "background.default",
+        flexDirection: "column",
+        gap: 3,
       }}
     >
       <Box sx={{ display: "flex", alignItems: "center" }}>

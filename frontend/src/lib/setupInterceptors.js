@@ -5,8 +5,8 @@ import { setAuthStatus } from "@store/auth/authSlices.js";
 import { logger } from "@lib/logger.js";
 
 /**
- * Setup Axios Interceptors untuk request dan response
- * Menangani auth token, error handling, dan notifikasi
+ * Setup Axios Interceptors untuk request dan response.
+ * Menangani auth token, error handling, dan notifikasi.
  *
  * @param {Object} params
  * @param {import("@reduxjs/toolkit").EnhancedStore} params.store - Redux store
@@ -47,8 +47,7 @@ export function setupInterceptors({ store }) {
           success: false,
           statusCode: 0,
           code: "REQUEST_SETUP_FAILED",
-          message:
-            "Gagal menyiapkan permintaan. Silakan muat ulang halaman atau coba beberapa saat lagi.",
+          message: "Gagal menyiapkan permintaan. Silakan muat ulang halaman atau coba beberapa saat lagi.",
           details: null,
         });
       }
@@ -60,8 +59,7 @@ export function setupInterceptors({ store }) {
         success: false,
         statusCode: 0,
         code: "REQUEST_FAILED",
-        message:
-          "Permintaan tidak dapat diproses. Silakan periksa kembali dan coba lagi.",
+        message: "Permintaan tidak dapat diproses. Silakan periksa kembali dan coba lagi.",
         details: null,
       });
     }
@@ -69,11 +67,7 @@ export function setupInterceptors({ store }) {
 
   Client.interceptors.response.use(
     (response) => {
-      logger.debug(
-        "✅ Response berhasil:",
-        response.config.url,
-        response.status
-      );
+      logger.debug("✅ Response berhasil:", response.config.url, response.status);
       return response.data;
     },
 
@@ -82,8 +76,7 @@ export function setupInterceptors({ store }) {
 
       let statusCode = 500;
       let errorCode = "UNKNOWN_ERROR";
-      let message =
-        "Sistem sedang mengalami gangguan. Tim kami sedang menanganinya. Silakan coba beberapa saat lagi.";
+      let message = "Sistem sedang mengalami gangguan. Tim kami sedang menanganinya. Silakan coba beberapa saat lagi.";
       let details = null;
 
       if (response?.data) {
@@ -100,8 +93,7 @@ export function setupInterceptors({ store }) {
         });
       } else if (error.code === "ECONNABORTED") {
         errorCode = "CONNECTION_ABORTED";
-        message =
-          "Koneksi terputus secara tiba-tiba. Periksa koneksi internet Anda dan coba kembali.";
+        message = "Koneksi terputus secara tiba-tiba. Periksa koneksi internet Anda dan coba kembali.";
         logger.warn("🔌 Connection aborted (ECONNABORTED):", {
           url: config?.url,
           timeout: config?.timeout,
@@ -109,21 +101,18 @@ export function setupInterceptors({ store }) {
         });
       } else if (error.message?.includes("timeout")) {
         errorCode = "REQUEST_TIMEOUT";
-        message =
-          "Permintaan membutuhkan waktu terlalu lama. Periksa koneksi internet Anda dan coba kembali.";
+        message = "Permintaan membutuhkan waktu terlalu lama. Periksa koneksi internet Anda dan coba kembali.";
         logger.warn("⏰ Request timeout:", {
           url: config?.url,
           timeout: config?.timeout,
         });
       } else if (!navigator.onLine) {
         errorCode = "NO_INTERNET_CONNECTION";
-        message =
-          "Koneksi internet terputus. Periksa jaringan Anda dan coba kembali saat sudah terhubung.";
+        message = "Koneksi internet terputus. Periksa jaringan Anda dan coba kembali saat sudah terhubung.";
         logger.warn("📡 Tidak ada koneksi internet");
-      }  else if (error.code === "ECONNREFUSED") {
+      } else if (error.code === "ECONNREFUSED") {
         errorCode = "CONNECTION_REFUSED";
-        message =
-          "Koneksi ke server ditolak. Server mungkin sedang dalam pemeliharaan. Silakan coba beberapa saat lagi.";
+        message = "Koneksi ke server ditolak. Server mungkin sedang dalam pemeliharaan. Silakan coba beberapa saat lagi.";
         logger.error("🚫 Connection refused (ECONNREFUSED):", {
           url: config?.url,
           message: error.message,
@@ -135,82 +124,53 @@ export function setupInterceptors({ store }) {
       }
 
       /**
-       * Handling untuk status 401 (Unauthorized)
-       * Hanya update Redux state, navigasi ditangani oleh PrivateGuard
+       * Handling untuk status 401 (Unauthorized).
+       * Update Redux state ke guest, PrivateGuard akan redirect ke login.
        */
       if (statusCode === 401 && !isRedirecting) {
-        const currentPath = window.location.pathname;
+        isRedirecting = true;
+        logger.warn("🔒 Unauthorized - Updating auth state to guest");
 
-        if (currentPath.includes("/login") || currentPath === "/login") {
-          logger.debug("🔒 Already on login page, skipping redirect");
-        } else {
-          isRedirecting = true;
-          logger.warn("🔒 Unauthorized - Updating auth state to guest");
+        try {
+          await supabase.auth.signOut();
 
-          try {
-            /**
-             * Clear Supabase session
-             */
-            await supabase.auth.signOut();
-
-            const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
-            if (projectId) {
-              localStorage.removeItem(`sb-${projectId}-auth-token`);
-            }
-
-            /**
-             * Save current path for redirect after login
-             */
-            sessionStorage.setItem("redirectAfterLogin", currentPath);
-
-            /**
-             * Update Redux state to guest
-             * PrivateGuard akan mendeteksi perubahan ini dan redirect ke login
-             */
-            store.dispatch(setAuthStatus("guest"));
-            store.dispatch({ type: "auth/resetAuthState" });
-          } catch (err) {
-            logger.error("❌ Error handling 401:", err.message);
-            /**
-             * Tetap update state meskipun ada error
-             */
-            store.dispatch(setAuthStatus("guest"));
-store.dispatch({ type: "auth/resetAuthState" });
-          } finally {
-            /**
-             * Reset redirecting flag after delay
-             */
-            setTimeout(() => {
-              isRedirecting = false;
-            }, 1000);
+          const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
+          if (projectId) {
+            localStorage.removeItem(`sb-${projectId}-auth-token`);
           }
+
+          sessionStorage.setItem("redirectAfterLogin", window.location.pathname);
+        } catch (err) {
+          logger.error("❌ Error handling 401:", err.message);
         }
+
+        store.dispatch(setAuthStatus("guest"));
+        store.dispatch({ type: "auth/resetAuthState" });
+
+        setTimeout(() => {
+          isRedirecting = false;
+        }, 1000);
 
         return Promise.reject({
           success: false,
           statusCode: 401,
           code: "SESSION_EXPIRED",
-          message:
-            "Sesi Anda telah berakhir. Silakan masuk kembali untuk melanjutkan.",
+          message: "Sesi Anda telah berakhir. Silakan masuk kembali untuk melanjutkan.",
           details: null,
         });
       }
 
       /**
-       * Tampilkan notifikasi untuk error koneksi yang critical
+       * Tampilkan notifikasi untuk error koneksi yang critical.
        */
       const connectionErrors = [
         "NO_INTERNET_CONNECTION",
         "REQUEST_TIMEOUT",
         "CONNECTION_ABORTED",
         "CONNECTION_REFUSED",
-        "SERVER_UNREACHABLE",
       ];
 
-      if (
-        connectionErrors.includes(errorCode) &&
-        !config?.skipErrorNotification
-      ) {
+      if (connectionErrors.includes(errorCode) && !config?.skipErrorNotification) {
         store.dispatch(
           showNotification({
             title: getErrorTitle(errorCode),
@@ -237,7 +197,7 @@ store.dispatch({ type: "auth/resetAuthState" });
 }
 
 /**
- * Mendapatkan judul error yang mudah dibaca berdasarkan error code
+ * Mendapatkan judul error yang mudah dibaca berdasarkan error code.
  *
  * @param {string} code - Error code dari response
  * @returns {string} Judul error dalam Bahasa Indonesia
@@ -255,9 +215,6 @@ function getErrorTitle(code) {
 
     case "CONNECTION_REFUSED":
       return "Server Tidak Tersedia";
-
-    case "SERVER_UNREACHABLE":
-      return "Server Tidak Dapat Dijangkau";
 
     default:
       return "Gangguan Koneksi";
