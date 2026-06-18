@@ -101,7 +101,16 @@ const MainRoutes = {
   path: "/",
   element: <MainLayout />,
   children: [
-  
+    {
+      index: true,
+      element: (
+        <PrivateGuard>
+          <RoleGuard allowedRoles={[Role.ADMIN, Role.CASHIER, Role.MECHANIC]}>
+            <Dashboard />
+          </RoleGuard>
+        </PrivateGuard>
+      ),
+    },
     {
       path: "dashboard",
       element: (

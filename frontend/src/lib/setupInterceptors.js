@@ -120,19 +120,7 @@ export function setupInterceptors({ store }) {
         message =
           "Koneksi internet terputus. Periksa jaringan Anda dan coba kembali saat sudah terhubung.";
         logger.warn("📡 Tidak ada koneksi internet");
-      } else if (
-        error.message?.includes("Network Error") ||
-        error.code === "ERR_NETWORK"
-      ) {
-        errorCode = "SERVER_UNREACHABLE";
-        message =
-          "Layanan sedang tidak dapat dijangkau. Periksa koneksi internet Anda atau coba beberapa saat lagi.";
-        logger.error("🌐 Network error:", {
-          url: config?.url,
-          code: error.code,
-          message: error.message,
-        });
-      } else if (error.code === "ECONNREFUSED") {
+      }  else if (error.code === "ECONNREFUSED") {
         errorCode = "CONNECTION_REFUSED";
         message =
           "Koneksi ke server ditolak. Server mungkin sedang dalam pemeliharaan. Silakan coba beberapa saat lagi.";

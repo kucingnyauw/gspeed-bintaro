@@ -11,6 +11,7 @@
  * - Scroll otomatis ke bawah saat ada pesan baru
  * - Send button dengan animasi hover
  * - Error state untuk pesan gagal
+ * - Auto-adjust saat keyboard muncul di mobile (Visual Viewport API)
  * - Desain minimalis dengan spacing yang lega
  *
  * @component
@@ -19,7 +20,7 @@
  * @param {Function} props.onClose - Handler untuk menutup dialog
  * @returns {JSX.Element} Dialog chatbot
  */
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useSelector } from "react-redux";
 import {
   Box,
@@ -226,6 +227,58 @@ const Chat = ({ open, onClose }) => {
   const firstName = user?.fullName?.split(" ")[0] || "Sobat";
   const borderRadius = `${theme.shape.borderRadius}px`;
 
+  /**
+   * State untuk menyimpan tinggi keyboard (visual viewport offset).
+   * Digunakan untuk menambah padding-bottom saat keyboard muncul di mobile.
+   *
+   * @type {[number, Function]}
+   */
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  /**
+   * Handler untuk Visual Viewport resize.
+   * Menghitung selisih antara window height dan visual viewport height.
+   * Selisih ini adalah tinggi keyboard yang muncul.
+   *
+   * @type {Function}
+   */
+  const handleViewportResize = useCallback(() => {
+    if (window.visualViewport) {
+      const currentHeight = window.visualViewport.height;
+      const windowHeight = window.innerHeight;
+      const keyboardOffset = windowHeight - currentHeight;
+
+      // Hanya update jika offset > 0 (keyboard muncul)
+      if (keyboardOffset > 0) {
+        setKeyboardHeight(keyboardOffset);
+      } else {
+        setKeyboardHeight(0);
+      }
+    }
+  }, []);
+
+  /**
+   * Effect: Tambahkan listener untuk visual viewport resize.
+   * Bersihkan listener saat komponen unmount.
+   */
+  useEffect(() => {
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener("resize", handleViewportResize);
+      return () => {
+        window.visualViewport.removeEventListener("resize", handleViewportResize);
+      };
+    }
+  }, [handleViewportResize]);
+
+  /**
+   * Effect: Reset keyboard height saat dialog ditutup.
+   */
+  useEffect(() => {
+    if (!open) {
+      setKeyboardHeight(0);
+    }
+  }, [open]);
+
   useEffect(() => {
     if (open && !hasInitialized.current) {
       initChat();
@@ -286,6 +339,9 @@ const Chat = ({ open, onClose }) => {
           },
           overflow: "hidden",
           animation: `${fadeInUp} 0.3s ${theme.transitions.easing.easeOut}`,
+          // Tambahkan padding-bottom saat keyboard muncul
+          pb: isMobile ? `${keyboardHeight}px` : 0,
+          transition: "padding-bottom 0.2s ease",
         }}
       >
         {/* HEADER */}

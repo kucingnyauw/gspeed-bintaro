@@ -1,3 +1,12 @@
+/**
+ * MainLayout - Layout utama aplikasi untuk halaman yang memerlukan autentikasi.
+ *
+ * Tidak ada logic auth di sini. Semua guard & loading state ditangani oleh:
+ * - PrivateGuard (unknown → AppLoading, guest → redirect, auth/degraded → render)
+ *
+ * @component
+ * @returns {JSX.Element} Main layout dengan NavigationScroll wrapper
+ */
 import { useSelector } from "react-redux";
 import { Box } from "@mui/material";
 import { Outlet } from "react-router-dom";
@@ -10,25 +19,6 @@ import Tools from "@layout/tools/Tools.jsx";
 import MainContentStyled from "@layout/MainContentStyled.jsx";
 import NavigationScroll from "@layout/NavigationScroll.jsx";
 
-/**
- * MainLayout - Layout utama aplikasi untuk halaman yang memerlukan autentikasi.
- *
- * Struktur layout:
- * - Header (fixed top)
- * - Sidebar (collapsible)
- * - Main Content dengan Outlet untuk nested routes
- * - Footer
- * - Tools panel
- *
- * Fitur:
- * - Sidebar responsif dengan state open/close dari Redux
- * - Main content area dengan margin yang menyesuaikan sidebar
- * - Animasi fade-in pada content container
- * - Scroll to top otomatis saat navigasi (via NavigationScroll)
- *
- * @component
- * @returns {JSX.Element} Main layout dengan NavigationScroll wrapper
- */
 const MainLayout = () => {
   const isOpen = useSelector(selectSidebarIsOpen);
   const { isMobile } = useDevice();
