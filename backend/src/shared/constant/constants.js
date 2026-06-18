@@ -28,4 +28,3 @@ export const MAX_MECHANIC_ASSIGNMENTS = 10;
 export const SPAREPART_LOW_STOCK_THRESHOLD = 5;
 export const MAX_PAGE = 999;
 export const MAX_LIMIT = 100;
-export const DEFAULT_STARTING_CASH = 300000;

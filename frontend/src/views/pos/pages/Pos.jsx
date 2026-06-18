@@ -1,11 +1,26 @@
+/**
+ * Pos - Halaman Point of Sale dengan tampilan Grid & Tabel.
+ *
+ * Fitur:
+ * - Header (PosHeader) selalu tampil di kedua mode (view toggle, search, filter, refresh)
+ * - Toggle tampilan Grid/Tabel
+ * - Grid: Card produk + PosPagination
+ * - Tabel: AppTable standar (pagination sudah include)
+ * - Klik produk untuk tambah ke keranjang
+ * - Filter & pencarian real-time
+ *
+ * @component
+ * @returns {JSX.Element} Halaman POS
+ */
 import { useCallback, useMemo, useState } from "react";
 import { useDispatch } from "react-redux";
-import { ListFilter, RotateCcw, ShoppingCart } from "lucide-react";
+import { ShoppingCart } from "lucide-react";
 import {
   Avatar,
   Box,
   Chip,
   IconButton,
+  Skeleton,
   Stack,
   Tooltip,
   Typography,
@@ -17,7 +32,12 @@ import { AppTable } from "@components";
 import { useDebounce } from "@hooks";
 import { addItem } from "@store/cart/cartSlices.js";
 import { formatToIdr } from "@shared/utils";
-import { PosProductFilterDialog } from "@views/pos/components";
+import {
+  PosProductCard,
+  PosProductFilterDialog,
+  PosHeader,
+  PosPagination,
+} from "@views/pos/components";
 import {
   usePosProductsQuery,
   usePosProductFilters,
@@ -26,10 +46,21 @@ import {
 const Pos = () => {
   const theme = useTheme();
   const dispatch = useDispatch();
+  const br = `${theme.shape.borderRadius}px`;
+
+  /** @type {[string, Function]} */
+  const [viewMode, setViewMode] = useState("grid");
+
+  /** @type {[number, Function]} */
   const [page, setPage] = useState(1);
+
+  /** @type {[number, Function]} */
   const [limit, setLimit] = useState(10);
+
+  /** @type {[string, Function]} */
   const [search, setSearch] = useState("");
 
+  /** @type {string} */
   const debouncedSearch = useDebounce(search);
 
   const {
@@ -79,7 +110,10 @@ const Pos = () => {
 
   const { data, isLoading, refetch } = usePosProductsQuery(params);
 
+  /** @type {Array} */
   const tableData = data?.data || [];
+
+  /** @type {Object} */
   const metadata = data?.metadata || {};
 
   const handleApplyFilter = useCallback(() => {
@@ -93,9 +127,7 @@ const Pos = () => {
   }, [resetFilter]);
 
   const handleRowClick = useCallback(
-    (row) => {
-      handleAddToCart(row);
-    },
+    (row) => handleAddToCart(row),
     [handleAddToCart]
   );
 
@@ -117,45 +149,48 @@ const Pos = () => {
         sx={{
           width: 40,
           height: 40,
-          borderRadius: `${theme.shape.borderRadius}px`,
-          bgcolor: !row.image?.url
-            ? alpha(theme.palette.secondary.main, 0.08)
-            : "transparent",
-          color: !row.image?.url
-            ? theme.palette.secondary.main
-            : "transparent",
+          borderRadius: br,
+          bgcolor: !row.image?.url ? alpha(theme.palette.secondary.main, 0.08) : "transparent",
+          color: !row.image?.url ? "secondary.main" : "transparent",
           fontSize: "0.875rem",
-          fontWeight: 400,
+          fontWeight: 500,
         }}
       >
         {!row.image?.url && row.name?.charAt(0)?.toUpperCase()}
       </Avatar>,
 
-      <Typography key={`name-${row.id}`} variant="body2" sx={{ fontWeight: 400 }}>
+      <Typography key={`name-${row.id}`} variant="body2" sx={{ fontWeight: 500 }}>
         {row.name}
       </Typography>,
 
-      <Typography key={`desc-${row.id}`} variant="body2" color="text.secondary" sx={{ fontWeight: 400, maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+      <Typography
+        key={`desc-${row.id}`}
+        variant="body2"
+        color="text.secondary"
+        sx={{ maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+      >
         {row.description || "—"}
       </Typography>,
 
-      <Typography key={`sku-${row.id}`} variant="body2" color="text.secondary" sx={{ fontWeight: 400 }}>
+      <Typography key={`sku-${row.id}`} variant="body2" color="text.secondary">
         {row.sku || "—"}
       </Typography>,
 
-      <Typography key={`price-${row.id}`} variant="body2" sx={{ fontWeight: 400 }}>
+      <Typography key={`price-${row.id}`} variant="body2" sx={{ fontWeight: 500 }}>
         {formatToIdr(row.price)}
       </Typography>,
 
-      <Typography key={`cost-${row.id}`} variant="body2" color="text.secondary" sx={{ fontWeight: 400 }}>
+      <Typography key={`cost-${row.id}`} variant="body2" color="text.secondary">
         {row.cost > 0 ? formatToIdr(row.cost) : "—"}
       </Typography>,
 
       <Typography
         key={`stock-${row.id}`}
         variant="body2"
-        color={row.type === "SERVICE" ? "text.disabled" : row.stock > 0 ? "text.primary" : "error.main"}
-        sx={{ fontWeight: 400 }}
+        sx={{
+          fontWeight: 500,
+          color: row.type === "SERVICE" ? "text.disabled" : row.stock > 0 ? "text.primary" : "error.main",
+        }}
       >
         {row.type === "SERVICE" ? "—" : row.stock ?? 0}
       </Typography>,
@@ -166,11 +201,11 @@ const Pos = () => {
         label={row.type === "SERVICE" ? "Servis" : "Sparepart"}
         size="small"
         variant="outlined"
-        sx={{ fontWeight: 400 }}
+        sx={{ fontWeight: 500, height: 24 }}
       />,
 
       <Stack key={`action-${row.id}`} direction="row" sx={{ gap: 0.5 }}>
-        <Tooltip title="Tambah ke Keranjang">
+        <Tooltip title="Tambah ke Keranjang" placement="top" arrow>
           <Box component="span" sx={{ display: "inline-flex" }}>
             <IconButton
               onClick={(e) => handleAddToCartClick(e, row)}
@@ -179,17 +214,17 @@ const Pos = () => {
               sx={{
                 border: "1px solid",
                 borderColor: alpha(theme.palette.divider, 0.8),
-                borderRadius: `${theme.shape.borderRadius}px`,
+                borderRadius: br,
                 bgcolor: alpha(theme.palette.background.paper, 0.6),
-                color: theme.palette.text.secondary,
+                color: "text.secondary",
                 transition: theme.transitions.create(
                   ["background-color", "border-color", "color"],
                   { duration: theme.transitions.duration.shorter }
                 ),
                 "&:hover": {
-                  bgcolor: alpha(theme.palette.secondary.main, 0.06),
+                  bgcolor: alpha(theme.palette.secondary.main, 0.08),
                   borderColor: alpha(theme.palette.secondary.main, 0.4),
-                  color: theme.palette.secondary.main,
+                  color: "secondary.main",
                 },
               }}
             >
@@ -199,15 +234,7 @@ const Pos = () => {
         </Tooltip>
       </Stack>,
     ],
-    [handleAddToCartClick, theme]
-  );
-
-  const tableActions = useMemo(
-    () => [
-      { icon: ListFilter, label: "Filter", onClick: openFilter },
-      { icon: RotateCcw, label: "Refresh", onClick: () => refetch() },
-    ],
-    [openFilter, refetch]
+    [handleAddToCartClick, theme, br]
   );
 
   const handlePageChange = useCallback((event, newPage) => {
@@ -225,37 +252,117 @@ const Pos = () => {
   }, []);
 
   return (
-    <>
-      <AppTable
-        actions={tableActions}
-        count={metadata.totalPages || 0}
-        data={tableData}
-        emptyStateMessage="Tidak ada produk tersedia"
-        headers={[
-          "Gambar",
-          "Nama Produk",
-          "Deskripsi",
-          "SKU",
-          "Harga",
-          "HPP",
-          "Stok",
-          "Tipe",
-          "Aksi",
-        ]}
-        isLoading={isLoading}
-        onChange={handlePageChange}
-        onRowClick={handleRowClick}
-        onRowsPerPageChange={handleRowsPerPageChange}
-        onSearchChange={onSearchChange}
-        page={metadata.currentPage || page}
-        renderRow={renderRow}
-        rowsPerPage={limit}
-        rowsPerPageOptions={[5, 10, 25, 50]}
-        searchPlaceholder="Cari produk..."
+    <Stack sx={{ gap: 3 }}>
+      {/* Header - selalu tampil */}
+      <PosHeader
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
         searchVal={search}
-        subtitle="Pilih produk untuk ditambahkan ke keranjang"
-        title="Daftar Produk"
+        onSearchChange={onSearchChange}
+        onOpenFilter={openFilter}
+        onRefresh={() => refetch()}
       />
+
+      {viewMode === "grid" ? (
+        <>
+          {/* Grid produk */}
+          {isLoading ? (
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", md: "repeat(3, 1fr)", lg: "repeat(4, 1fr)" },
+                gap: 2.5,
+              }}
+            >
+              {[1, 2, 3, 4, 5, 6, 7, 8].map((i) => (
+                <Box
+                  key={i}
+                  sx={{
+                    borderRadius: br,
+                    border: `1px solid ${theme.palette.divider}`,
+                    p: 2.5,
+                  }}
+                >
+                  <Stack sx={{ gap: 2 }}>
+                    <Stack direction="row" sx={{ justifyContent: "space-between" }}>
+                      <Skeleton variant="rounded" width={44} height={44} />
+                      <Skeleton variant="rounded" width={64} height={24} />
+                    </Stack>
+                    <Skeleton width="70%" height={20} />
+                    <Skeleton width="90%" height={14} />
+                    <Stack direction="row" sx={{ justifyContent: "space-between", alignItems: "center" }}>
+                      <Skeleton width={80} height={28} />
+                      <Skeleton variant="rounded" width={36} height={36} />
+                    </Stack>
+                  </Stack>
+                </Box>
+              ))}
+            </Box>
+          ) : tableData.length === 0 ? (
+            <Stack
+              sx={{
+                alignItems: "center",
+                justifyContent: "center",
+                py: 10,
+                gap: 2,
+                textAlign: "center",
+              }}
+            >
+              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                Tidak ada produk tersedia
+              </Typography>
+              <Typography variant="caption" color="text.secondary">
+                Coba ubah filter atau kata kunci pencarian
+              </Typography>
+            </Stack>
+          ) : (
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: { xs: "1fr", sm: "repeat(2, 1fr)", md: "repeat(3, 1fr)", lg: "repeat(4, 1fr)" },
+                gap: 2.5,
+              }}
+            >
+              {tableData.map((product) => (
+                <PosProductCard
+                  key={product.id}
+                  product={product}
+                  onAddToCart={handleAddToCart}
+                />
+              ))}
+            </Box>
+          )}
+
+          {/* Pagination - hanya di grid */}
+          <PosPagination
+            page={page}
+            totalPages={metadata.totalPages || 0}
+            totalItems={metadata.total || 0}
+            itemsPerPage={limit}
+            isLoading={isLoading}
+            onPageChange={setPage}
+            onRowsPerPageChange={handleRowsPerPageChange}
+          />
+        </>
+      ) : (
+        /* Tabel - pagination sudah include di AppTable */
+        <AppTable
+          count={metadata.totalPages || 0}
+          data={tableData}
+          emptyStateMessage="Tidak ada produk tersedia"
+          headers={["Gambar", "Nama", "Deskripsi", "SKU", "Harga", "HPP", "Stok", "Tipe", "Aksi"]}
+          isLoading={isLoading}
+          onChange={handlePageChange}
+          onRowClick={handleRowClick}
+          onRowsPerPageChange={handleRowsPerPageChange}
+          page={metadata.currentPage || page}
+          renderRow={renderRow}
+          rowsPerPage={limit}
+          rowsPerPageOptions={[5, 10, 25, 50]}
+          subtitle="Pilih produk untuk ditambahkan ke keranjang"
+          title="Daftar Produk"
+        />
+      )}
 
       <PosProductFilterDialog
         onApply={handleApplyFilter}
@@ -265,7 +372,7 @@ const Pos = () => {
         open={filterOpen}
         tempFilters={tempFilters}
       />
-    </>
+    </Stack>
   );
 };
 
