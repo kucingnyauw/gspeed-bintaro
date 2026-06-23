@@ -64,7 +64,7 @@ class OrderRepository {
     id: true,
     status: true,
     createdAt: true,
-    note : true,
+    note: true,
     changedBy: {
       select: { id: true, fullName: true },
     },
@@ -258,6 +258,7 @@ class OrderRepository {
    * @complexity Before: O(n) - Full scan without composite index
    * @complexity After: O(log n) - Uses composite index (cashierId, status, deletedAt)
    */
+
   async findActiveByCashier(cashierId, query = {}) {
     const limit = query.limit || 10;
     const skip = ((query.page || 1) - 1) * limit;
@@ -265,9 +266,7 @@ class OrderRepository {
     const where = {
       cashierId,
       deletedAt: null,
-      status: query.status
-        ? query.status
-        : { notIn: ["COMPLETED", "CLOSED", "CANCELLED"] },
+      status: query.status ? query.status : { notIn: ["CLOSED", "CANCELLED"] },
     };
 
     if (query.search) {
@@ -363,136 +362,69 @@ class OrderRepository {
     });
   }
 
-
-/**
- * Membatalkan banyak pesanan sekaligus (hanya status DRAFT)
- * @param {string[]} ids - Array ID pesanan
- * @param {string} note - Catatan pembatalan
- * @param {string} userId - ID user yang membatalkan
- * @returns {Promise<{success: Array, failed: Array}>} Hasil pembatalan
- * @complexity O(n) - Batch cancel dengan partial success tracking
- */
-async cancelMany(ids, note, userId) {
-  const results = { success: [], failed: [] };
-
-  const batchSize = 10;
-  
-  for (let i = 0; i < ids.length; i += batchSize) {
-    const batch = ids.slice(i, i + batchSize);
-    
-    try {
-      await prisma.$transaction(async (tx) => {
-        const result = await tx.order.updateMany({
-          where: { 
-            id: { in: batch }, 
-            deletedAt: null,
-            status: "DRAFT"
-          },
-          data: { status: "CANCELLED", updatedAt: new Date() }
-        });
-
-        const cancelledIds = batch.filter((_, idx) => idx < result.count);
-
-        if (cancelledIds.length > 0) {
-          const historyData = cancelledIds.map(id => ({
-            orderId: id,
-            status: "CANCELLED",
-            changedById: userId,
-            note
-          }));
-
-          await tx.orderStatusHistory.createMany({
-            data: historyData
-          });
-        }
-
-        results.success.push(...batch);
-      });
-    } catch (error) {
-      for (const id of batch) {
-        try {
-          await prisma.$transaction(async (tx) => {
-            await tx.order.update({
-              where: { id, deletedAt: null, status: "DRAFT" },
-              data: { status: "CANCELLED", updatedAt: new Date() }
-            });
-
-            await tx.orderStatusHistory.create({
-              data: {
-                orderId: id,
-                status: "CANCELLED",
-                changedById: userId,
-                note
-              }
-            });
-          });
-
-          results.success.push(id);
-        } catch (individualError) {
-          results.failed.push({ id, error: individualError.message });
-        }
-      }
-    }
-  }
-
-  return results;
-}
-
-  async closeMany(ids, note, userId) {
+  /**
+   * Membatalkan banyak pesanan sekaligus (hanya status DRAFT)
+   * @param {string[]} ids - Array ID pesanan
+   * @param {string} note - Catatan pembatalan
+   * @param {string} userId - ID user yang membatalkan
+   * @returns {Promise<{success: Array, failed: Array}>} Hasil pembatalan
+   * @complexity O(n) - Batch cancel dengan partial success tracking
+   */
+  async cancelMany(ids, note, userId) {
     const results = { success: [], failed: [] };
-  
+
     const batchSize = 10;
-    
+
     for (let i = 0; i < ids.length; i += batchSize) {
       const batch = ids.slice(i, i + batchSize);
-      
+
       try {
         await prisma.$transaction(async (tx) => {
-          await tx.order.updateMany({
-            where: { id: { in: batch }, deletedAt: null },
-            data: { 
-              status: "CLOSED", 
-              closedAt: new Date(), 
-              updatedAt: new Date() 
-            }
+          const result = await tx.order.updateMany({
+            where: {
+              id: { in: batch },
+              deletedAt: null,
+              status: "DRAFT",
+            },
+            data: { status: "CANCELLED", updatedAt: new Date() },
           });
-  
-          const historyData = batch.map(id => ({
-            orderId: id,
-            status: "CLOSED",
-            changedById: userId,
-            note
-          }));
-  
-          await tx.orderStatusHistory.createMany({
-            data: historyData
-          });
+
+          const cancelledIds = batch.filter((_, idx) => idx < result.count);
+
+          if (cancelledIds.length > 0) {
+            const historyData = cancelledIds.map((id) => ({
+              orderId: id,
+              status: "CANCELLED",
+              changedById: userId,
+              note,
+            }));
+
+            await tx.orderStatusHistory.createMany({
+              data: historyData,
+            });
+          }
+
+          results.success.push(...batch);
         });
-  
-        results.success.push(...batch);
       } catch (error) {
         for (const id of batch) {
           try {
             await prisma.$transaction(async (tx) => {
               await tx.order.update({
-                where: { id, deletedAt: null },
-                data: { 
-                  status: "CLOSED", 
-                  closedAt: new Date(), 
-                  updatedAt: new Date() 
-                }
+                where: { id, deletedAt: null, status: "DRAFT" },
+                data: { status: "CANCELLED", updatedAt: new Date() },
               });
-  
+
               await tx.orderStatusHistory.create({
                 data: {
                   orderId: id,
-                  status: "CLOSED",
+                  status: "CANCELLED",
                   changedById: userId,
-                  note
-                }
+                  note,
+                },
               });
             });
-  
+
             results.success.push(id);
           } catch (individualError) {
             results.failed.push({ id, error: individualError.message });
@@ -500,11 +432,75 @@ async cancelMany(ids, note, userId) {
         }
       }
     }
-  
+
     return results;
   }
 
+  async closeMany(ids, note, userId) {
+    const results = { success: [], failed: [] };
 
+    const batchSize = 10;
+
+    for (let i = 0; i < ids.length; i += batchSize) {
+      const batch = ids.slice(i, i + batchSize);
+
+      try {
+        await prisma.$transaction(async (tx) => {
+          await tx.order.updateMany({
+            where: { id: { in: batch }, deletedAt: null },
+            data: {
+              status: "CLOSED",
+              closedAt: new Date(),
+              updatedAt: new Date(),
+            },
+          });
+
+          const historyData = batch.map((id) => ({
+            orderId: id,
+            status: "CLOSED",
+            changedById: userId,
+            note,
+          }));
+
+          await tx.orderStatusHistory.createMany({
+            data: historyData,
+          });
+        });
+
+        results.success.push(...batch);
+      } catch (error) {
+        for (const id of batch) {
+          try {
+            await prisma.$transaction(async (tx) => {
+              await tx.order.update({
+                where: { id, deletedAt: null },
+                data: {
+                  status: "CLOSED",
+                  closedAt: new Date(),
+                  updatedAt: new Date(),
+                },
+              });
+
+              await tx.orderStatusHistory.create({
+                data: {
+                  orderId: id,
+                  status: "CLOSED",
+                  changedById: userId,
+                  note,
+                },
+              });
+            });
+
+            results.success.push(id);
+          } catch (individualError) {
+            results.failed.push({ id, error: individualError.message });
+          }
+        }
+      }
+    }
+
+    return results;
+  }
 }
 
 export default OrderRepository;

@@ -18,6 +18,7 @@ import { formatDateTime, formatToIdr, normalizeEnumText } from "@shared/utils";
 import {
   OrderBulkCancelDialog,
   OrderCancelDialog,
+  OrderCloseDialog,
   OrderDetailDialog,
   OrderPaymentDialog,
 } from "@views/orders/components";
@@ -98,8 +99,9 @@ const Orders = () => {
 
   const canPay = (row) => row.status === "DRAFT" && !row.payment;
 
-  const canCancel = (status) =>
-    !["COMPLETED", "CLOSED", "CANCELLED"].includes(status);
+  const canCancel = (row) => row.status === "DRAFT";
+
+  const canClose = (row) => row.status === "COMPLETED";
 
   const getItemTypeChip = (row) => {
     const hasService = row.items?.some(
@@ -318,65 +320,89 @@ const Orders = () => {
           </Box>
         </Tooltip>
 
-        {row.status === "COMPLETED" && (
-          <Tooltip title="Tutup Pesanan">
-            <Box component="span" sx={{ display: "inline-flex" }}>
-              <IconButton
-                onClick={(e) => handleCloseOrder(e, row)}
-                size="small"
-                aria-label="Tutup Pesanan"
-                sx={{
-                  border: "1px solid",
-                  borderColor: alpha(theme.palette.divider, 0.8),
-                  borderRadius: `${theme.shape.borderRadius}px`,
-                  bgcolor: alpha(theme.palette.background.paper, 0.6),
-                  color: theme.palette.text.secondary,
-                  transition: theme.transitions.create(
-                    ["background-color", "border-color", "color"],
-                    { duration: theme.transitions.duration.shorter }
-                  ),
-                  "&:hover": {
-                    bgcolor: alpha(theme.palette.secondary.main, 0.06),
-                    borderColor: alpha(theme.palette.secondary.main, 0.4),
-                    color: theme.palette.secondary.main,
-                  },
-                }}
-              >
-                <CheckCircle size={16} strokeWidth={1.5} />
-              </IconButton>
-            </Box>
-          </Tooltip>
-        )}
+        <Tooltip
+          title={canClose(row) ? "Tutup Pesanan" : "Pesanan belum selesai"}
+        >
+          <Box component="span" sx={{ display: "inline-flex" }}>
+            <IconButton
+              onClick={(e) => canClose(row) && handleCloseOrder(e, row)}
+              disabled={!canClose(row)}
+              size="small"
+              aria-label="Tutup Pesanan"
+              sx={{
+                border: "1px solid",
+                borderColor: canClose(row)
+                  ? alpha(theme.palette.divider, 0.8)
+                  : alpha(theme.palette.divider, 0.4),
+                borderRadius: `${theme.shape.borderRadius}px`,
+                bgcolor: canClose(row)
+                  ? alpha(theme.palette.background.paper, 0.6)
+                  : "transparent",
+                color: canClose(row)
+                  ? theme.palette.text.secondary
+                  : theme.palette.action.disabled,
+                transition: theme.transitions.create(
+                  ["background-color", "border-color", "color"],
+                  { duration: theme.transitions.duration.shorter }
+                ),
+                "&:hover": canClose(row)
+                  ? {
+                      bgcolor: alpha(theme.palette.secondary.main, 0.06),
+                      borderColor: alpha(theme.palette.secondary.main, 0.4),
+                      color: theme.palette.secondary.main,
+                    }
+                  : {},
+              }}
+            >
+              <CheckCircle size={16} strokeWidth={1.5} />
+            </IconButton>
+          </Box>
+        </Tooltip>
 
-        {canCancel(row.status) && (
-          <Tooltip title="Batalkan Pesanan">
-            <Box component="span" sx={{ display: "inline-flex" }}>
-              <IconButton
-                onClick={(e) => handleCancel(e, row)}
-                size="small"
-                aria-label="Batalkan Pesanan"
-                sx={{
-                  border: "1px solid",
-                  borderColor: alpha(theme.palette.divider, 0.8),
-                  borderRadius: `${theme.shape.borderRadius}px`,
-                  bgcolor: alpha(theme.palette.background.paper, 0.6),
-                  color: theme.palette.text.secondary,
-                  transition: theme.transitions.create(
-                    ["background-color", "border-color", "color"],
-                    { duration: theme.transitions.duration.shorter }
-                  ),
-                  "&:hover": {
-                    bgcolor: alpha(theme.palette.error.main, 0.06),
-                    borderColor: alpha(theme.palette.error.main, 0.4),
-                    color: theme.palette.error.main,
-                  },
-                }}
-              >
-                <XCircle size={16} strokeWidth={1.5} />
-              </IconButton>
-            </Box>
-          </Tooltip>
-        )}
+        <Tooltip
+          title={
+            canCancel(row)
+              ? "Batalkan Pesanan"
+              : row.status === "CANCELLED"
+              ? "Pesanan sudah dibatalkan"
+              : "Hanya pesanan DRAFT yang bisa dibatalkan"
+          }
+        >
+          <Box component="span" sx={{ display: "inline-flex" }}>
+            <IconButton
+              onClick={(e) => canCancel(row) && handleCancel(e, row)}
+              disabled={!canCancel(row)}
+              size="small"
+              aria-label="Batalkan Pesanan"
+              sx={{
+                border: "1px solid",
+                borderColor: canCancel(row)
+                  ? alpha(theme.palette.divider, 0.8)
+                  : alpha(theme.palette.divider, 0.4),
+                borderRadius: `${theme.shape.borderRadius}px`,
+                bgcolor: canCancel(row)
+                  ? alpha(theme.palette.background.paper, 0.6)
+                  : "transparent",
+                color: canCancel(row)
+                  ? theme.palette.text.secondary
+                  : theme.palette.action.disabled,
+                transition: theme.transitions.create(
+                  ["background-color", "border-color", "color"],
+                  { duration: theme.transitions.duration.shorter }
+                ),
+                "&:hover": canCancel(row)
+                  ? {
+                      bgcolor: alpha(theme.palette.error.main, 0.06),
+                      borderColor: alpha(theme.palette.error.main, 0.4),
+                      color: theme.palette.error.main,
+                    }
+                  : {},
+              }}
+            >
+              <XCircle size={16} strokeWidth={1.5} />
+            </IconButton>
+          </Box>
+        </Tooltip>
       </Stack>,
     ],
     [handlePayment, handleCloseOrder, handleCancel, theme]
@@ -456,6 +482,12 @@ const Orders = () => {
         order={dialog.data}
         onClose={closeDialog}
         open={dialog.open && dialog.type === "cancel"}
+      />
+
+      <OrderCloseDialog
+        order={dialog.data}
+        onClose={closeDialog}
+        open={dialog.open && dialog.type === "close"}
       />
 
       <OrderBulkCancelDialog

@@ -1,23 +1,12 @@
 import { useCallback, useMemo, useState } from "react";
-import { CheckCircle, Download, ListFilter, RotateCcw } from "lucide-react";
-import {
-  Box,
-  Chip,
-  IconButton,
-  Stack,
-  Tooltip,
-  Typography,
-  useTheme,
-} from "@mui/material";
-import { alpha } from "@mui/material/styles";
+import { Download, ListFilter, RotateCcw } from "lucide-react";
+import { Box, Chip, Stack, Typography, useTheme } from "@mui/material";
 
 import { AppTable } from "@components";
 import { useDebounce } from "@hooks";
 import { OrderStatus, statusColorMap } from "@shared/constant";
 import { formatDateTime, formatToIdr, normalizeEnumText } from "@shared/utils";
 import {
-  OrderBulkCloseDialog,
-  OrderCloseDialog,
   OrderDetailDialog,
   OrderExportDialog,
   OrderFilterDialog,
@@ -27,33 +16,16 @@ import {
   useOrderFilters,
   useOrderHistoryQuery,
 } from "@views/orders/hooks";
-import { usePermission } from "@hooks";
 
-/**
- * OrderHistory - Halaman riwayat pesanan.
- * Action tutup pesanan hanya tersedia untuk kasir.
- *
- * @returns {JSX.Element} Halaman riwayat pesanan
- */
 const OrderHistory = () => {
   const theme = useTheme();
 
-  /** @type {boolean} Apakah user adalah kasir */
-  const isCashier = usePermission({ role: "CASHIER" });
-
-  /** @type {[number, Function]} State halaman */
   const [page, setPage] = useState(1);
 
-  /** @type {[number, Function]} State limit per halaman */
   const [limit, setLimit] = useState(10);
 
-  /** @type {[string, Function]} State pencarian */
   const [search, setSearch] = useState("");
 
-  /** @type {[Array, Function]} State selected rows */
-  const [selectedRows, setSelectedRows] = useState([]);
-
-  /** @type {string} Nilai pencarian yang sudah di-debounce */
   const debouncedSearch = useDebounce(search);
 
   const {
@@ -68,21 +40,14 @@ const OrderHistory = () => {
   } = useOrderFilters();
 
   const {
-    bulkCloseDialog,
-    clearSelection,
-    closeBulkCloseDialog,
     closeDetailDialog,
     closeExportDialog,
     detailDialog,
     exportDialog,
-    openBulkCloseDialog,
     openDetailDialog,
     openExportDialog,
   } = useOrderDialog();
 
-  /**
-   * Query params untuk fetch data.
-   */
   const params = useMemo(
     () => ({
       customerId: activeFilters.customer?.id || undefined,
@@ -102,92 +67,32 @@ const OrderHistory = () => {
 
   const { data, isLoading, refetch } = useOrderHistoryQuery(params);
 
-  /** @type {Array} Data tabel */
   const tableData = data?.data || [];
 
-  /** @type {Object} Metadata pagination */
   const metadata = data?.metadata || {};
 
-  /**
-   * Handler apply filter.
-   */
   const handleApplyFilter = useCallback(() => {
     applyFilter();
     setPage(1);
   }, [applyFilter]);
 
-  /**
-   * Handler reset filter.
-   */
   const handleResetFilter = useCallback(() => {
     resetFilter();
     setPage(1);
   }, [resetFilter]);
 
-  /**
-   * Handler double click row.
-   */
   const handleRowDoubleClick = useCallback(
     (row) => openDetailDialog(row),
     [openDetailDialog]
   );
 
-  /**
-   * Handler tutup pesanan.
-   */
-  const handleCloseOrder = useCallback(
-    (e, row) => {
-      e.stopPropagation();
-      openDetailDialog(row);
-    },
-    [openDetailDialog]
-  );
-
-  /**
-   * Handler bulk close.
-   */
-  const handleBulkClose = useCallback(
-    (ids) => {
-      openBulkCloseDialog(ids, ids.length);
-    },
-    [openBulkCloseDialog]
-  );
-
-  /**
-   * Handler close bulk close dialog.
-   */
-  const handleCloseBulkClose = useCallback(() => {
-    closeBulkCloseDialog();
-    setSelectedRows([]);
-  }, [closeBulkCloseDialog]);
-
-  /**
-   * Handler perubahan seleksi.
-   */
-  const handleSelectionChange = useCallback((newSelection) => {
-    setSelectedRows(newSelection);
-  }, []);
-
-  /**
-   * Cek apakah pesanan bisa ditutup.
-   *
-   * @param {Object} row - Data pesanan
-   * @returns {boolean}
-   */
-  const canClose = (row) => {
-    if (row.status !== "COMPLETED") return false;
-    return row.items?.some((item) => item.product?.type === "SERVICE") ?? false;
-  };
-
-  /**
-   * Mendapatkan chip tipe item.
-   *
-   * @param {Object} row - Data pesanan
-   * @returns {JSX.Element}
-   */
   const getItemTypeChip = (row) => {
-    const hasService = row.items?.some((item) => item.product?.type === "SERVICE");
-    const hasSparepart = row.items?.some((item) => item.product?.type === "SPAREPART");
+    const hasService = row.items?.some(
+      (item) => item.product?.type === "SERVICE"
+    );
+    const hasSparepart = row.items?.some(
+      (item) => item.product?.type === "SPAREPART"
+    );
 
     if (hasService && hasSparepart) {
       return (
@@ -222,15 +127,13 @@ const OrderHistory = () => {
         />
       );
     }
-    return <Typography variant="caption" color="text.disabled">—</Typography>;
+    return (
+      <Typography variant="caption" color="text.disabled">
+        —
+      </Typography>
+    );
   };
 
-  /**
-   * Mendapatkan chip status pembayaran.
-   *
-   * @param {Object} row - Data pesanan
-   * @returns {JSX.Element}
-   */
   const getPaymentChip = (row) => {
     const status = row.paymentStatus;
 
@@ -278,146 +181,62 @@ const OrderHistory = () => {
     );
   };
 
-  /**
-   * Mendapatkan action buttons per row.
-   * Hanya ditampilkan untuk kasir.
-   *
-   * @param {Object} row - Data pesanan
-   * @returns {JSX.Element}
-   */
-  const getRowActions = useCallback(
-    (row) => {
-      if (!isCashier) return null;
-
-      const closeable = canClose(row);
-
-      return (
-        <Stack direction="row" spacing={0.5}>
-          <Tooltip
-            title={
-              row.status === "CLOSED"
-                ? "Pesanan sudah ditutup"
-                : row.status === "COMPLETED" && !closeable
-                ? "Pesanan sparepart tidak perlu ditutup"
-                : closeable
-                ? "Tutup Pesanan"
-                : "Pesanan belum selesai"
-            }
-          >
-            <Box component="span" sx={{ display: "inline-flex" }}>
-              <IconButton
-                onClick={(e) => closeable && handleCloseOrder(e, row)}
-                disabled={!closeable}
-                size="small"
-                aria-label="Tutup Pesanan"
-                sx={{
-                  border: "1px solid",
-                  borderColor: closeable
-                    ? alpha(theme.palette.divider, 0.8)
-                    : alpha(theme.palette.divider, 0.4),
-                  borderRadius: `${theme.shape.borderRadius}px`,
-                  bgcolor: closeable
-                    ? alpha(theme.palette.background.paper, 0.6)
-                    : "transparent",
-                  color: closeable
-                    ? theme.palette.text.secondary
-                    : theme.palette.action.disabled,
-                  transition: theme.transitions.create(
-                    ["background-color", "border-color", "color"],
-                    { duration: theme.transitions.duration.shorter }
-                  ),
-                  "&:hover": closeable
-                    ? {
-                        bgcolor: alpha(theme.palette.secondary.main, 0.06),
-                        borderColor: alpha(theme.palette.secondary.main, 0.4),
-                        color: theme.palette.secondary.main,
-                      }
-                    : {},
-                }}
-              >
-                <CheckCircle size={16} strokeWidth={1.5} />
-              </IconButton>
-            </Box>
-          </Tooltip>
-        </Stack>
-      );
-    },
-    [handleCloseOrder, theme, isCashier]
-  );
-
-  /**
-   * Render row untuk AppTable.
-   */
-  const renderRow = useCallback(
-    (row) => {
-      const baseColumns = [
-        <Typography key={`order-${row.id}`} variant="body2" fontWeight={400}>
-          {row.orderNumber}
-        </Typography>,
-        <Typography key={`total-${row.id}`} variant="body2" fontWeight={400}>
-          {formatToIdr(row.total)}
-        </Typography>,
-        <Chip
-          key={`status-${row.id}`}
-          color={statusColorMap[row.status] || "default"}
-          label={normalizeEnumText(OrderStatus[row.status] || row.status)}
-          size="small"
-          variant="outlined"
-          sx={{ fontWeight: 400 }}
-        />,
-        <Box key={`payment-${row.id}`}>
-          {getPaymentChip(row)}
-        </Box>,
-        <Box key={`items-${row.id}`}>
-          <Typography
-            variant="body2"
-            fontWeight={400}
-            sx={{
-              maxWidth: 180,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {row.items?.[0]?.productName || "—"}
+  const renderRow = useCallback((row) => {
+    return [
+      <Typography key={`order-${row.id}`} variant="body2" fontWeight={400}>
+        {row.orderNumber}
+      </Typography>,
+      <Typography key={`total-${row.id}`} variant="body2" fontWeight={400}>
+        {formatToIdr(row.total)}
+      </Typography>,
+      <Chip
+        key={`status-${row.id}`}
+        color={statusColorMap[row.status] || "default"}
+        label={normalizeEnumText(OrderStatus[row.status] || row.status)}
+        size="small"
+        variant="outlined"
+        sx={{ fontWeight: 400 }}
+      />,
+      <Box key={`payment-${row.id}`}>{getPaymentChip(row)}</Box>,
+      <Box key={`items-${row.id}`}>
+        <Typography
+          variant="body2"
+          fontWeight={400}
+          sx={{
+            maxWidth: 180,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {row.items?.[0]?.productName || "—"}
+        </Typography>
+        {row.totalItems > 1 && (
+          <Typography variant="caption" color="text.secondary" fontWeight={400}>
+            +{row.totalItems - 1} item lainnya
           </Typography>
-          {row.totalItems > 1 && (
-            <Typography variant="caption" color="text.secondary" fontWeight={400}>
-              +{row.totalItems - 1} item lainnya
-            </Typography>
-          )}
-        </Box>,
-        <Box key={`type-${row.id}`}>
-          {getItemTypeChip(row)}
-        </Box>,
-        <Typography key={`customer-${row.id}`} variant="body2" fontWeight={400}>
-          {row.customer?.name || "—"}
-        </Typography>,
-        <Typography key={`cashier-${row.id}`} variant="body2" fontWeight={400}>
-          {row.cashier?.fullName || "—"}
-        </Typography>,
-        <Typography key={`date-${row.id}`} variant="body2" color="text.secondary" fontWeight={400}>
-          {formatDateTime(row.createdAt)}
-        </Typography>,
-      ];
+        )}
+      </Box>,
+      <Box key={`type-${row.id}`}>{getItemTypeChip(row)}</Box>,
+      <Typography key={`customer-${row.id}`} variant="body2" fontWeight={400}>
+        {row.customer?.name || "—"}
+      </Typography>,
+      <Typography key={`cashier-${row.id}`} variant="body2" fontWeight={400}>
+        {row.cashier?.fullName || "—"}
+      </Typography>,
+      <Typography
+        key={`date-${row.id}`}
+        variant="body2"
+        color="text.secondary"
+        fontWeight={400}
+      >
+        {formatDateTime(row.createdAt)}
+      </Typography>,
+    ];
+  }, []);
 
-      const actions = getRowActions(row);
-
-      if (actions) {
-        baseColumns.push(actions);
-      }
-
-      return baseColumns;
-    },
-    [getRowActions]
-  );
-
-  /**
-   * Header kolom tabel.
-   * Kolom "Aksi" hanya ditampilkan untuk kasir.
-   */
   const tableHeaders = useMemo(() => {
-    const baseHeaders = [
+    return [
       "No. Order",
       "Total",
       "Status",
@@ -428,55 +247,25 @@ const OrderHistory = () => {
       "Kasir",
       "Tanggal",
     ];
+  }, []);
 
-    if (isCashier) {
-      baseHeaders.push("Aksi");
-    }
-
-    return baseHeaders;
-  }, [isCashier]);
-
-  /**
-   * Action buttons di header tabel.
-   * "Tutup Terpilih" hanya untuk kasir.
-   */
   const tableActions = useMemo(() => {
-    const baseActions = [
+    return [
       { icon: Download, label: "Export CSV", onClick: openExportDialog },
       { icon: ListFilter, label: "Filter", onClick: openFilter },
       { icon: RotateCcw, label: "Refresh", onClick: () => refetch() },
     ];
+  }, [openExportDialog, openFilter, refetch]);
 
-    if (isCashier) {
-      baseActions.push({
-        icon: CheckCircle,
-        label: "Tutup Terpilih",
-        onClick: handleBulkClose,
-        isBulkAction: true,
-      });
-    }
-
-    return baseActions;
-  }, [openExportDialog, openFilter, refetch, handleBulkClose, isCashier]);
-
-  /**
-   * Handler perubahan halaman.
-   */
   const handlePageChange = useCallback((event, newPage) => {
     setPage(newPage);
   }, []);
 
-  /**
-   * Handler perubahan rows per page.
-   */
   const handleRowsPerPageChange = useCallback((newLimit) => {
     setLimit(newLimit);
     setPage(1);
   }, []);
 
-  /**
-   * Handler perubahan pencarian.
-   */
   const onSearchChange = useCallback((e) => {
     setSearch(e.target.value);
     setPage(1);
@@ -489,21 +278,18 @@ const OrderHistory = () => {
         count={metadata.totalPages || 0}
         data={tableData}
         emptyStateMessage="Tidak ada pesanan ditemukan"
-        enableMultiSelect={isCashier}
         headers={tableHeaders}
         isLoading={isLoading}
         onChange={handlePageChange}
         onRowDoubleClick={handleRowDoubleClick}
         onRowsPerPageChange={handleRowsPerPageChange}
         onSearchChange={onSearchChange}
-        onSelectionChange={handleSelectionChange}
         page={metadata.currentPage || page}
         renderRow={renderRow}
         rowsPerPage={limit}
         rowsPerPageOptions={[5, 10, 25, 50]}
         searchPlaceholder="Cari pesanan..."
         searchVal={search}
-        selectedRows={selectedRows}
         subtitle="Semua riwayat pesanan pelanggan"
         title="Riwayat Pesanan"
       />
@@ -524,14 +310,6 @@ const OrderHistory = () => {
       />
 
       <OrderExportDialog open={exportDialog} onClose={closeExportDialog} />
-
-      <OrderBulkCloseDialog
-        selectedIds={bulkCloseDialog.selectedIds}
-        selectedCount={bulkCloseDialog.selectedCount}
-        onClose={handleCloseBulkClose}
-        onClearSelection={clearSelection}
-        open={bulkCloseDialog.open}
-      />
     </>
   );
 };
